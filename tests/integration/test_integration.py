@@ -2,7 +2,7 @@
 
 Requires:
     - CALENDAR_TEST_MODE=true environment variable
-    - A calendar named "MCP-Test-Calendar" in Calendar.app
+    - The test calendar is created/deleted automatically by conftest.py
 
 Run with: make test-integration
 """
