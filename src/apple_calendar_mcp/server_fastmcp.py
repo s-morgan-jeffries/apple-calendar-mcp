@@ -65,3 +65,49 @@ def get_calendars() -> str:
         lines.append(_format_calendar(cal))
 
     return f"Found {len(calendars)} calendar(s):\n\n" + "\n".join(lines)
+
+
+@mcp.tool()
+def create_event(
+    calendar_name: str,
+    summary: str,
+    start_date: str,
+    end_date: str,
+    location: str = "",
+    description: str = "",
+    url: str = "",
+    allday_event: bool = False,
+) -> str:
+    """Create a new event in a specified calendar.
+
+    Args:
+        calendar_name: Exact name of the target calendar (use get_calendars to find available names)
+        summary: Event title
+        start_date: Start date/time in ISO 8601 format (e.g., "2026-03-15" for all-day, "2026-03-15T14:30:00" for timed)
+        end_date: End date/time in ISO 8601 format (must be after start_date)
+        location: Event location (optional)
+        description: Event notes/description (optional)
+        url: URL associated with the event (optional)
+        allday_event: Whether this is an all-day event (default: false). When true, use date-only format for start_date/end_date.
+    """
+    client = get_client()
+    try:
+        event_uid = client.create_event(
+            calendar_name=calendar_name,
+            summary=summary,
+            start_date=start_date,
+            end_date=end_date,
+            location=location or None,
+            description=description or None,
+            url=url or None,
+            allday_event=allday_event,
+        )
+    except Exception as e:
+        return f"Error creating event: {e}"
+
+    result = f"Created event '{summary}' in calendar '{calendar_name}'\nEvent UID: {event_uid}"
+    if location:
+        result += f"\nLocation: {location}"
+    if allday_event:
+        result += "\nAll-day event"
+    return result
