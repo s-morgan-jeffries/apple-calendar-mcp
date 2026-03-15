@@ -293,6 +293,105 @@ end tell'''
 
         return parsed
 
+    def update_event(
+        self,
+        calendar_name: str,
+        event_uid: str,
+        summary: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        location: str | None = None,
+        description: str | None = None,
+        url: str | None = None,
+        allday_event: bool | None = None,
+    ) -> dict[str, Any]:
+        """Update an existing event's properties by UID.
+
+        Only provided fields are updated; omitted fields (None) are left unchanged.
+        Pass an empty string to clear a text field.
+
+        Args:
+            calendar_name: Name of the calendar containing the event
+            event_uid: UID of the event to update
+            summary: New event title (optional)
+            start_date: New start date/time in ISO 8601 format (optional)
+            end_date: New end date/time in ISO 8601 format (optional)
+            location: New location (optional, "" to clear)
+            description: New description (optional, "" to clear)
+            url: New URL (optional, "" to clear)
+            allday_event: New all-day status (optional)
+
+        Returns:
+            Dict with 'uid' and 'updated_fields' keys
+
+        Raises:
+            CalendarSafetyError: If safety checks block the target calendar
+            ValueError: If no fields provided or date format is invalid
+            subprocess.CalledProcessError: If AppleScript execution fails
+        """
+        self._verify_calendar_safety(calendar_name)
+
+        # Build set lines and track updated fields
+        set_lines = []
+        updated_fields = []
+
+        # String fields: property name in AppleScript → (field_name, value)
+        string_fields = [
+            ("summary", "summary", summary),
+            ("location", "location", location),
+            ("description", "description", description),
+            ("url", "url", url),
+        ]
+        for as_prop, field_name, value in string_fields:
+            if value is not None:
+                escaped = self._escape_applescript_string(value)
+                set_lines.append(f'        set {as_prop} of evt to "{escaped}"')
+                updated_fields.append(field_name)
+
+        # Date fields: handle ordering to avoid start > end constraint
+        if start_date is not None and end_date is not None:
+            as_start = self._iso_to_applescript_date(start_date)
+            as_end = self._iso_to_applescript_date(end_date)
+            set_lines.append('        set end date of evt to date "December 31, 2099 11:59:59 PM"')
+            set_lines.append(f'        set start date of evt to date "{as_start}"')
+            set_lines.append(f'        set end date of evt to date "{as_end}"')
+            updated_fields.extend(["start_date", "end_date"])
+        elif start_date is not None:
+            as_date = self._iso_to_applescript_date(start_date)
+            set_lines.append(f'        set start date of evt to date "{as_date}"')
+            updated_fields.append("start_date")
+        elif end_date is not None:
+            as_date = self._iso_to_applescript_date(end_date)
+            set_lines.append(f'        set end date of evt to date "{as_date}"')
+            updated_fields.append("end_date")
+
+        if allday_event is not None:
+            allday_str = "true" if allday_event else "false"
+            set_lines.append(f"        set allday event of evt to {allday_str}")
+            updated_fields.append("allday_event")
+
+        if not updated_fields:
+            raise ValueError("At least one field must be provided to update")
+
+        cal_escaped = self._escape_applescript_string(calendar_name)
+        uid_escaped = self._escape_applescript_string(event_uid)
+        set_block = "\n".join(set_lines)
+
+        script = f'''tell application "Calendar"
+    tell calendar "{cal_escaped}"
+        set matchingEvents to (every event whose uid is "{uid_escaped}")
+        if (count of matchingEvents) is 0 then
+            error "Event not found: {uid_escaped}"
+        end if
+        set evt to item 1 of matchingEvents
+{set_block}
+        return uid of evt
+    end tell
+end tell'''
+
+        run_applescript(script)
+        return {"uid": event_uid, "updated_fields": updated_fields}
+
     def get_calendars(self) -> list[dict[str, Any]]:
         """Get all calendars from Apple Calendar.
 

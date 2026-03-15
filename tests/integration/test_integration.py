@@ -253,3 +253,110 @@ class TestGetEventsIntegration:
             end_date="2099-01-02T00:00:00",
         )
         assert events == []
+
+
+class TestUpdateEventIntegration:
+    """Integration tests for update_event against real Calendar.app."""
+
+    def test_update_summary(self, connector):
+        """Update summary and verify via get_events."""
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Original Summary",
+            start_date="2026-09-01T10:00:00",
+            end_date="2026-09-01T11:00:00",
+        )
+        try:
+            connector.update_event(TEST_CALENDAR, uid, summary="Updated Summary")
+            events = connector.get_events(TEST_CALENDAR, "2026-09-01T00:00:00", "2026-09-02T00:00:00")
+            test_events = [e for e in events if e["uid"] == uid]
+            assert len(test_events) == 1
+            assert test_events[0]["summary"] == "Updated Summary"
+        finally:
+            _delete_event_by_uid(uid)
+
+    def test_update_location(self, connector):
+        """Update location from A to B and verify."""
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Location Update Test",
+            start_date="2026-09-02T10:00:00",
+            end_date="2026-09-02T11:00:00",
+            location="Room A",
+        )
+        try:
+            connector.update_event(TEST_CALENDAR, uid, location="Room B")
+            events = connector.get_events(TEST_CALENDAR, "2026-09-02T00:00:00", "2026-09-03T00:00:00")
+            test_events = [e for e in events if e["uid"] == uid]
+            assert len(test_events) == 1
+            assert test_events[0]["location"] == "Room B"
+        finally:
+            _delete_event_by_uid(uid)
+
+    def test_update_dates(self, connector):
+        """Update start/end dates and verify."""
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Date Update Test",
+            start_date="2026-09-03T10:00:00",
+            end_date="2026-09-03T11:00:00",
+        )
+        try:
+            connector.update_event(
+                TEST_CALENDAR, uid,
+                start_date="2026-09-03T14:00:00",
+                end_date="2026-09-03T15:00:00",
+            )
+            events = connector.get_events(TEST_CALENDAR, "2026-09-03T13:00:00", "2026-09-03T16:00:00")
+            test_events = [e for e in events if e["uid"] == uid]
+            assert len(test_events) == 1
+            assert "2026-09-03" in test_events[0]["start_date"]
+        finally:
+            _delete_event_by_uid(uid)
+
+    def test_update_multiple_fields(self, connector):
+        """Update summary and location in one call."""
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Multi Update Test",
+            start_date="2026-09-04T10:00:00",
+            end_date="2026-09-04T11:00:00",
+            location="Old Place",
+        )
+        try:
+            result = connector.update_event(
+                TEST_CALENDAR, uid,
+                summary="New Multi Title",
+                location="New Place",
+            )
+            assert "summary" in result["updated_fields"]
+            assert "location" in result["updated_fields"]
+            events = connector.get_events(TEST_CALENDAR, "2026-09-04T00:00:00", "2026-09-05T00:00:00")
+            test_events = [e for e in events if e["uid"] == uid]
+            assert test_events[0]["summary"] == "New Multi Title"
+            assert test_events[0]["location"] == "New Place"
+        finally:
+            _delete_event_by_uid(uid)
+
+    def test_update_nonexistent_event(self, connector):
+        """Updating a non-existent UID should raise an error."""
+        with pytest.raises(Exception, match="Event not found"):
+            connector.update_event(TEST_CALENDAR, "DOES-NOT-EXIST-UID", summary="X")
+
+    def test_clear_location(self, connector):
+        """Passing location="" should clear the location field."""
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Clear Location Test",
+            start_date="2026-09-05T10:00:00",
+            end_date="2026-09-05T11:00:00",
+            location="Will Be Cleared",
+        )
+        try:
+            connector.update_event(TEST_CALENDAR, uid, location="")
+            events = connector.get_events(TEST_CALENDAR, "2026-09-05T00:00:00", "2026-09-06T00:00:00")
+            test_events = [e for e in events if e["uid"] == uid]
+            assert len(test_events) == 1
+            assert test_events[0]["location"] == ""
+        finally:
+            _delete_event_by_uid(uid)

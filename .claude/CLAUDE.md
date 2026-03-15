@@ -3,7 +3,7 @@
 An MCP server bridging Claude and Apple Calendar via AppleScript and EventKit on macOS.
 
 **Stack:** Python 3.10+, FastMCP, AppleScript (via `osascript`), Swift/EventKit (via `swift`)
-**Version:** v0.1.0 | **Tests:** 68 unit, 14 integration | **Coverage:** TBD
+**Version:** v0.1.0 | **Tests:** 89 unit, 20 integration | **Coverage:** TBD
 
 ## Commands
 
@@ -18,12 +18,12 @@ make test-verbose          # Tests with verbose output
 
 **Running the server:** `uv run python -m apple_calendar_mcp.server_fastmcp` or via Claude Desktop config.
 
-## API Surface (3 functions)
+## API Surface (4 functions)
 
 - **Calendars:** `get_calendars`
-- **Events:** `get_events`, `create_event`
+- **Events:** `get_events`, `create_event`, `update_event`
 
-Planned (filed as issues): `update_event`, `update_events`, `delete_events`, `get_availability`
+Planned (filed as issues): `update_events`, `delete_events`, `get_availability`
 
 ## Core API Principles
 
@@ -40,13 +40,17 @@ Planned (filed as issues): `update_event`, `update_events`, `delete_events`, `ge
 
 **Batch vs individual access:** `name of every calendar` works but `properties of calendar "X"` fails. Use batch property access for calendars.
 
-**Event UIDs work fine:** Individual event property access works: `uid of event`, `summary of event`, `start date of event`, etc.
+**Event UIDs differ across APIs:** AppleScript's `uid of event` returns a different identifier than EventKit's `eventIdentifier`. Use EventKit's `calendarItemIdentifier` to get UIDs that match AppleScript. The Swift helper uses `calendarItemIdentifier` for this reason.
+
+**Event UIDs work fine in AppleScript:** Individual event property access works: `uid of event`, `summary of event`, `start date of event`, etc.
 
 **Variable naming conflicts:** Never use variable names that match Calendar properties. If Calendar has a `summary` property, don't use `summary` as a variable name — use `eventSummary`.
 
 **JSON helpers duplicated:** AppleScript has no imports/modules. Every AppleScript block that returns JSON must include its own helper functions. This is intentional.
 
 **Date format:** AppleScript returns dates as `"Monday, April 3, 2023 at 10:35:00 AM"` (locale-dependent, includes day name). The connector handles ISO 8601 conversion.
+
+**Date ordering on updates:** AppleScript rejects `set start date` if the new start is after the current end date (and vice versa). When updating both dates, `update_event` temporarily extends the end date to avoid this constraint.
 
 **String escaping:** Always use `_escape_applescript_string()` for user-provided text. Unescaped quotes break AppleScript blocks silently.
 

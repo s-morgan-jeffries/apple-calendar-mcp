@@ -165,3 +165,53 @@ def get_events(
         lines.append(_format_event(event))
 
     return f"Found {len(events)} event(s) in '{calendar_name}':\n\n" + "\n".join(lines)
+
+
+@mcp.tool()
+def update_event(
+    calendar_name: str,
+    event_uid: str,
+    summary: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    location: str | None = None,
+    description: str | None = None,
+    url: str | None = None,
+    allday_event: bool | None = None,
+) -> str:
+    """Update an existing event's properties by UID.
+
+    Only provided fields are updated; omitted fields are left unchanged.
+    To clear a text field (location, description, url), pass an empty string "".
+
+    Use get_events first to find the event's UID and calendar_name.
+
+    Args:
+        calendar_name: Exact name of the calendar containing the event
+        event_uid: UID of the event to update (from get_events results)
+        summary: New event title (optional)
+        start_date: New start date/time in ISO 8601 format (optional)
+        end_date: New end date/time in ISO 8601 format (optional)
+        location: New location, or "" to clear (optional)
+        description: New description/notes, or "" to clear (optional)
+        url: New URL, or "" to clear (optional)
+        allday_event: New all-day status (optional)
+    """
+    client = get_client()
+    try:
+        result = client.update_event(
+            calendar_name=calendar_name,
+            event_uid=event_uid,
+            summary=summary,
+            start_date=start_date,
+            end_date=end_date,
+            location=location,
+            description=description,
+            url=url,
+            allday_event=allday_event,
+        )
+    except Exception as e:
+        return f"Error updating event: {e}"
+
+    fields_str = ", ".join(result["updated_fields"])
+    return f"Updated event {event_uid} in calendar '{calendar_name}'\nUpdated fields: {fields_str}"
