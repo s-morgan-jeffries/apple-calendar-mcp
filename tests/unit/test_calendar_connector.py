@@ -1,12 +1,14 @@
 """Unit tests for CalendarConnector — core helpers and get_calendars."""
 import json
 import subprocess
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 import pytest
 
 from apple_calendar_mcp.calendar_connector import (
     run_applescript,
+    run_swift_helper,
     CalendarConnector,
     CalendarSafetyError,
 )
@@ -65,6 +67,59 @@ class TestRunApplescript:
         )
         with pytest.raises(subprocess.CalledProcessError):
             run_applescript("script")
+
+
+# ── run_swift_helper ─────────────────────────────────────────────────────────
+
+
+class TestRunSwiftHelper:
+    """Tests for the run_swift_helper function."""
+
+    @patch("apple_calendar_mcp.calendar_connector.subprocess.run")
+    def test_returns_stdout_stripped(self, mock_run):
+        mock_run.return_value = MagicMock(stdout='  [{"uid": "123"}]  \n')
+        result = run_swift_helper("get_events", ["--calendar", "Work"])
+        assert result == '[{"uid": "123"}]'
+
+    @patch("apple_calendar_mcp.calendar_connector.subprocess.run")
+    def test_calls_swift_with_script_path_and_args(self, mock_run):
+        mock_run.return_value = MagicMock(stdout="[]")
+        run_swift_helper("get_events", ["--calendar", "Work", "--start", "2026-03-15"])
+        call_args = mock_run.call_args
+        cmd = call_args[0][0]
+        assert cmd[0] == "swift"
+        assert cmd[1].endswith("get_events.swift")
+        assert "--calendar" in cmd
+        assert "Work" in cmd
+
+    @patch("apple_calendar_mcp.calendar_connector.subprocess.run")
+    def test_script_path_relative_to_package(self, mock_run):
+        mock_run.return_value = MagicMock(stdout="[]")
+        run_swift_helper("get_events", [])
+        cmd = mock_run.call_args[0][0]
+        script_path = Path(cmd[1])
+        assert script_path.parent.name == "swift"
+        assert script_path.parent.parent.name == "apple_calendar_mcp"
+
+    @patch("apple_calendar_mcp.calendar_connector.subprocess.run")
+    def test_custom_timeout(self, mock_run):
+        mock_run.return_value = MagicMock(stdout="[]")
+        run_swift_helper("get_events", [], timeout=120)
+        assert mock_run.call_args[1]["timeout"] == 120
+
+    @patch("apple_calendar_mcp.calendar_connector.subprocess.run")
+    def test_called_process_error_propagates(self, mock_run):
+        mock_run.side_effect = subprocess.CalledProcessError(
+            returncode=1, cmd="swift", stderr="compilation error"
+        )
+        with pytest.raises(subprocess.CalledProcessError):
+            run_swift_helper("get_events", [])
+
+    @patch("apple_calendar_mcp.calendar_connector.subprocess.run")
+    def test_timeout_expired_propagates(self, mock_run):
+        mock_run.side_effect = subprocess.TimeoutExpired(cmd="swift", timeout=30)
+        with pytest.raises(subprocess.TimeoutExpired):
+            run_swift_helper("get_events", [])
 
 
 # ── _escape_applescript_string ───────────────────────────────────────────────
@@ -354,3 +409,75 @@ class TestCreateEvent:
         assert "location" not in script.lower() or "set location" not in script
         assert "description" not in script.lower() or "set description" not in script
         assert "set url" not in script
+
+
+# ── get_events ──────────────────────────────────────────────────────────────
+
+
+class TestGetEvents:
+    """Tests for CalendarConnector.get_events()."""
+
+    def setup_method(self):
+        self.connector = CalendarConnector()
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_calls_swift_helper_with_correct_args(self, mock_swift):
+        mock_swift.return_value = "[]"
+        self.connector.get_events(
+            calendar_name="Work",
+            start_date="2026-03-15T00:00:00",
+            end_date="2026-03-16T00:00:00",
+        )
+        mock_swift.assert_called_once_with(
+            "get_events",
+            ["--calendar", "Work", "--start", "2026-03-15T00:00:00", "--end", "2026-03-16T00:00:00"],
+        )
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_parses_json_response(self, mock_swift):
+        mock_swift.return_value = json.dumps([
+            {"uid": "ABC-123", "summary": "Meeting", "start_date": "2026-03-15T14:00:00Z",
+             "end_date": "2026-03-15T15:00:00Z", "allday_event": False, "location": "",
+             "description": "", "url": "", "status": "confirmed", "calendar_name": "Work"},
+        ])
+        result = self.connector.get_events("Work", "2026-03-15T00:00:00", "2026-03-16T00:00:00")
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0]["uid"] == "ABC-123"
+        assert result[0]["summary"] == "Meeting"
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_returns_empty_list_when_no_events(self, mock_swift):
+        mock_swift.return_value = "[]"
+        result = self.connector.get_events("Work", "2026-03-15T00:00:00", "2026-03-16T00:00:00")
+        assert result == []
+
+    def test_invalid_start_date_raises_error(self):
+        with pytest.raises(ValueError, match="Invalid date format"):
+            self.connector.get_events("Work", "not-a-date", "2026-03-16T00:00:00")
+
+    def test_invalid_end_date_raises_error(self):
+        with pytest.raises(ValueError, match="Invalid date format"):
+            self.connector.get_events("Work", "2026-03-15T00:00:00", "not-a-date")
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_handles_authorization_error(self, mock_swift):
+        mock_swift.return_value = json.dumps(
+            {"error": "calendar_access_denied", "message": "Access denied"}
+        )
+        with pytest.raises(PermissionError, match="Access denied"):
+            self.connector.get_events("Work", "2026-03-15T00:00:00", "2026-03-16T00:00:00")
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_handles_calendar_not_found_error(self, mock_swift):
+        mock_swift.return_value = json.dumps(
+            {"error": "calendar_not_found", "message": "Calendar 'Foo' not found."}
+        )
+        with pytest.raises(ValueError, match="Calendar 'Foo' not found"):
+            self.connector.get_events("Foo", "2026-03-15T00:00:00", "2026-03-16T00:00:00")
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_date_only_format_accepted(self, mock_swift):
+        mock_swift.return_value = "[]"
+        self.connector.get_events("Work", "2026-03-15", "2026-03-16")
+        mock_swift.assert_called_once()

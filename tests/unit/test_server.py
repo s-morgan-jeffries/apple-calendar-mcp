@@ -146,6 +146,57 @@ class TestCreateEventTool:
         assert isinstance(result, str)
 
 
+class TestGetEventsTool:
+    """Tests for the get_events MCP tool."""
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_returns_formatted_event_list(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.get_events.return_value = [
+            {"uid": "ABC-123", "summary": "Team Meeting", "start_date": "2026-03-15T14:00:00Z",
+             "end_date": "2026-03-15T15:00:00Z", "allday_event": False, "location": "Room 4",
+             "description": "Weekly sync", "url": "", "status": "confirmed", "calendar_name": "Work"},
+        ]
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import get_events
+        result = get_events(calendar_name="Work", start_date="2026-03-15T00:00:00", end_date="2026-03-16T00:00:00")
+        assert "Team Meeting" in result
+        assert "Room 4" in result
+        assert isinstance(result, str)
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_returns_no_events_message(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.get_events.return_value = []
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import get_events
+        result = get_events(calendar_name="Work", start_date="2026-03-15T00:00:00", end_date="2026-03-16T00:00:00")
+        assert "No events found" in result
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_returns_error_string_on_failure(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.get_events.side_effect = ValueError("Calendar 'Foo' not found")
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import get_events
+        result = get_events(calendar_name="Foo", start_date="2026-03-15T00:00:00", end_date="2026-03-16T00:00:00")
+        assert "Error" in result
+        assert isinstance(result, str)
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_returns_permission_error_as_string(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.get_events.side_effect = PermissionError("Calendar access denied")
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import get_events
+        result = get_events(calendar_name="Work", start_date="2026-03-15T00:00:00", end_date="2026-03-16T00:00:00")
+        assert "Error" in result
+
+
 class TestServerConfiguration:
     """Tests for MCP server configuration."""
 

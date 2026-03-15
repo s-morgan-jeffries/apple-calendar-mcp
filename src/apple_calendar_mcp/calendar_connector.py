@@ -3,6 +3,7 @@ import subprocess
 import json
 import os
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Optional
 
 
@@ -25,6 +26,32 @@ def run_applescript(script: str, timeout: int = 60) -> str:
 
     result = subprocess.run(
         ["osascript", "-e", script],
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=timeout,
+    )
+    return result.stdout.strip()
+
+
+def run_swift_helper(script_name: str, args: list[str], timeout: int = 30) -> str:
+    """Execute a Swift helper script and return the result.
+
+    Args:
+        script_name: Name of the Swift script (without .swift extension)
+        args: Command-line arguments to pass to the script
+        timeout: Maximum seconds to wait (default: 30)
+
+    Returns:
+        The stdout output from the Swift script
+
+    Raises:
+        subprocess.TimeoutExpired: If script execution exceeds timeout
+        subprocess.CalledProcessError: If script execution fails
+    """
+    script_path = Path(__file__).parent / "swift" / f"{script_name}.swift"
+    result = subprocess.run(
+        ["swift", str(script_path)] + args,
         capture_output=True,
         text=True,
         check=True,
@@ -207,6 +234,64 @@ class CalendarConnector:
 end tell'''
 
         return run_applescript(script).strip()
+
+    def _validate_date(self, date_str: str) -> None:
+        """Validate that a string is a valid ISO 8601 date.
+
+        Raises:
+            ValueError: If the date format is invalid.
+        """
+        try:
+            if "T" in date_str:
+                datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+            else:
+                datetime.fromisoformat(date_str + "T00:00:00")
+        except ValueError as e:
+            raise ValueError(
+                f"Invalid date format '{date_str}'. "
+                "Expected ISO 8601 format like '2026-03-15' or '2026-03-15T14:30:00'"
+            ) from e
+
+    def get_events(
+        self,
+        calendar_name: str,
+        start_date: str,
+        end_date: str,
+    ) -> list[dict[str, Any]]:
+        """Get events from a calendar within a date range.
+
+        Uses EventKit via Swift helper for fast native date-range queries.
+
+        Args:
+            calendar_name: Name of the calendar to query
+            start_date: Start of date range in ISO 8601 format
+            end_date: End of date range in ISO 8601 format
+
+        Returns:
+            List of event dicts with keys: uid, summary, start_date, end_date,
+            allday_event, location, description, url, status, calendar_name.
+
+        Raises:
+            ValueError: If date format is invalid or calendar not found
+            PermissionError: If EventKit calendar access is denied
+        """
+        self._validate_date(start_date)
+        self._validate_date(end_date)
+
+        result = run_swift_helper(
+            "get_events",
+            ["--calendar", calendar_name, "--start", start_date, "--end", end_date],
+        )
+        parsed = json.loads(result)
+
+        # Handle error responses from Swift helper
+        if isinstance(parsed, dict) and "error" in parsed:
+            if parsed["error"] == "calendar_access_denied":
+                raise PermissionError(parsed["message"])
+            else:
+                raise ValueError(parsed["message"])
+
+        return parsed
 
     def get_calendars(self) -> list[dict[str, Any]]:
         """Get all calendars from Apple Calendar.
