@@ -111,3 +111,57 @@ def create_event(
     if allday_event:
         result += "\nAll-day event"
     return result
+
+
+def _format_event(event: dict) -> str:
+    """Format an event dict as human-readable text."""
+    result = f"Title: {event['summary']}\n"
+    result += f"Start: {event['start_date']}\n"
+    result += f"End: {event['end_date']}\n"
+    if event.get("allday_event"):
+        result += "All-day event\n"
+    if event.get("location"):
+        result += f"Location: {event['location']}\n"
+    if event.get("description"):
+        result += f"Description: {event['description']}\n"
+    if event.get("url"):
+        result += f"URL: {event['url']}\n"
+    result += f"Status: {event.get('status', 'none')}\n"
+    result += f"UID: {event['uid']}\n"
+    return result
+
+
+@mcp.tool()
+def get_events(
+    calendar_name: str,
+    start_date: str,
+    end_date: str,
+) -> str:
+    """Get events from a calendar within a date range.
+
+    Returns all events in the specified calendar that overlap with the given
+    date range. Use get_calendars first to find available calendar names.
+
+    Args:
+        calendar_name: Exact name of the calendar to query (use get_calendars to find available names)
+        start_date: Start of date range in ISO 8601 format (e.g., "2026-03-15" or "2026-03-15T00:00:00")
+        end_date: End of date range in ISO 8601 format (must be after start_date)
+    """
+    client = get_client()
+    try:
+        events = client.get_events(
+            calendar_name=calendar_name,
+            start_date=start_date,
+            end_date=end_date,
+        )
+    except Exception as e:
+        return f"Error getting events: {e}"
+
+    if not events:
+        return f"No events found in '{calendar_name}' between {start_date} and {end_date}."
+
+    lines = []
+    for event in events:
+        lines.append(_format_event(event))
+
+    return f"Found {len(events)} event(s) in '{calendar_name}':\n\n" + "\n".join(lines)

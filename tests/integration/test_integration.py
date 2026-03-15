@@ -19,11 +19,29 @@ pytestmark = pytest.mark.skipif(
     reason="Integration tests require CALENDAR_TEST_MODE=true",
 )
 
+TEST_CALENDAR = os.environ.get("CALENDAR_TEST_NAME", "MCP-Test-Calendar")
+
 
 @pytest.fixture
 def connector():
     """Create a CalendarConnector with safety checks enabled."""
     return CalendarConnector(enable_safety_checks=True)
+
+
+def _delete_event_by_uid(uid: str):
+    """Clean up a created event by UID."""
+    script = f'''tell application "Calendar"
+    tell calendar "{TEST_CALENDAR}"
+        set matchingEvents to (every event whose uid is "{uid}")
+        repeat with evt in matchingEvents
+            delete evt
+        end repeat
+    end tell
+end tell'''
+    try:
+        run_applescript(script)
+    except Exception:
+        pass  # Best-effort cleanup
 
 
 class TestGetCalendarsIntegration:
@@ -77,27 +95,10 @@ class TestGetCalendarsIntegration:
 class TestCreateEventIntegration:
     """Integration tests for create_event against real Calendar.app."""
 
-    TEST_CALENDAR = "MCP-Test-Calendar"
-
-    def _delete_event_by_uid(self, uid: str):
-        """Clean up a created event by UID."""
-        script = f'''tell application "Calendar"
-    tell calendar "{self.TEST_CALENDAR}"
-        set matchingEvents to (every event whose uid is "{uid}")
-        repeat with evt in matchingEvents
-            delete evt
-        end repeat
-    end tell
-end tell'''
-        try:
-            run_applescript(script)
-        except Exception:
-            pass  # Best-effort cleanup
-
     def test_creates_event_and_returns_uid(self, connector):
         """Creating an event should return a valid UID string."""
         uid = connector.create_event(
-            calendar_name=self.TEST_CALENDAR,
+            calendar_name=TEST_CALENDAR,
             summary="Integration Test Event",
             start_date="2026-06-15T10:00:00",
             end_date="2026-06-15T11:00:00",
@@ -105,22 +106,21 @@ end tell'''
         try:
             assert isinstance(uid, str)
             assert len(uid) > 0
-            # UIDs are typically UUID format
             assert re.match(r"^[A-F0-9-]+$", uid, re.IGNORECASE), f"UID doesn't look like UUID: {uid}"
         finally:
-            self._delete_event_by_uid(uid)
+            _delete_event_by_uid(uid)
 
     def test_created_event_has_correct_summary(self, connector):
         """Verify the created event has the right summary via AppleScript query."""
         uid = connector.create_event(
-            calendar_name=self.TEST_CALENDAR,
+            calendar_name=TEST_CALENDAR,
             summary="Verify Summary Test",
             start_date="2026-06-15T14:00:00",
             end_date="2026-06-15T15:00:00",
         )
         try:
             script = f'''tell application "Calendar"
-    tell calendar "{self.TEST_CALENDAR}"
+    tell calendar "{TEST_CALENDAR}"
         set evt to first event whose uid is "{uid}"
         return summary of evt
     end tell
@@ -128,12 +128,12 @@ end tell'''
             result = run_applescript(script)
             assert result == "Verify Summary Test"
         finally:
-            self._delete_event_by_uid(uid)
+            _delete_event_by_uid(uid)
 
     def test_creates_event_with_optional_fields(self, connector):
         """Creating an event with location, description, and URL should succeed."""
         uid = connector.create_event(
-            calendar_name=self.TEST_CALENDAR,
+            calendar_name=TEST_CALENDAR,
             summary="Full Event Test",
             start_date="2026-06-15T09:00:00",
             end_date="2026-06-15T10:00:00",
@@ -144,9 +144,8 @@ end tell'''
         try:
             assert isinstance(uid, str)
             assert len(uid) > 0
-            # Verify location was set
             script = f'''tell application "Calendar"
-    tell calendar "{self.TEST_CALENDAR}"
+    tell calendar "{TEST_CALENDAR}"
         set evt to first event whose uid is "{uid}"
         return location of evt
     end tell
@@ -154,12 +153,12 @@ end tell'''
             result = run_applescript(script)
             assert result == "Conference Room B"
         finally:
-            self._delete_event_by_uid(uid)
+            _delete_event_by_uid(uid)
 
     def test_creates_allday_event(self, connector):
         """Creating an all-day event should set the allday flag."""
         uid = connector.create_event(
-            calendar_name=self.TEST_CALENDAR,
+            calendar_name=TEST_CALENDAR,
             summary="All Day Test",
             start_date="2026-06-15",
             end_date="2026-06-16",
@@ -168,7 +167,7 @@ end tell'''
         try:
             assert isinstance(uid, str)
             script = f'''tell application "Calendar"
-    tell calendar "{self.TEST_CALENDAR}"
+    tell calendar "{TEST_CALENDAR}"
         set evt to first event whose uid is "{uid}"
         return allday event of evt
     end tell
@@ -176,4 +175,81 @@ end tell'''
             result = run_applescript(script)
             assert result == "true"
         finally:
-            self._delete_event_by_uid(uid)
+            _delete_event_by_uid(uid)
+
+
+class TestGetEventsIntegration:
+    """Integration tests for get_events against real Calendar.app via EventKit."""
+
+    def test_get_events_returns_created_event(self, connector):
+        """Create an event, then verify get_events returns it."""
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="GetEvents Test",
+            start_date="2026-07-01T10:00:00",
+            end_date="2026-07-01T11:00:00",
+        )
+        try:
+            events = connector.get_events(
+                calendar_name=TEST_CALENDAR,
+                start_date="2026-07-01T00:00:00",
+                end_date="2026-07-02T00:00:00",
+            )
+            summaries = [e["summary"] for e in events]
+            assert "GetEvents Test" in summaries
+        finally:
+            _delete_event_by_uid(uid)
+
+    def test_date_range_filtering(self, connector):
+        """Event outside date range should not be returned."""
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Outside Range Test",
+            start_date="2026-08-01T10:00:00",
+            end_date="2026-08-01T11:00:00",
+        )
+        try:
+            events = connector.get_events(
+                calendar_name=TEST_CALENDAR,
+                start_date="2026-07-01T00:00:00",
+                end_date="2026-07-02T00:00:00",
+            )
+            summaries = [e["summary"] for e in events]
+            assert "Outside Range Test" not in summaries
+        finally:
+            _delete_event_by_uid(uid)
+
+    def test_event_has_expected_keys(self, connector):
+        """Returned event dicts should have all expected keys."""
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Keys Test Event",
+            start_date="2026-07-02T10:00:00",
+            end_date="2026-07-02T11:00:00",
+            location="Test Location",
+        )
+        try:
+            events = connector.get_events(
+                calendar_name=TEST_CALENDAR,
+                start_date="2026-07-02T00:00:00",
+                end_date="2026-07-03T00:00:00",
+            )
+            test_events = [e for e in events if e["summary"] == "Keys Test Event"]
+            assert len(test_events) == 1
+            event = test_events[0]
+            for key in ["uid", "summary", "start_date", "end_date", "allday_event",
+                         "location", "description", "url", "status", "calendar_name"]:
+                assert key in event, f"Missing key '{key}' in event"
+            assert event["location"] == "Test Location"
+            assert event["calendar_name"] == TEST_CALENDAR
+        finally:
+            _delete_event_by_uid(uid)
+
+    def test_empty_date_range_returns_empty_list(self, connector):
+        """Date range with no events should return empty list."""
+        events = connector.get_events(
+            calendar_name=TEST_CALENDAR,
+            start_date="2099-01-01T00:00:00",
+            end_date="2099-01-02T00:00:00",
+        )
+        assert events == []

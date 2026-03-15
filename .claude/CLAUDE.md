@@ -1,9 +1,9 @@
 # Apple Calendar MCP Server
 
-An MCP server bridging Claude and Apple Calendar via AppleScript on macOS.
+An MCP server bridging Claude and Apple Calendar via AppleScript and EventKit on macOS.
 
-**Stack:** Python 3.10+, FastMCP, AppleScript (via `osascript`)
-**Version:** v0.1.0 | **Tests:** 50 unit, 10 integration | **Coverage:** TBD
+**Stack:** Python 3.10+, FastMCP, AppleScript (via `osascript`), Swift/EventKit (via `swift`)
+**Version:** v0.1.0 | **Tests:** 68 unit, 14 integration | **Coverage:** TBD
 
 ## Commands
 
@@ -18,12 +18,12 @@ make test-verbose          # Tests with verbose output
 
 **Running the server:** `uv run python -m apple_calendar_mcp.server_fastmcp` or via Claude Desktop config.
 
-## API Surface (2 functions)
+## API Surface (3 functions)
 
 - **Calendars:** `get_calendars`
-- **Events:** `create_event`
+- **Events:** `get_events`, `create_event`
 
-Planned (filed as issues): `get_events`, `update_event`, `update_events`, `delete_events`, `get_availability`
+Planned (filed as issues): `update_event`, `update_events`, `delete_events`, `get_availability`
 
 ## Core API Principles
 
@@ -50,7 +50,14 @@ Planned (filed as issues): `get_events`, `update_event`, `update_events`, `delet
 
 **String escaping:** Always use `_escape_applescript_string()` for user-provided text. Unescaped quotes break AppleScript blocks silently.
 
-**Performance:** `whose` clause with date filtering timed out on large calendars (5600+ events). Event filtering strategy needs careful design.
+**Performance:** `whose` clause with date filtering timed out on large calendars (5600+ events). AppleScript event reads are fundamentally too slow (~9s/event for index access, ~18s/property-batch for 306 events). `get_events` uses EventKit via Swift helper instead.
+
+## Hybrid Architecture
+
+- **Writes** (create, update, delete): AppleScript via `osascript` — fast for single-event operations
+- **Reads** (get_events): Swift/EventKit via `swift` subprocess — native date-range queries, sub-second on any calendar size
+
+The Swift helper at `src/apple_calendar_mcp/swift/get_events.swift` uses `EKEventStore` for fast predicate-based queries. First run triggers a macOS calendar access permission dialog.
 
 ## Calendar Safety
 
@@ -63,7 +70,7 @@ Destructive operations require `CALENDAR_TEST_MODE=true` and `CALENDAR_TEST_NAME
 | Unit tests | Every code change | `make test-unit` |
 | Integration tests | New/modified AppleScript operations | `make test-integration` (requires test calendar) |
 
-**Hard rule:** If you wrote or modified an AppleScript string in the connector, integration tests must cover that operation before merge. Unit tests mock `run_applescript()` and cannot catch AppleScript syntax errors.
+**Hard rule:** If you wrote or modified an AppleScript string in the connector, integration tests must cover that operation before merge. Unit tests mock `run_applescript()` and `run_swift_helper()` and cannot catch AppleScript/Swift errors.
 
 ## Branch Convention
 
@@ -82,6 +89,7 @@ CHANGELOG.md is only updated on release branches, never on feature branches.
 
 ## Key Files
 
-- `src/apple_calendar_mcp/calendar_connector.py` — Core AppleScript client
+- `src/apple_calendar_mcp/calendar_connector.py` — Core client (AppleScript + Swift helpers)
 - `src/apple_calendar_mcp/server_fastmcp.py` — FastMCP server wrapping the connector
+- `src/apple_calendar_mcp/swift/get_events.swift` — EventKit-based event query (fast reads)
 - `docs/research/calendar-api-gap-analysis.md` — What's possible, what's not
