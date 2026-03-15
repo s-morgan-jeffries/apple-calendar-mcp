@@ -392,6 +392,55 @@ end tell'''
         run_applescript(script)
         return {"uid": event_uid, "updated_fields": updated_fields}
 
+    def delete_events(
+        self,
+        calendar_name: str,
+        event_uids: str | list[str],
+    ) -> dict[str, Any]:
+        """Delete one or more events by UID.
+
+        Args:
+            calendar_name: Name of the calendar containing the events
+            event_uids: Single UID string or list of UIDs to delete
+
+        Returns:
+            Dict with 'deleted_uids' and 'not_found_uids' keys
+
+        Raises:
+            CalendarSafetyError: If safety checks block the target calendar
+            ValueError: If event_uids is empty
+        """
+        self._verify_calendar_safety(calendar_name)
+
+        uids = [event_uids] if isinstance(event_uids, str) else event_uids
+        if not uids:
+            raise ValueError("At least one event UID must be provided")
+
+        cal_escaped = self._escape_applescript_string(calendar_name)
+        deleted_uids = []
+        not_found_uids = []
+
+        for uid in uids:
+            uid_escaped = self._escape_applescript_string(uid)
+            script = f'''tell application "Calendar"
+    tell calendar "{cal_escaped}"
+        set matchingEvents to (every event whose uid is "{uid_escaped}")
+        if (count of matchingEvents) is 0 then
+            error "Event not found: {uid_escaped}"
+        end if
+        repeat with evt in matchingEvents
+            delete evt
+        end repeat
+    end tell
+end tell'''
+            try:
+                run_applescript(script)
+                deleted_uids.append(uid)
+            except subprocess.CalledProcessError:
+                not_found_uids.append(uid)
+
+        return {"deleted_uids": deleted_uids, "not_found_uids": not_found_uids}
+
     def get_calendars(self) -> list[dict[str, Any]]:
         """Get all calendars from Apple Calendar.
 

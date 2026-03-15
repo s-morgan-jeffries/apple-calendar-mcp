@@ -249,6 +249,66 @@ class TestUpdateEventTool:
         assert call_kwargs["location"] == ""
 
 
+class TestDeleteEventsTool:
+    """Tests for the delete_events MCP tool."""
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_returns_success_message(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.delete_events.return_value = {
+            "deleted_uids": ["ABC-123"],
+            "not_found_uids": [],
+        }
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import delete_events
+        result = delete_events(calendar_name="Work", event_uid="ABC-123")
+        assert "Deleted 1 event(s)" in result
+        assert "Work" in result
+        assert isinstance(result, str)
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_returns_error_on_failure(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.delete_events.side_effect = Exception("Calendar not found")
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import delete_events
+        result = delete_events(calendar_name="Nonexistent", event_uid="ABC-123")
+        assert "Error" in result
+        assert isinstance(result, str)
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_returns_partial_success_message(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.delete_events.return_value = {
+            "deleted_uids": ["UID-1", "UID-3"],
+            "not_found_uids": ["UID-2"],
+        }
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import delete_events
+        result = delete_events(calendar_name="Work", event_uid=["UID-1", "UID-2", "UID-3"])
+        assert "Deleted 2 event(s)" in result
+        assert "not found" in result.lower() or "UID-2" in result
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_accepts_list_of_uids(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.delete_events.return_value = {
+            "deleted_uids": ["UID-1", "UID-2"],
+            "not_found_uids": [],
+        }
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import delete_events
+        delete_events(calendar_name="Work", event_uid=["UID-1", "UID-2"])
+        mock_client.delete_events.assert_called_once_with(
+            calendar_name="Work",
+            event_uids=["UID-1", "UID-2"],
+        )
+
+
 class TestServerConfiguration:
     """Tests for MCP server configuration."""
 

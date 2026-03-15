@@ -360,3 +360,78 @@ class TestUpdateEventIntegration:
             assert test_events[0]["location"] == ""
         finally:
             _delete_event_by_uid(uid)
+
+
+class TestDeleteEventsIntegration:
+    """Integration tests for delete_events against real Calendar.app."""
+
+    def test_delete_single_event(self, connector):
+        """Create event, delete it, verify it's gone via get_events."""
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Delete Single Test",
+            start_date="2026-10-01T10:00:00",
+            end_date="2026-10-01T11:00:00",
+        )
+        try:
+            # Verify event exists
+            events = connector.get_events(TEST_CALENDAR, "2026-10-01T00:00:00", "2026-10-02T00:00:00")
+            assert any(e["uid"] == uid for e in events)
+
+            # Delete it
+            result = connector.delete_events(TEST_CALENDAR, uid)
+            assert uid in result["deleted_uids"]
+            assert result["not_found_uids"] == []
+
+            # Verify it's gone
+            events = connector.get_events(TEST_CALENDAR, "2026-10-01T00:00:00", "2026-10-02T00:00:00")
+            assert not any(e["uid"] == uid for e in events)
+        finally:
+            _delete_event_by_uid(uid)
+
+    def test_delete_multiple_events(self, connector):
+        """Create 3 events, delete all, verify gone."""
+        uids = []
+        for i in range(3):
+            uid = connector.create_event(
+                calendar_name=TEST_CALENDAR,
+                summary=f"Batch Delete Test {i}",
+                start_date="2026-10-02T10:00:00",
+                end_date="2026-10-02T11:00:00",
+            )
+            uids.append(uid)
+        try:
+            result = connector.delete_events(TEST_CALENDAR, uids)
+            assert len(result["deleted_uids"]) == 3
+            assert result["not_found_uids"] == []
+
+            events = connector.get_events(TEST_CALENDAR, "2026-10-02T00:00:00", "2026-10-03T00:00:00")
+            for uid in uids:
+                assert not any(e["uid"] == uid for e in events)
+        finally:
+            for uid in uids:
+                _delete_event_by_uid(uid)
+
+    def test_delete_nonexistent_event(self, connector):
+        """Deleting a non-existent UID should report it as not found."""
+        result = connector.delete_events(TEST_CALENDAR, "DOES-NOT-EXIST-UID")
+        assert result["deleted_uids"] == []
+        assert "DOES-NOT-EXIST-UID" in result["not_found_uids"]
+
+    def test_delete_already_deleted(self, connector):
+        """Deleting an event twice — second attempt reports not found."""
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Double Delete Test",
+            start_date="2026-10-03T10:00:00",
+            end_date="2026-10-03T11:00:00",
+        )
+        try:
+            result1 = connector.delete_events(TEST_CALENDAR, uid)
+            assert uid in result1["deleted_uids"]
+
+            result2 = connector.delete_events(TEST_CALENDAR, uid)
+            assert result2["deleted_uids"] == []
+            assert uid in result2["not_found_uids"]
+        finally:
+            _delete_event_by_uid(uid)
