@@ -3,7 +3,7 @@
 An MCP server bridging Claude and Apple Calendar via AppleScript on macOS.
 
 **Stack:** Python 3.10+, FastMCP, AppleScript (via `osascript`)
-**Version:** v0.1.0 | **Tests:** TBD | **Coverage:** TBD
+**Version:** v0.1.0 | **Tests:** 33 unit, 6 integration | **Coverage:** TBD
 
 ## Commands
 
@@ -69,6 +69,15 @@ Destructive operations require `CALENDAR_TEST_MODE=true` and `CALENDAR_TEST_NAME
 `{type}/issue-{num}-{description}` — e.g., `feature/issue-1-get-calendars`, `fix/issue-5-date-parsing`
 
 CHANGELOG.md is only updated on release branches, never on feature branches.
+
+## Release Workflow
+
+1. Run all tests: `make test` + `make test-integration`
+2. Run blind evals if tool descriptions changed (`evals/agent_tool_usability/`)
+3. Bump version in `pyproject.toml` and `.claude/CLAUDE.md`
+4. Run `./scripts/check_version_sync.sh`
+5. Update CHANGELOG.md (release branches only)
+6. Tag: `git tag vX.Y.Z` and push
 
 ## Key Files
 

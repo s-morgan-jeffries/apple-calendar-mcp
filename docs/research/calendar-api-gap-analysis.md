@@ -55,7 +55,7 @@ Since UIDs are inaccessible, calendars must be identified by name. For duplicate
 | `recurrence` | ✅ | string (RRULE) or `missing value` | iCalendar RRULE format |
 | `excluded dates` | ✅ | list of dates or empty | For recurring event exceptions |
 | `stamp date` | ✅ | date | Last modified timestamp |
-| `sequence` | needs testing | integer | iCalendar sequence number |
+| `sequence` | ✅ | integer (0-based) | iCalendar sequence number |
 | `attendees` | ✅ (element) | list of attendee objects | Can query count; individual properties need testing |
 
 ### Date Format
