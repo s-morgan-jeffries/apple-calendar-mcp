@@ -197,6 +197,58 @@ class TestGetEventsTool:
         assert "Error" in result
 
 
+class TestUpdateEventTool:
+    """Tests for the update_event MCP tool."""
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_returns_success_message(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.update_event.return_value = {"uid": "ABC-123", "updated_fields": ["summary"]}
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import update_event
+        result = update_event(calendar_name="Work", event_uid="ABC-123", summary="New Title")
+        assert "ABC-123" in result
+        assert "summary" in result
+        assert isinstance(result, str)
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_returns_error_on_failure(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.update_event.side_effect = Exception("Event not found")
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import update_event
+        result = update_event(calendar_name="Work", event_uid="BAD-UID", summary="X")
+        assert "Error" in result
+        assert isinstance(result, str)
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_passes_none_for_omitted_fields(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.update_event.return_value = {"uid": "ABC-123", "updated_fields": ["summary"]}
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import update_event
+        update_event(calendar_name="Work", event_uid="ABC-123", summary="New")
+        call_kwargs = mock_client.update_event.call_args[1]
+        assert call_kwargs["location"] is None
+        assert call_kwargs["description"] is None
+        assert call_kwargs["url"] is None
+        assert call_kwargs["allday_event"] is None
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_passes_empty_string_through(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.update_event.return_value = {"uid": "ABC-123", "updated_fields": ["location"]}
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import update_event
+        update_event(calendar_name="Work", event_uid="ABC-123", location="")
+        call_kwargs = mock_client.update_event.call_args[1]
+        assert call_kwargs["location"] == ""
+
+
 class TestServerConfiguration:
     """Tests for MCP server configuration."""
 

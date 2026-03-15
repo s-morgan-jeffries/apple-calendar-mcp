@@ -481,3 +481,130 @@ class TestGetEvents:
         mock_swift.return_value = "[]"
         self.connector.get_events("Work", "2026-03-15", "2026-03-16")
         mock_swift.assert_called_once()
+
+
+# ── update_event ────────────────────────────────────────────────────────────
+
+
+class TestUpdateEvent:
+    """Tests for CalendarConnector.update_event()."""
+
+    def setup_method(self):
+        self.connector = CalendarConnector(enable_safety_checks=False)
+
+    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
+    def test_updates_summary(self, mock_run):
+        mock_run.return_value = "ABC-123"
+        self.connector.update_event("MCP-Test-Calendar", "ABC-123", summary="New Title")
+        script = mock_run.call_args[0][0]
+        assert 'set summary of evt to "New Title"' in script
+
+    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
+    def test_updates_start_date(self, mock_run):
+        mock_run.return_value = "ABC-123"
+        self.connector.update_event("MCP-Test-Calendar", "ABC-123", start_date="2026-03-15T14:30:00")
+        script = mock_run.call_args[0][0]
+        assert 'set start date of evt to date "March 15, 2026 02:30:00 PM"' in script
+
+    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
+    def test_updates_end_date(self, mock_run):
+        mock_run.return_value = "ABC-123"
+        self.connector.update_event("MCP-Test-Calendar", "ABC-123", end_date="2026-03-15T15:30:00")
+        script = mock_run.call_args[0][0]
+        assert 'set end date of evt to date "March 15, 2026 03:30:00 PM"' in script
+
+    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
+    def test_updates_location(self, mock_run):
+        mock_run.return_value = "ABC-123"
+        self.connector.update_event("MCP-Test-Calendar", "ABC-123", location="Room B")
+        script = mock_run.call_args[0][0]
+        assert 'set location of evt to "Room B"' in script
+
+    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
+    def test_updates_description(self, mock_run):
+        mock_run.return_value = "ABC-123"
+        self.connector.update_event("MCP-Test-Calendar", "ABC-123", description="New notes")
+        script = mock_run.call_args[0][0]
+        assert 'set description of evt to "New notes"' in script
+
+    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
+    def test_updates_url(self, mock_run):
+        mock_run.return_value = "ABC-123"
+        self.connector.update_event("MCP-Test-Calendar", "ABC-123", url="https://example.com")
+        script = mock_run.call_args[0][0]
+        assert 'set url of evt to "https://example.com"' in script
+
+    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
+    def test_updates_allday_true(self, mock_run):
+        mock_run.return_value = "ABC-123"
+        self.connector.update_event("MCP-Test-Calendar", "ABC-123", allday_event=True)
+        script = mock_run.call_args[0][0]
+        assert "set allday event of evt to true" in script
+
+    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
+    def test_updates_allday_false(self, mock_run):
+        mock_run.return_value = "ABC-123"
+        self.connector.update_event("MCP-Test-Calendar", "ABC-123", allday_event=False)
+        script = mock_run.call_args[0][0]
+        assert "set allday event of evt to false" in script
+
+    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
+    def test_updates_multiple_fields(self, mock_run):
+        mock_run.return_value = "ABC-123"
+        self.connector.update_event("MCP-Test-Calendar", "ABC-123", summary="New", location="Room C")
+        script = mock_run.call_args[0][0]
+        assert 'set summary of evt to "New"' in script
+        assert 'set location of evt to "Room C"' in script
+
+    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
+    def test_only_provided_fields_set(self, mock_run):
+        mock_run.return_value = "ABC-123"
+        self.connector.update_event("MCP-Test-Calendar", "ABC-123", summary="New Title")
+        script = mock_run.call_args[0][0]
+        assert "set summary of evt" in script
+        assert "set location of evt" not in script
+        assert "set description of evt" not in script
+        assert "set url of evt" not in script
+        assert "set start date of evt" not in script
+        assert "set end date of evt" not in script
+        assert "set allday event of evt" not in script
+
+    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
+    def test_escapes_special_characters(self, mock_run):
+        mock_run.return_value = "ABC-123"
+        self.connector.update_event("MCP-Test-Calendar", "ABC-123", summary='Say "hello"')
+        script = mock_run.call_args[0][0]
+        assert 'Say \\"hello\\"' in script
+
+    def test_invalid_date_raises(self):
+        with pytest.raises(ValueError, match="Invalid date format"):
+            self.connector.update_event("MCP-Test-Calendar", "ABC-123", start_date="not-a-date")
+
+    def test_safety_blocks_non_test_calendar(self):
+        connector = CalendarConnector(enable_safety_checks=True)
+        with pytest.raises(CalendarSafetyError, match="not an allowed test calendar"):
+            connector.update_event("Personal", "ABC-123", summary="Test")
+
+    def test_no_fields_raises(self):
+        with pytest.raises(ValueError, match="At least one field"):
+            self.connector.update_event("MCP-Test-Calendar", "ABC-123")
+
+    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
+    def test_returns_dict_with_uid_and_updated_fields(self, mock_run):
+        mock_run.return_value = "ABC-123"
+        result = self.connector.update_event("MCP-Test-Calendar", "ABC-123", summary="New", location="Room")
+        assert result == {"uid": "ABC-123", "updated_fields": ["summary", "location"]}
+
+    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
+    def test_uses_whose_uid_clause(self, mock_run):
+        mock_run.return_value = "ABC-123"
+        self.connector.update_event("MCP-Test-Calendar", "ABC-123", summary="X")
+        script = mock_run.call_args[0][0]
+        assert 'whose uid is "ABC-123"' in script
+
+    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
+    def test_clear_field_with_empty_string(self, mock_run):
+        mock_run.return_value = "ABC-123"
+        self.connector.update_event("MCP-Test-Calendar", "ABC-123", location="")
+        script = mock_run.call_args[0][0]
+        assert 'set location of evt to ""' in script

@@ -76,7 +76,7 @@ func eventToDict(_ event: EKEvent) -> [String: Any] {
     df.formatOptions = [.withInternetDateTime]
 
     var dict: [String: Any] = [
-        "uid": event.eventIdentifier ?? "",
+        "uid": event.calendarItemIdentifier,
         "summary": event.title ?? "",
         "start_date": df.string(from: event.startDate),
         "end_date": df.string(from: event.endDate),
