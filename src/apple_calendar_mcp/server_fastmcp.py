@@ -215,3 +215,37 @@ def update_event(
 
     fields_str = ", ".join(result["updated_fields"])
     return f"Updated event {event_uid} in calendar '{calendar_name}'\nUpdated fields: {fields_str}"
+
+
+@mcp.tool()
+def delete_events(
+    calendar_name: str,
+    event_uid: str | list[str],
+) -> str:
+    """Delete one or more events from a calendar by UID.
+
+    Accepts a single UID or a list of UIDs for batch deletion. Events that
+    don't exist are reported but don't cause the entire operation to fail.
+
+    Use get_events first to find the event UID(s) and calendar_name.
+
+    Args:
+        calendar_name: Exact name of the calendar containing the event(s)
+        event_uid: UID of a single event (str) or list of UIDs to delete
+    """
+    client = get_client()
+    try:
+        result = client.delete_events(
+            calendar_name=calendar_name,
+            event_uids=event_uid,
+        )
+    except Exception as e:
+        return f"Error deleting event(s): {e}"
+
+    deleted = result["deleted_uids"]
+    not_found = result["not_found_uids"]
+
+    msg = f"Deleted {len(deleted)} event(s) from calendar '{calendar_name}'"
+    if not_found:
+        msg += f"\nNot found ({len(not_found)}): {', '.join(not_found)}"
+    return msg

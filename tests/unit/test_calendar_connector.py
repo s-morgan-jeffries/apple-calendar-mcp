@@ -608,3 +608,83 @@ class TestUpdateEvent:
         self.connector.update_event("MCP-Test-Calendar", "ABC-123", location="")
         script = mock_run.call_args[0][0]
         assert 'set location of evt to ""' in script
+
+
+# ── delete_events ──────────────────────────────────────────────────────────
+
+
+class TestDeleteEvents:
+    """Tests for CalendarConnector.delete_events()."""
+
+    def setup_method(self):
+        self.connector = CalendarConnector(enable_safety_checks=False)
+
+    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
+    def test_deletes_single_event(self, mock_run):
+        mock_run.return_value = ""
+        result = self.connector.delete_events("MCP-Test-Calendar", "ABC-123")
+        assert result["deleted_uids"] == ["ABC-123"]
+        assert result["not_found_uids"] == []
+        script = mock_run.call_args[0][0]
+        assert 'whose uid is "ABC-123"' in script
+        assert "delete evt" in script
+
+    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
+    def test_deletes_multiple_events(self, mock_run):
+        mock_run.return_value = ""
+        result = self.connector.delete_events("MCP-Test-Calendar", ["UID-1", "UID-2", "UID-3"])
+        assert result["deleted_uids"] == ["UID-1", "UID-2", "UID-3"]
+        assert result["not_found_uids"] == []
+        assert mock_run.call_count == 3
+
+    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
+    def test_normalizes_single_uid_to_list(self, mock_run):
+        mock_run.return_value = ""
+        result = self.connector.delete_events("MCP-Test-Calendar", "SINGLE-UID")
+        assert isinstance(result["deleted_uids"], list)
+        assert result["deleted_uids"] == ["SINGLE-UID"]
+
+    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
+    def test_escapes_uid_in_script(self, mock_run):
+        mock_run.return_value = ""
+        self.connector.delete_events("MCP-Test-Calendar", 'UID-with-"quotes"')
+        script = mock_run.call_args[0][0]
+        assert 'UID-with-\\"quotes\\"' in script
+
+    def test_safety_blocks_non_test_calendar(self):
+        connector = CalendarConnector(enable_safety_checks=True)
+        with pytest.raises(CalendarSafetyError, match="not an allowed test calendar"):
+            connector.delete_events("Personal", "ABC-123")
+
+    def test_empty_list_raises(self):
+        with pytest.raises(ValueError, match="At least one event UID"):
+            self.connector.delete_events("MCP-Test-Calendar", [])
+
+    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
+    def test_not_found_uid(self, mock_run):
+        mock_run.side_effect = subprocess.CalledProcessError(
+            returncode=1, cmd="osascript", stderr="Event not found"
+        )
+        result = self.connector.delete_events("MCP-Test-Calendar", "BAD-UID")
+        assert result["deleted_uids"] == []
+        assert result["not_found_uids"] == ["BAD-UID"]
+
+    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
+    def test_batch_partial_failure(self, mock_run):
+        def side_effect(script):
+            if "UID-2" in script:
+                raise subprocess.CalledProcessError(
+                    returncode=1, cmd="osascript", stderr="Event not found"
+                )
+            return ""
+        mock_run.side_effect = side_effect
+        result = self.connector.delete_events("MCP-Test-Calendar", ["UID-1", "UID-2", "UID-3"])
+        assert result["deleted_uids"] == ["UID-1", "UID-3"]
+        assert result["not_found_uids"] == ["UID-2"]
+
+    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
+    def test_uses_delete_keyword(self, mock_run):
+        mock_run.return_value = ""
+        self.connector.delete_events("MCP-Test-Calendar", "ABC-123")
+        script = mock_run.call_args[0][0]
+        assert "delete evt" in script

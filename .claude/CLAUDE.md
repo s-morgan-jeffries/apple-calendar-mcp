@@ -3,7 +3,7 @@
 An MCP server bridging Claude and Apple Calendar via AppleScript and EventKit on macOS.
 
 **Stack:** Python 3.10+, FastMCP, AppleScript (via `osascript`), Swift/EventKit (via `swift`)
-**Version:** v0.1.0 | **Tests:** 89 unit, 20 integration | **Coverage:** TBD
+**Version:** v0.1.0 | **Tests:** 102 unit, 24 integration | **Coverage:** TBD
 
 ## Commands
 
@@ -18,12 +18,12 @@ make test-verbose          # Tests with verbose output
 
 **Running the server:** `uv run python -m apple_calendar_mcp.server_fastmcp` or via Claude Desktop config.
 
-## API Surface (4 functions)
+## API Surface (5 functions)
 
 - **Calendars:** `get_calendars`
-- **Events:** `get_events`, `create_event`, `update_event`
+- **Events:** `get_events`, `create_event`, `update_event`, `delete_events`
 
-Planned (filed as issues): `update_events`, `delete_events`, `get_availability`
+Planned (filed as issues): `update_events`, `get_availability`
 
 ## Core API Principles
 
