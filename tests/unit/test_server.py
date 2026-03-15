@@ -64,6 +64,88 @@ class TestGetCalendarsTool:
         assert "No calendars found" in result
 
 
+class TestCreateEventTool:
+    """Tests for the create_event MCP tool."""
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_returns_success_message_with_uid(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.create_event.return_value = "3290DD8F-17E9-4DCC-B5FA-764655253E7A"
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import create_event
+        result = create_event(
+            calendar_name="MCP-Test-Calendar",
+            summary="Team Meeting",
+            start_date="2026-03-15T14:00:00",
+            end_date="2026-03-15T15:00:00",
+        )
+        assert "Team Meeting" in result
+        assert "3290DD8F-17E9-4DCC-B5FA-764655253E7A" in result
+        assert "MCP-Test-Calendar" in result
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_returns_error_string_on_failure(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.create_event.side_effect = Exception("Calendar not found")
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import create_event
+        result = create_event(
+            calendar_name="Nonexistent",
+            summary="Test",
+            start_date="2026-03-15T14:00:00",
+            end_date="2026-03-15T15:00:00",
+        )
+        assert "Error" in result
+        assert isinstance(result, str)
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_passes_optional_fields_to_connector(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.create_event.return_value = "UID-123"
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import create_event
+        create_event(
+            calendar_name="MCP-Test-Calendar",
+            summary="Lunch",
+            start_date="2026-03-15T12:00:00",
+            end_date="2026-03-15T13:00:00",
+            location="Room A",
+            description="Notes here",
+            url="https://example.com",
+            allday_event=True,
+        )
+        mock_client.create_event.assert_called_once_with(
+            calendar_name="MCP-Test-Calendar",
+            summary="Lunch",
+            start_date="2026-03-15T12:00:00",
+            end_date="2026-03-15T13:00:00",
+            location="Room A",
+            description="Notes here",
+            url="https://example.com",
+            allday_event=True,
+        )
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_returns_safety_error_as_string(self, mock_get_client):
+        from apple_calendar_mcp.calendar_connector import CalendarSafetyError
+        mock_client = MagicMock()
+        mock_client.create_event.side_effect = CalendarSafetyError("blocked")
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import create_event
+        result = create_event(
+            calendar_name="Personal",
+            summary="Test",
+            start_date="2026-03-15T14:00:00",
+            end_date="2026-03-15T15:00:00",
+        )
+        assert "Error" in result
+        assert isinstance(result, str)
+
+
 class TestServerConfiguration:
     """Tests for MCP server configuration."""
 

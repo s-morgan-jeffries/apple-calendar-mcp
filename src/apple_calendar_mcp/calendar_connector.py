@@ -86,6 +86,21 @@ class CalendarConnector:
     def __init__(self, enable_safety_checks: bool = True):
         self.enable_safety_checks = enable_safety_checks
 
+    def _verify_calendar_safety(self, calendar_name: str) -> None:
+        """Verify that a write operation targets an allowed test calendar.
+
+        Raises:
+            CalendarSafetyError: If safety checks are enabled and the calendar
+                is not in the allowed test calendar list.
+        """
+        if not self.enable_safety_checks:
+            return
+        if calendar_name not in self.ALLOWED_TEST_CALENDARS:
+            raise CalendarSafetyError(
+                f"Calendar '{calendar_name}' is not an allowed test calendar. "
+                f"Allowed: {self.ALLOWED_TEST_CALENDARS}"
+            )
+
     def _escape_applescript_string(self, text: Optional[str]) -> str:
         """Escape quotes and backslashes for AppleScript strings."""
         if not text:
@@ -116,6 +131,82 @@ class CalendarConnector:
 
         # Format for AppleScript: "March 15, 2026 02:30:00 PM"
         return dt.strftime("%B %d, %Y %I:%M:%S %p")
+
+    def create_event(
+        self,
+        calendar_name: str,
+        summary: str,
+        start_date: str,
+        end_date: str,
+        location: Optional[str] = None,
+        description: Optional[str] = None,
+        url: Optional[str] = None,
+        allday_event: bool = False,
+    ) -> str:
+        """Create a new event in a specified calendar.
+
+        Args:
+            calendar_name: Name of the target calendar
+            summary: Event title
+            start_date: Start date/time in ISO 8601 format
+            end_date: End date/time in ISO 8601 format
+            location: Event location (optional)
+            description: Event notes (optional)
+            url: URL associated with the event (optional)
+            allday_event: Whether this is an all-day event
+
+        Returns:
+            The UID of the created event
+
+        Raises:
+            CalendarSafetyError: If safety checks block the target calendar
+            ValueError: If date format is invalid
+            subprocess.CalledProcessError: If AppleScript execution fails
+        """
+        self._verify_calendar_safety(calendar_name)
+
+        # Convert dates (validates format)
+        as_start = self._iso_to_applescript_date(start_date)
+        as_end = self._iso_to_applescript_date(end_date)
+
+        # Escape user-provided strings
+        cal_escaped = self._escape_applescript_string(calendar_name)
+        summary_escaped = self._escape_applescript_string(summary)
+
+        # Build allday property
+        allday_str = "true" if allday_event else "false"
+
+        # Build optional property setters
+        optional_lines = []
+        if location:
+            loc_escaped = self._escape_applescript_string(location)
+            optional_lines.append(
+                f'        set location of newEvent to "{loc_escaped}"'
+            )
+        if description:
+            desc_escaped = self._escape_applescript_string(description)
+            optional_lines.append(
+                f'        set description of newEvent to "{desc_escaped}"'
+            )
+        if url:
+            url_escaped = self._escape_applescript_string(url)
+            optional_lines.append(
+                f'        set url of newEvent to "{url_escaped}"'
+            )
+
+        optional_block = "\n".join(optional_lines)
+        if optional_block:
+            optional_block = "\n" + optional_block
+
+        script = f'''tell application "Calendar"
+    tell calendar "{cal_escaped}"
+        set newEvent to make new event at end of events with properties {{summary:"{summary_escaped}", start date:date "{as_start}", end date:date "{as_end}", allday event:{allday_str}}}
+{optional_block}
+        return uid of newEvent
+    end tell
+end tell'''
+
+        return run_applescript(script).strip()
 
     def get_calendars(self) -> list[dict[str, Any]]:
         """Get all calendars from Apple Calendar.
