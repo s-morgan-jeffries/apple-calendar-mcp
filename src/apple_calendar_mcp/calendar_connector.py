@@ -442,14 +442,21 @@ end tell'''
         return {"deleted_uids": deleted_uids, "not_found_uids": not_found_uids}
 
     def _parse_iso_datetime(self, date_str: str) -> datetime:
-        """Parse an ISO 8601 date string to a datetime object.
+        """Parse an ISO 8601 date string to a naive local-time datetime.
+
+        Timezone-aware dates (e.g., from EventKit's UTC output) are converted
+        to local time before stripping tzinfo, so they can be compared with
+        timezone-naive query dates.
 
         Raises:
             ValueError: If the date format is invalid.
         """
         try:
             if "T" in date_str:
-                return datetime.fromisoformat(date_str.replace("Z", "+00:00")).replace(tzinfo=None)
+                dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+                if dt.tzinfo is not None:
+                    dt = dt.astimezone().replace(tzinfo=None)
+                return dt
             else:
                 return datetime.fromisoformat(date_str + "T00:00:00")
         except ValueError as e:
