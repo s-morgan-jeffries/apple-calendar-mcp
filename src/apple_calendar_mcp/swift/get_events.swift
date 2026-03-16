@@ -135,6 +135,9 @@ if !accessGranted {
     exit(0)
 }
 
+// Refresh sources to pick up recently-created events
+store.refreshSourcesIfNecessary()
+
 // Find the calendar by name
 let allCalendars = store.calendars(for: .event)
 guard let calendar = allCalendars.first(where: { $0.title == parsed.calendar }) else {

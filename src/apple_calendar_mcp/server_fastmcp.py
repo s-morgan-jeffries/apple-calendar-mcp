@@ -24,11 +24,15 @@ _client: Optional[CalendarConnector] = None
 
 
 def get_client() -> CalendarConnector:
-    """Get or create the Calendar client."""
+    """Get or create the Calendar client.
+
+    Safety checks are enabled only when CALENDAR_TEST_MODE=true (integration tests).
+    In production (Claude Desktop), safety checks are off so all calendars are writable.
+    """
     global _client
     if _client is None:
-        _in_pytest = os.environ.get("PYTEST_CURRENT_TEST") is not None
-        _client = CalendarConnector(enable_safety_checks=not _in_pytest)
+        _test_mode = os.environ.get("CALENDAR_TEST_MODE") == "true"
+        _client = CalendarConnector(enable_safety_checks=_test_mode)
     return _client
 
 
