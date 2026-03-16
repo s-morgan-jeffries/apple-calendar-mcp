@@ -96,6 +96,23 @@ func eventToDict(_ event: EKEvent) -> [String: Any] {
     @unknown default: dict["status"] = "unknown"
     }
 
+    // Recurrence fields
+    dict["is_recurring"] = event.hasRecurrenceRules
+    dict["is_detached"] = event.isDetached
+    dict["occurrence_date"] = df.string(from: event.occurrenceDate)
+
+    if let rules = event.recurrenceRules, let rule = rules.first {
+        // Extract RRULE string from EKRecurrenceRule description
+        let ruleStr = "\(rule)"
+        if let range = ruleStr.range(of: "RRULE ") {
+            dict["recurrence_rule"] = String(ruleStr[range.upperBound...])
+        } else {
+            dict["recurrence_rule"] = ruleStr
+        }
+    } else {
+        dict["recurrence_rule"] = NSNull()
+    }
+
     return dict
 }
 

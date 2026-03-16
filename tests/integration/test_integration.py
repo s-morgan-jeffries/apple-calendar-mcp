@@ -469,3 +469,44 @@ class TestGetAvailabilityIntegration:
         )
         assert len(slots) == 1
         assert slots[0]["duration_minutes"] == 480
+
+
+class TestRecurringEventsIntegration:
+    """Integration tests for recurring event handling."""
+
+    def test_create_recurring_event_and_read_occurrences(self, connector):
+        """Create a recurring event, verify multiple occurrences returned with recurrence fields."""
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Recurring Test",
+            start_date="2027-01-05T10:00:00",
+            end_date="2027-01-05T11:00:00",
+            recurrence_rule="FREQ=WEEKLY;COUNT=3",
+        )
+        try:
+            events = connector.get_events(
+                calendar_name=TEST_CALENDAR,
+                start_date="2027-01-01",
+                end_date="2027-01-31",
+            )
+            recurring = [e for e in events if e["uid"] == uid]
+            assert len(recurring) == 3
+
+            # All share the same UID
+            assert all(e["uid"] == uid for e in recurring)
+
+            # All have recurrence fields
+            for evt in recurring:
+                assert evt["is_recurring"] is True
+                assert "FREQ=WEEKLY" in evt["recurrence_rule"]
+                assert evt["is_detached"] is False
+
+            # Each has a different occurrence_date
+            occ_dates = [e["occurrence_date"] for e in recurring]
+            assert len(set(occ_dates)) == 3
+        finally:
+            # Recurring events can't be fully deleted via AppleScript,
+            # so we recreate the calendar to clean up
+            from tests.helpers.calendar_setup import delete_test_calendar, create_test_calendar
+            delete_test_calendar(TEST_CALENDAR)
+            create_test_calendar(TEST_CALENDAR)

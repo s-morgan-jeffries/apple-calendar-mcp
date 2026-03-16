@@ -16,6 +16,8 @@ CALENDAR IDENTIFICATION: Calendars are identified by name (not UID — UIDs are 
 
 EVENTS: Events have summary (title), start/end dates, location, description (notes), URL, status, and recurrence. Events are identified by their UID (UUID format).
 
+RECURRING EVENTS: Recurring events share the same UID across all occurrences. Each occurrence has a unique occurrence_date. The is_recurring field indicates if an event is part of a series. The recurrence_rule field contains the iCalendar RRULE (e.g., "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE,FR"). Note: update_event by UID modifies the entire series — single-occurrence modification is not yet supported.
+
 DATES: All dates use ISO 8601 format (e.g., "2026-03-15" or "2026-03-15T14:30:00"). The server handles conversion to/from AppleScript's locale-dependent date format.
 """)
 
@@ -81,6 +83,7 @@ def create_event(
     description: str = "",
     url: str = "",
     allday_event: bool = False,
+    recurrence_rule: str = "",
 ) -> str:
     """Create a new event in a specified calendar.
 
@@ -93,6 +96,7 @@ def create_event(
         description: Event notes/description (optional)
         url: URL associated with the event (optional)
         allday_event: Whether this is an all-day event (default: false). When true, use date-only format for start_date/end_date.
+        recurrence_rule: iCalendar RRULE string for recurring events (optional, e.g., "FREQ=WEEKLY;BYDAY=MO,WE,FR" or "FREQ=DAILY;COUNT=10")
     """
     client = get_client()
     try:
@@ -105,6 +109,7 @@ def create_event(
             description=description or None,
             url=url or None,
             allday_event=allday_event,
+            recurrence_rule=recurrence_rule or None,
         )
     except Exception as e:
         return f"Error creating event: {e}"
@@ -114,6 +119,8 @@ def create_event(
         result += f"\nLocation: {location}"
     if allday_event:
         result += "\nAll-day event"
+    if recurrence_rule:
+        result += f"\nRecurrence: {recurrence_rule}"
     return result
 
 
@@ -130,6 +137,10 @@ def _format_event(event: dict) -> str:
         result += f"Description: {event['description']}\n"
     if event.get("url"):
         result += f"URL: {event['url']}\n"
+    if event.get("is_recurring"):
+        result += f"Recurring: {event.get('recurrence_rule', 'yes')}\n"
+        if event.get("is_detached"):
+            result += "Modified occurrence (detached from series)\n"
     result += f"Status: {event.get('status', 'none')}\n"
     result += f"UID: {event['uid']}\n"
     return result

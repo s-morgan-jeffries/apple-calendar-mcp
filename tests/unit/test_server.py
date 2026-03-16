@@ -126,7 +126,26 @@ class TestCreateEventTool:
             description="Notes here",
             url="https://example.com",
             allday_event=True,
+            recurrence_rule=None,
         )
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_passes_recurrence_rule_to_connector(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.create_event.return_value = "REC-UID"
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import create_event
+        result = create_event(
+            calendar_name="Work",
+            summary="Weekly Standup",
+            start_date="2026-07-01T09:00:00",
+            end_date="2026-07-01T09:30:00",
+            recurrence_rule="FREQ=WEEKLY;BYDAY=MO,WE,FR",
+        )
+        call_kwargs = mock_client.create_event.call_args[1]
+        assert call_kwargs["recurrence_rule"] == "FREQ=WEEKLY;BYDAY=MO,WE,FR"
+        assert "Recurrence" in result
 
     @patch("apple_calendar_mcp.server_fastmcp.get_client")
     def test_returns_safety_error_as_string(self, mock_get_client):
@@ -164,6 +183,23 @@ class TestGetEventsTool:
         assert "Team Meeting" in result
         assert "Room 4" in result
         assert isinstance(result, str)
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_formats_recurring_event(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.get_events.return_value = [
+            {"uid": "REC-123", "summary": "Weekly Standup", "start_date": "2026-07-01T09:00:00",
+             "end_date": "2026-07-01T09:30:00", "allday_event": False, "location": "",
+             "description": "", "url": "", "status": "confirmed", "calendar_name": "Work",
+             "is_recurring": True, "recurrence_rule": "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE,FR",
+             "is_detached": False, "occurrence_date": "2026-07-01T09:00:00"},
+        ]
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import get_events
+        result = get_events(calendar_name="Work", start_date="2026-07-01", end_date="2026-07-02")
+        assert "Recurring" in result
+        assert "FREQ=WEEKLY" in result
 
     @patch("apple_calendar_mcp.server_fastmcp.get_client")
     def test_returns_no_events_message(self, mock_get_client):
