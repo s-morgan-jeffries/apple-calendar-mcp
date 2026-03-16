@@ -162,7 +162,7 @@ All write operations implemented and tested via AppleScript:
 
 | Feature | UI Available | AppleScript | Status |
 |---------|-------------|-------------|--------|
-| Recurring events | ✅ | Partial (recurrence property readable) | Modification behavior unknown |
+| Recurring events | ✅ | ✅ Read + create with RRULE. See Recurring Events section. | Tested 2026-03-16 |
 | Attendees | ✅ | Partial (count works) | Individual attendee properties untested |
 | Alerts/reminders | ✅ | Unknown | Needs testing |
 | Travel time | ✅ | Unknown | Needs testing |
@@ -170,11 +170,53 @@ All write operations implemented and tested via AppleScript:
 
 ---
 
+## Recurring Events (tested 2026-03-16)
+
+### Creating Recurring Events
+
+AppleScript supports setting recurrence with RRULE syntax at creation time:
+
+```applescript
+make new event at end of events with properties {summary:"Weekly Standup", start date:date "July 01, 2026 09:00:00 AM", end date:date "July 01, 2026 09:30:00 AM", recurrence:"FREQ=WEEKLY;BYDAY=MO,WE,FR"}
+```
+
+Reading back: `recurrence of event` returns `"FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE,FR"` (Calendar normalizes by adding `INTERVAL=1`).
+
+### Occurrence UIDs
+
+**All occurrences of a recurring event share the same UID.** Querying via EventKit returns one event object per occurrence, each with the same `calendarItemIdentifier`. Occurrences are distinguished by their `occurrenceDate` / `startDate`.
+
+This means **UID alone is insufficient to target a specific occurrence** — you need UID + date.
+
+### Modification Behavior (AppleScript)
+
+**Modifying the series event modifies ALL occurrences.** When using `whose uid is "..."` to find a recurring event and setting a property (e.g., `set summary`), all occurrences are updated. AppleScript does not offer a way to modify a single occurrence through `whose uid`.
+
+**Deleting via `item N of matchingEvents` removes a single occurrence.** When `whose uid` returns multiple items (one per occurrence), deleting `item 1` removes only that occurrence (adds it to excluded dates). However, `delete (every event whose uid is ...)` does NOT delete the entire series — it only removes visible occurrences, and the series regenerates new ones. To fully remove a recurring series, delete the calendar and recreate it, or use EventKit's `remove(_:span:)` with `.futureEvents`.
+
+### EventKit Properties
+
+Each occurrence exposes:
+- `hasRecurrenceRules`: `true` — the occurrence belongs to a recurring series
+- `isDetached`: `false` — not individually modified (would be `true` for detached occurrences)
+- `occurrenceDate`: the specific date of this occurrence (ISO 8601)
+- `recurrenceRules`: array containing the RRULE (e.g., `FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE,FR`)
+
+### Implications for API Design
+
+1. **Read support**: Extend Swift helper to return `recurrence_rule`, `is_recurring`, and `occurrence_date` fields
+2. **Create support**: Add optional `recurrence_rule` parameter (RRULE string) to `create_event`
+3. **Update behavior**: Updating by UID modifies the entire series. To modify a single occurrence, EventKit's `save(_:span:)` with `.thisEvent` span is needed (not available via AppleScript)
+4. **Delete behavior**: Current `delete_events` with `whose uid` + `delete` removes one occurrence. Deleting all matching events removes the series. Consider adding a `delete_series` flag.
+5. **Occurrence identification**: Need UID + occurrence_date to uniquely identify an occurrence
+
+---
+
 ## Open Questions
 
-1. **Event filtering on large calendars:** What's the largest date range that doesn't timeout? Is there a pagination strategy?
-2. **Recurring event modification:** Does modifying one instance affect the series? Can we target a specific occurrence?
+1. ~~**Event filtering on large calendars:**~~ Solved — EventKit via Swift helper provides sub-second queries on any calendar size.
+2. ~~**Recurring event modification:**~~ Answered — AppleScript modification via `whose uid` affects the entire series. Single-occurrence modification requires EventKit's `.thisEvent` span. See Recurring Events section.
 3. **Attendee properties:** What fields are available on attendee objects?
-4. **Calendar creation:** Does `make new calendar` work? What properties can be set?
+4. ~~**Calendar creation:**~~ Answered — `make new calendar with properties {name:"X"}` works. Used in test setup.
 5. **Alert/reminder access:** Can we read/set event alerts via AppleScript?
-6. **EventKit alternative:** Would PyObjC + EventKit provide better performance and more capabilities than AppleScript?
+6. ~~**EventKit alternative:**~~ Partially answered — EventKit via Swift helper is used for reads. Write migration depends on Claude Desktop usability testing (#33).
