@@ -94,19 +94,46 @@ This is a blocking issue for `get_events`. Potential strategies:
 
 Per OmniFocus benchmarks: ~17ms per property read. Calendar likely similar. With 10 properties per event × 100 events = ~17 seconds. Minimizing property reads is critical.
 
+### Solution: EventKit via Swift Helper
+
+The `whose` clause timeout was resolved by implementing a Swift helper (`src/apple_calendar_mcp/swift/get_events.swift`) that uses EventKit's `EKEventStore` with native predicate-based queries. This provides sub-second reads on any calendar size.
+
+### Benchmarks (2026-03-16, 16 calendars, Work calendar: 1376 events)
+
+| Operation | Method | Time | Notes |
+|-----------|--------|------|-------|
+| `get_calendars` | AppleScript (batch) | ~6.4s | Slow — 16 calendars, batch property reads |
+| `get_events` (1 month) | EventKit/Swift | ~0.4s | Fast — native predicate filtering |
+| `get_events` (1 year) | EventKit/Swift | ~0.5s | Scales well |
+| `get_events` (10 years, 1376 events) | EventKit/Swift | ~0.8s | Sub-second even for large ranges |
+| `get_availability` (1 month) | EventKit + Python | ~0.4s | Inherits get_events performance |
+| `get_availability` (1 year) | EventKit + Python | ~0.5s | |
+| `create_event` | AppleScript | ~1.7s | Single event, acceptable |
+| `update_event` | AppleScript (`whose uid`) | ~2.6s | UID lookup + property set |
+| `delete_events` (single) | AppleScript (`whose uid`) | ~2.4s | Single UID lookup |
+| `delete_events` (batch, 5) | AppleScript (`whose uid` × 5) | ~14.5s | Linear scaling, N separate invocations |
+
+**Key observations:**
+- **Read operations (EventKit)** are sub-second regardless of calendar size
+- **Write operations (AppleScript)** are 1–3s per operation due to IPC overhead
+- **Batch delete scales linearly** — each UID requires a separate AppleScript invocation
+- **get_calendars is surprisingly slow** at ~6.4s for AppleScript batch property reads
+- Write performance is acceptable for typical single-event use (create, update, delete one)
+- Batch delete of 10+ events may feel slow; consider EventKit migration if this becomes a common use case
+
 ---
 
-## Write Operations (not yet tested)
+## Write Operations
 
-These need testing against a test calendar:
+All write operations implemented and tested via AppleScript:
 
-| Operation | AppleScript Command | Priority |
-|-----------|-------------------|----------|
-| Create calendar | `make new calendar with properties {name:"X"}` | P1 |
-| Create event | `make new event at end of events of cal with properties {summary:"X", start date:D, end date:D}` | P1 |
-| Update event | `set summary of evt to "X"` | P1 |
-| Delete event | `delete evt` | P1 |
-| Delete calendar | `delete cal` | P2 |
+| Operation | AppleScript Command | Status | Timing |
+|-----------|-------------------|--------|--------|
+| Create calendar | `make new calendar with properties {name:"X"}` | ✅ Implemented (test setup) | <1s |
+| Create event | `make new event at end of events of cal with properties {...}` | ✅ Implemented | ~1.7s |
+| Update event | `set summary of evt to "X"` (via `whose uid`) | ✅ Implemented | ~2.6s |
+| Delete event | `delete evt` (via `whose uid`) | ✅ Implemented | ~2.4s |
+| Delete calendar | `delete cal` | ✅ Implemented (test teardown) | <1s |
 
 ---
 

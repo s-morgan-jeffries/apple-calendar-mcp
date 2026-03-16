@@ -14,6 +14,7 @@ make test-integration      # Real Calendar tests (requires test calendar)
 make test-verbose          # Tests with verbose output
 ./scripts/check_complexity.sh       # Cyclomatic complexity check
 ./scripts/check_version_sync.sh     # Version consistency across files
+./scripts/benchmark_performance.sh [calendar]  # Performance benchmarks (real Calendar.app)
 ```
 
 **Running the server:** `uv run python -m apple_calendar_mcp.server_fastmcp` or via Claude Desktop config.
