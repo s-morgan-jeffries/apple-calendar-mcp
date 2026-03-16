@@ -534,3 +534,181 @@ class TestRecurringEventsIntegration:
             from tests.helpers.calendar_setup import delete_test_calendar, create_test_calendar
             delete_test_calendar(TEST_CALENDAR)
             create_test_calendar(TEST_CALENDAR)
+
+
+class TestRoundTripIntegration:
+    """Round-trip tests: create → read → use returned data to query again."""
+
+    def test_created_event_fields_match_input(self, connector):
+        """Create event with all fields, read back, verify every field matches."""
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Round Trip Test",
+            start_date="2027-03-01T14:00:00",
+            end_date="2027-03-01T15:00:00",
+            location="Conference Room",
+            description="Testing round-trip",
+            url="https://example.com/test",
+        )
+        try:
+            events = connector.get_events(TEST_CALENDAR, "2027-03-01", "2027-03-02")
+            matches = [e for e in events if e["uid"] == uid]
+            assert len(matches) == 1
+            event = matches[0]
+            assert event["summary"] == "Round Trip Test"
+            assert event["location"] == "Conference Room"
+            assert event["description"] == "Testing round-trip"
+            assert event["url"] == "https://example.com/test"
+            assert event["calendar_name"] == TEST_CALENDAR
+        finally:
+            _delete_event_by_uid(uid)
+
+    def test_returned_timestamps_usable_for_requery(self, connector):
+        """Create event, read timestamps, use them to query again — timezone round-trip."""
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Timestamp Round Trip",
+            start_date="2027-03-15T10:00:00",
+            end_date="2027-03-15T11:00:00",
+        )
+        try:
+            # First query: wide range
+            events = connector.get_events(TEST_CALENDAR, "2027-03-15", "2027-03-16")
+            matches = [e for e in events if e["uid"] == uid]
+            assert len(matches) == 1
+
+            # Use returned timestamps for a second, narrow query
+            returned_start = matches[0]["start_date"]
+            returned_end = matches[0]["end_date"]
+            events2 = connector.get_events(TEST_CALENDAR, returned_start, returned_end)
+            matches2 = [e for e in events2 if e["uid"] == uid]
+            assert len(matches2) == 1, (
+                f"Event not found using returned timestamps: start={returned_start}, end={returned_end}"
+            )
+        finally:
+            _delete_event_by_uid(uid)
+
+    def test_update_then_read_back(self, connector):
+        """Create → update → read back → verify only updated fields changed."""
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Before Update",
+            start_date="2027-04-01T09:00:00",
+            end_date="2027-04-01T10:00:00",
+            location="Room A",
+        )
+        try:
+            connector.update_event(TEST_CALENDAR, uid, summary="After Update")
+            events = connector.get_events(TEST_CALENDAR, "2027-04-01", "2027-04-02")
+            matches = [e for e in events if e["uid"] == uid]
+            assert len(matches) == 1
+            assert matches[0]["summary"] == "After Update"
+            assert matches[0]["location"] == "Room A"  # unchanged
+        finally:
+            _delete_event_by_uid(uid)
+
+
+class TestWorkflowIntegration:
+    """Multi-step workflow tests simulating real Claude Desktop usage."""
+
+    def test_full_event_lifecycle(self, connector):
+        """Create → update → verify → delete → verify gone."""
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Lifecycle Test",
+            start_date="2027-05-01T10:00:00",
+            end_date="2027-05-01T11:00:00",
+        )
+        try:
+            # Update
+            connector.update_event(TEST_CALENDAR, uid, summary="Updated Lifecycle")
+
+            # Verify update
+            events = connector.get_events(TEST_CALENDAR, "2027-05-01", "2027-05-02")
+            assert any(e["uid"] == uid and e["summary"] == "Updated Lifecycle" for e in events)
+
+            # Delete
+            result = connector.delete_events(TEST_CALENDAR, uid)
+            assert uid in result["deleted_uids"]
+
+            # Verify gone
+            events = connector.get_events(TEST_CALENDAR, "2027-05-01", "2027-05-02")
+            assert not any(e["uid"] == uid for e in events)
+        finally:
+            _delete_event_by_uid(uid)
+
+    def test_availability_blocked_by_new_event(self, connector):
+        """Check availability → create event → re-check → verify slot blocked."""
+        # Check initial availability
+        slots_before = connector.get_availability(
+            [TEST_CALENDAR], "2027-06-01T09:00:00", "2027-06-01T12:00:00"
+        )
+        assert len(slots_before) == 1  # entirely free
+
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Block This Slot",
+            start_date="2027-06-01T10:00:00",
+            end_date="2027-06-01T11:00:00",
+        )
+        try:
+            # Re-check availability
+            slots_after = connector.get_availability(
+                [TEST_CALENDAR], "2027-06-01T09:00:00", "2027-06-01T12:00:00"
+            )
+            assert len(slots_after) == 2  # split into two free slots
+            assert slots_after[0]["end_date"] == "2027-06-01T10:00:00"
+            assert slots_after[1]["start_date"] == "2027-06-01T11:00:00"
+        finally:
+            _delete_event_by_uid(uid)
+
+
+class TestTimezoneIntegration:
+    """Timezone edge case tests."""
+
+    def test_event_near_midnight(self, connector):
+        """Event at 23:30 should be found when querying across midnight."""
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Late Night Event",
+            start_date="2027-07-01T23:30:00",
+            end_date="2027-07-02T00:30:00",
+        )
+        try:
+            events = connector.get_events(TEST_CALENDAR, "2027-07-01T23:00:00", "2027-07-02T01:00:00")
+            matches = [e for e in events if e["uid"] == uid]
+            assert len(matches) == 1
+        finally:
+            _delete_event_by_uid(uid)
+
+    def test_allday_event_fields(self, connector):
+        """All-day event should return allday_event=True with correct date boundaries."""
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="All Day Test",
+            start_date="2027-08-01",
+            end_date="2027-08-02",
+            allday_event=True,
+        )
+        try:
+            events = connector.get_events(TEST_CALENDAR, "2027-08-01", "2027-08-03")
+            matches = [e for e in events if e["uid"] == uid]
+            assert len(matches) == 1
+            assert matches[0]["allday_event"] is True
+        finally:
+            _delete_event_by_uid(uid)
+
+
+class TestErrorHandlingIntegration:
+    """Error handling tests against real Calendar.app."""
+
+    def test_get_events_nonexistent_calendar(self, connector):
+        """Querying a non-existent calendar should raise ValueError."""
+        with pytest.raises(ValueError, match="not found"):
+            connector.get_events("Calendar-That-Does-Not-Exist", "2027-01-01", "2027-01-02")
+
+    def test_delete_nonexistent_uid_reports_not_found(self, connector):
+        """Deleting a non-existent UID should report it, not crash."""
+        result = connector.delete_events(TEST_CALENDAR, "DOES-NOT-EXIST-UID-12345")
+        assert result["deleted_uids"] == []
+        assert "DOES-NOT-EXIST-UID-12345" in result["not_found_uids"]

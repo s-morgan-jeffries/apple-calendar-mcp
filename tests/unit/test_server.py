@@ -1,5 +1,6 @@
 """Unit tests for the FastMCP server layer."""
 import json
+import os
 from unittest.mock import patch, MagicMock
 
 import pytest
@@ -20,6 +21,34 @@ class TestGetClient:
         client1 = get_client()
         client2 = get_client()
         assert client1 is client2
+
+
+class TestProductionConfig:
+    """Tests for safety check configuration based on environment."""
+
+    def setup_method(self):
+        # Reset the singleton so each test gets a fresh client
+        import apple_calendar_mcp.server_fastmcp as mod
+        self._original_client = mod._client
+        mod._client = None
+
+    def teardown_method(self):
+        import apple_calendar_mcp.server_fastmcp as mod
+        mod._client = self._original_client
+
+    def test_safety_checks_disabled_without_test_mode(self):
+        """In production (no CALENDAR_TEST_MODE), safety checks should be off."""
+        env = os.environ.copy()
+        env.pop("CALENDAR_TEST_MODE", None)
+        with patch.dict(os.environ, env, clear=True):
+            client = get_client()
+            assert client.enable_safety_checks is False
+
+    def test_safety_checks_enabled_with_test_mode(self):
+        """In test mode (CALENDAR_TEST_MODE=true), safety checks should be on."""
+        with patch.dict(os.environ, {"CALENDAR_TEST_MODE": "true"}):
+            client = get_client()
+            assert client.enable_safety_checks is True
 
 
 class TestGetCalendarsTool:
