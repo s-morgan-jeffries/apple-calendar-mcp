@@ -409,6 +409,20 @@ class TestCreateEvent:
         assert "location" not in script.lower() or "set location" not in script
         assert "description" not in script.lower() or "set description" not in script
         assert "set url" not in script
+        assert "recurrence" not in script
+
+    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
+    def test_creates_recurring_event(self, mock_run):
+        mock_run.return_value = "REC-UID"
+        self.connector.create_event(
+            calendar_name="MCP-Test-Calendar",
+            summary="Weekly Standup",
+            start_date="2026-07-01T09:00:00",
+            end_date="2026-07-01T09:30:00",
+            recurrence_rule="FREQ=WEEKLY;BYDAY=MO,WE,FR",
+        )
+        script = mock_run.call_args[0][0]
+        assert 'recurrence:"FREQ=WEEKLY;BYDAY=MO,WE,FR"' in script
 
 
 # ── get_events ──────────────────────────────────────────────────────────────
@@ -481,6 +495,22 @@ class TestGetEvents:
         mock_swift.return_value = "[]"
         self.connector.get_events("Work", "2026-03-15", "2026-03-16")
         mock_swift.assert_called_once()
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_recurring_event_fields_returned(self, mock_swift):
+        mock_swift.return_value = json.dumps([
+            {"uid": "REC-123", "summary": "Weekly Standup", "start_date": "2026-07-01T09:00:00",
+             "end_date": "2026-07-01T09:30:00", "allday_event": False, "location": "",
+             "description": "", "url": "", "status": "confirmed", "calendar_name": "Work",
+             "is_recurring": True, "recurrence_rule": "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE,FR",
+             "is_detached": False, "occurrence_date": "2026-07-01T09:00:00"},
+        ])
+        result = self.connector.get_events("Work", "2026-07-01", "2026-07-02")
+        event = result[0]
+        assert event["is_recurring"] is True
+        assert "FREQ=WEEKLY" in event["recurrence_rule"]
+        assert event["is_detached"] is False
+        assert event["occurrence_date"] == "2026-07-01T09:00:00"
 
 
 # ── get_availability ────────────────────────────────────────────────────────

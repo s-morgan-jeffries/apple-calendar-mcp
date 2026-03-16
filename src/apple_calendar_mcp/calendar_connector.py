@@ -169,6 +169,7 @@ class CalendarConnector:
         description: Optional[str] = None,
         url: Optional[str] = None,
         allday_event: bool = False,
+        recurrence_rule: Optional[str] = None,
     ) -> str:
         """Create a new event in a specified calendar.
 
@@ -181,6 +182,7 @@ class CalendarConnector:
             description: Event notes (optional)
             url: URL associated with the event (optional)
             allday_event: Whether this is an all-day event
+            recurrence_rule: iCalendar RRULE string (optional, e.g. "FREQ=WEEKLY;BYDAY=MO,WE,FR")
 
         Returns:
             The UID of the created event
@@ -202,6 +204,12 @@ class CalendarConnector:
 
         # Build allday property
         allday_str = "true" if allday_event else "false"
+
+        # Build recurrence property (included in creation properties, not set separately)
+        recurrence_prop = ""
+        if recurrence_rule:
+            rule_escaped = self._escape_applescript_string(recurrence_rule)
+            recurrence_prop = f', recurrence:"{rule_escaped}"'
 
         # Build optional property setters
         optional_lines = []
@@ -227,7 +235,7 @@ class CalendarConnector:
 
         script = f'''tell application "Calendar"
     tell calendar "{cal_escaped}"
-        set newEvent to make new event at end of events with properties {{summary:"{summary_escaped}", start date:date "{as_start}", end date:date "{as_end}", allday event:{allday_str}}}
+        set newEvent to make new event at end of events with properties {{summary:"{summary_escaped}", start date:date "{as_start}", end date:date "{as_end}", allday event:{allday_str}{recurrence_prop}}}
 {optional_block}
         return uid of newEvent
     end tell
