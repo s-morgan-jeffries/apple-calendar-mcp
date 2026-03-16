@@ -465,6 +465,32 @@ end tell'''
                 "Expected ISO 8601 format like '2026-03-15' or '2026-03-15T14:30:00'"
             ) from e
 
+    def _build_busy_blocks(self, events: list[dict]) -> list[tuple[datetime, datetime]]:
+        """Build sorted, merged busy blocks from a list of events."""
+        blocks = []
+        for event in events:
+            evt_start = self._parse_iso_datetime(event["start_date"])
+            evt_end = self._parse_iso_datetime(event["end_date"])
+
+            if event.get("allday_event"):
+                evt_start = evt_start.replace(hour=0, minute=0, second=0)
+                evt_end = evt_end.replace(hour=0, minute=0, second=0)
+                if evt_end == evt_start:
+                    evt_end += timedelta(days=1)
+
+            blocks.append((evt_start, evt_end))
+
+        blocks.sort(key=lambda b: b[0])
+
+        merged = []
+        for start, end in blocks:
+            if merged and start <= merged[-1][1]:
+                merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+            else:
+                merged.append((start, end))
+
+        return merged
+
     def get_availability(
         self,
         calendar_names: list[str],
@@ -495,44 +521,16 @@ end tell'''
         range_start = self._parse_iso_datetime(start_date)
         range_end = self._parse_iso_datetime(end_date)
 
-        # Collect all events across calendars
         all_events = []
         for cal_name in calendar_names:
-            events = self.get_events(cal_name, start_date, end_date)
-            all_events.extend(events)
+            all_events.extend(self.get_events(cal_name, start_date, end_date))
 
-        # Build busy blocks from events
-        busy_blocks = []
-        for event in all_events:
-            evt_start = self._parse_iso_datetime(event["start_date"])
-            evt_end = self._parse_iso_datetime(event["end_date"])
+        merged = self._build_busy_blocks(all_events)
 
-            # All-day events block the full day(s)
-            if event.get("allday_event"):
-                evt_start = evt_start.replace(hour=0, minute=0, second=0)
-                evt_end = evt_end.replace(hour=0, minute=0, second=0)
-                if evt_end == evt_start:
-                    evt_end += timedelta(days=1)
-
-            busy_blocks.append((evt_start, evt_end))
-
-        # Sort by start time
-        busy_blocks.sort(key=lambda b: b[0])
-
-        # Merge overlapping/adjacent blocks
-        merged = []
-        for start, end in busy_blocks:
-            if merged and start <= merged[-1][1]:
-                merged[-1] = (merged[-1][0], max(merged[-1][1], end))
-            else:
-                merged.append((start, end))
-
-        # Compute free slots (gaps between busy blocks within the range)
         free_slots = []
         cursor = range_start
 
         for busy_start, busy_end in merged:
-            # Clamp to range
             busy_start = max(busy_start, range_start)
             busy_end = min(busy_end, range_end)
 
@@ -545,7 +543,6 @@ end tell'''
                 })
             cursor = max(cursor, busy_end)
 
-        # Gap after last busy block
         if cursor < range_end:
             duration = int((range_end - cursor).total_seconds() / 60)
             free_slots.append({
