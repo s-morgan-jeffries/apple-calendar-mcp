@@ -64,6 +64,58 @@ class TestGetCalendarsTool:
         assert "No calendars found" in result
 
 
+class TestCreateCalendarTool:
+    """Tests for the create_calendar MCP tool."""
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_returns_success_message(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.create_calendar.return_value = {"name": "New Calendar"}
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import create_calendar
+        result = create_calendar(name="New Calendar")
+        assert "Created calendar" in result
+        assert "New Calendar" in result
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_returns_error_on_failure(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.create_calendar.side_effect = Exception("AppleScript failed")
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import create_calendar
+        result = create_calendar(name="Bad Calendar")
+        assert "Error" in result
+        assert isinstance(result, str)
+
+
+class TestDeleteCalendarTool:
+    """Tests for the delete_calendar MCP tool."""
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_returns_success_message(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.delete_calendar.return_value = {"name": "Old Calendar"}
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import delete_calendar
+        result = delete_calendar(name="Old Calendar")
+        assert "Deleted calendar" in result
+        assert "Old Calendar" in result
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_returns_error_on_failure(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.delete_calendar.side_effect = ValueError("Calendar 'X' not found")
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import delete_calendar
+        result = delete_calendar(name="X")
+        assert "Error" in result
+        assert isinstance(result, str)
+
+
 class TestCreateEventTool:
     """Tests for the create_event MCP tool."""
 

@@ -294,6 +294,63 @@ class TestGetCalendars:
         assert "Calendar" in script
 
 
+# ── create_calendar ─────────────────────────────────────────────────────────
+
+
+class TestCreateCalendar:
+    """Tests for CalendarConnector.create_calendar()."""
+
+    def setup_method(self):
+        self.connector = CalendarConnector(enable_safety_checks=False)
+
+    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
+    def test_creates_calendar(self, mock_run):
+        mock_run.return_value = "calendar id ABC-123"
+        result = self.connector.create_calendar("New Calendar")
+        assert result == {"name": "New Calendar"}
+        script = mock_run.call_args[0][0]
+        assert 'make new calendar' in script
+        assert 'name:"New Calendar"' in script
+
+    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
+    def test_escapes_special_characters(self, mock_run):
+        mock_run.return_value = "calendar id ABC-123"
+        self.connector.create_calendar('Cal with "quotes"')
+        script = mock_run.call_args[0][0]
+        assert 'Cal with \\"quotes\\"' in script
+
+
+# ── delete_calendar ─────────────────────────────────────────────────────────
+
+
+class TestDeleteCalendar:
+    """Tests for CalendarConnector.delete_calendar()."""
+
+    def setup_method(self):
+        self.connector = CalendarConnector(enable_safety_checks=False)
+
+    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
+    def test_deletes_calendar(self, mock_run):
+        mock_run.return_value = ""
+        result = self.connector.delete_calendar("Old Calendar")
+        assert result == {"name": "Old Calendar"}
+        script = mock_run.call_args[0][0]
+        assert 'delete calendar "Old Calendar"' in script
+
+    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
+    def test_not_found_raises_error(self, mock_run):
+        mock_run.side_effect = subprocess.CalledProcessError(
+            returncode=1, cmd="osascript", stderr="Calendar not found"
+        )
+        with pytest.raises(ValueError, match="not found"):
+            self.connector.delete_calendar("Nonexistent")
+
+    def test_safety_blocks_non_test_calendar(self):
+        connector = CalendarConnector(enable_safety_checks=True)
+        with pytest.raises(CalendarSafetyError, match="not an allowed test calendar"):
+            connector.delete_calendar("Personal")
+
+
 # ── create_event ─────────────────────────────────────────────────────────────
 
 

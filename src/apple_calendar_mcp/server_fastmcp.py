@@ -74,6 +74,38 @@ def get_calendars() -> str:
 
 
 @mcp.tool()
+def create_calendar(name: str) -> str:
+    """Create a new calendar in Apple Calendar.
+
+    Args:
+        name: Name for the new calendar
+    """
+    client = get_client()
+    try:
+        result = client.create_calendar(name=name)
+    except Exception as e:
+        return f"Error creating calendar: {e}"
+    return f"Created calendar '{result['name']}'"
+
+
+@mcp.tool()
+def delete_calendar(name: str) -> str:
+    """Delete a calendar from Apple Calendar.
+
+    This permanently removes the calendar and all its events. Use with caution.
+
+    Args:
+        name: Exact name of the calendar to delete (use get_calendars to find available names)
+    """
+    client = get_client()
+    try:
+        result = client.delete_calendar(name=name)
+    except Exception as e:
+        return f"Error deleting calendar: {e}"
+    return f"Deleted calendar '{result['name']}'"
+
+
+@mcp.tool()
 def create_event(
     calendar_name: str,
     summary: str,
