@@ -588,6 +588,32 @@ class TestRoundTripIntegration:
         finally:
             _delete_event_by_uid(uid)
 
+    def test_returned_timestamps_without_z_suffix(self, connector):
+        """Simulate Claude stripping Z from timestamps — should still find the event."""
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Stripped Z Test",
+            start_date="2027-03-20T14:00:00",
+            end_date="2027-03-20T15:00:00",
+        )
+        try:
+            events = connector.get_events(TEST_CALENDAR, "2027-03-20", "2027-03-21")
+            matches = [e for e in events if e["uid"] == uid]
+            assert len(matches) == 1
+
+            # Strip any Z suffix (simulating what Claude Desktop does)
+            returned_start = matches[0]["start_date"].rstrip("Z")
+            returned_end = matches[0]["end_date"].rstrip("Z")
+
+            # Should still find the event
+            events2 = connector.get_events(TEST_CALENDAR, returned_start, returned_end)
+            matches2 = [e for e in events2 if e["uid"] == uid]
+            assert len(matches2) == 1, (
+                f"Event not found with stripped-Z timestamps: start={returned_start}, end={returned_end}"
+            )
+        finally:
+            _delete_event_by_uid(uid)
+
     def test_update_then_read_back(self, connector):
         """Create → update → read back → verify only updated fields changed."""
         uid = connector.create_event(

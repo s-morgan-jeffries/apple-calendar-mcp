@@ -253,8 +253,8 @@ class TestGetEventsTool:
     def test_returns_formatted_event_list(self, mock_get_client):
         mock_client = MagicMock()
         mock_client.get_events.return_value = [
-            {"uid": "ABC-123", "summary": "Team Meeting", "start_date": "2026-03-15T14:00:00Z",
-             "end_date": "2026-03-15T15:00:00Z", "allday_event": False, "location": "Room 4",
+            {"uid": "ABC-123", "summary": "Team Meeting", "start_date": "2026-03-15T14:00:00",
+             "end_date": "2026-03-15T15:00:00", "allday_event": False, "location": "Room 4",
              "description": "Weekly sync", "url": "", "status": "confirmed", "calendar_name": "Work"},
         ]
         mock_get_client.return_value = mock_client
