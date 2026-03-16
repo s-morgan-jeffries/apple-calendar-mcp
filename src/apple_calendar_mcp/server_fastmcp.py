@@ -167,6 +167,55 @@ def get_events(
     return f"Found {len(events)} event(s) in '{calendar_name}':\n\n" + "\n".join(lines)
 
 
+def _format_free_slot(slot: dict) -> str:
+    """Format a free time slot as human-readable text."""
+    hours = slot["duration_minutes"] // 60
+    minutes = slot["duration_minutes"] % 60
+    if hours and minutes:
+        duration = f"{hours}h {minutes}m"
+    elif hours:
+        duration = f"{hours}h"
+    else:
+        duration = f"{minutes}m"
+    return f"{slot['start_date']} to {slot['end_date']} ({duration})"
+
+
+@mcp.tool()
+def get_availability(
+    calendar_names: list[str],
+    start_date: str,
+    end_date: str,
+) -> str:
+    """Find free time slots across one or more calendars.
+
+    Queries all specified calendars, merges busy periods, and returns
+    available (free) time slots within the date range. Useful for scheduling.
+
+    Use get_calendars first to find available calendar names.
+
+    Args:
+        calendar_names: List of calendar names to check for combined availability
+        start_date: Start of range in ISO 8601 format (e.g., "2026-03-15T09:00:00")
+        end_date: End of range in ISO 8601 format (e.g., "2026-03-15T17:00:00")
+    """
+    client = get_client()
+    try:
+        slots = client.get_availability(
+            calendar_names=calendar_names,
+            start_date=start_date,
+            end_date=end_date,
+        )
+    except Exception as e:
+        return f"Error checking availability: {e}"
+
+    cal_list = ", ".join(f"'{c}'" for c in calendar_names)
+    if not slots:
+        return f"No free time in {cal_list} between {start_date} and {end_date}."
+
+    lines = [_format_free_slot(slot) for slot in slots]
+    return f"Found {len(slots)} free slot(s) across {cal_list}:\n\n" + "\n".join(lines)
+
+
 @mcp.tool()
 def update_event(
     calendar_name: str,

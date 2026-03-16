@@ -2,7 +2,7 @@
 import subprocess
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Optional
 
@@ -440,6 +440,121 @@ end tell'''
                 not_found_uids.append(uid)
 
         return {"deleted_uids": deleted_uids, "not_found_uids": not_found_uids}
+
+    def _parse_iso_datetime(self, date_str: str) -> datetime:
+        """Parse an ISO 8601 date string to a naive local-time datetime.
+
+        Timezone-aware dates (e.g., from EventKit's UTC output) are converted
+        to local time before stripping tzinfo, so they can be compared with
+        timezone-naive query dates.
+
+        Raises:
+            ValueError: If the date format is invalid.
+        """
+        try:
+            if "T" in date_str:
+                dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+                if dt.tzinfo is not None:
+                    dt = dt.astimezone().replace(tzinfo=None)
+                return dt
+            else:
+                return datetime.fromisoformat(date_str + "T00:00:00")
+        except ValueError as e:
+            raise ValueError(
+                f"Invalid date format '{date_str}'. "
+                "Expected ISO 8601 format like '2026-03-15' or '2026-03-15T14:30:00'"
+            ) from e
+
+    def get_availability(
+        self,
+        calendar_names: list[str],
+        start_date: str,
+        end_date: str,
+    ) -> list[dict[str, Any]]:
+        """Get free time slots across one or more calendars.
+
+        Queries events from all specified calendars, merges overlapping busy
+        periods, and returns the gaps (free slots) within the date range.
+
+        Args:
+            calendar_names: List of calendar names to check
+            start_date: Start of range in ISO 8601 format
+            end_date: End of range in ISO 8601 format
+
+        Returns:
+            List of dicts with 'start_date', 'end_date', 'duration_minutes' keys
+            representing free time slots.
+
+        Raises:
+            ValueError: If date format is invalid, calendar not found, or no calendars provided
+            PermissionError: If EventKit calendar access is denied
+        """
+        if not calendar_names:
+            raise ValueError("At least one calendar name must be provided")
+
+        range_start = self._parse_iso_datetime(start_date)
+        range_end = self._parse_iso_datetime(end_date)
+
+        # Collect all events across calendars
+        all_events = []
+        for cal_name in calendar_names:
+            events = self.get_events(cal_name, start_date, end_date)
+            all_events.extend(events)
+
+        # Build busy blocks from events
+        busy_blocks = []
+        for event in all_events:
+            evt_start = self._parse_iso_datetime(event["start_date"])
+            evt_end = self._parse_iso_datetime(event["end_date"])
+
+            # All-day events block the full day(s)
+            if event.get("allday_event"):
+                evt_start = evt_start.replace(hour=0, minute=0, second=0)
+                evt_end = evt_end.replace(hour=0, minute=0, second=0)
+                if evt_end == evt_start:
+                    evt_end += timedelta(days=1)
+
+            busy_blocks.append((evt_start, evt_end))
+
+        # Sort by start time
+        busy_blocks.sort(key=lambda b: b[0])
+
+        # Merge overlapping/adjacent blocks
+        merged = []
+        for start, end in busy_blocks:
+            if merged and start <= merged[-1][1]:
+                merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+            else:
+                merged.append((start, end))
+
+        # Compute free slots (gaps between busy blocks within the range)
+        free_slots = []
+        cursor = range_start
+
+        for busy_start, busy_end in merged:
+            # Clamp to range
+            busy_start = max(busy_start, range_start)
+            busy_end = min(busy_end, range_end)
+
+            if cursor < busy_start:
+                duration = int((busy_start - cursor).total_seconds() / 60)
+                free_slots.append({
+                    "start_date": cursor.isoformat(),
+                    "end_date": busy_start.isoformat(),
+                    "duration_minutes": duration,
+                })
+            cursor = max(cursor, busy_end)
+
+        # Gap after last busy block
+        if cursor < range_end:
+            duration = int((range_end - cursor).total_seconds() / 60)
+            free_slots.append({
+                "start_date": cursor.isoformat(),
+                "end_date": range_end.isoformat(),
+                "duration_minutes": duration,
+            })
+
+        return free_slots
 
     def get_calendars(self) -> list[dict[str, Any]]:
         """Get all calendars from Apple Calendar.

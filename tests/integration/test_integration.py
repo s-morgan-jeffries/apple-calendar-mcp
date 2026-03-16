@@ -435,3 +435,37 @@ class TestDeleteEventsIntegration:
             assert uid in result2["not_found_uids"]
         finally:
             _delete_event_by_uid(uid)
+
+
+class TestGetAvailabilityIntegration:
+    """Integration tests for get_availability against real Calendar.app."""
+
+    def test_free_slots_around_event(self, connector):
+        """Create an event and verify free slots before and after it."""
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Availability Test",
+            start_date="2026-11-01T10:00:00",
+            end_date="2026-11-01T11:00:00",
+        )
+        try:
+            slots = connector.get_availability(
+                calendar_names=[TEST_CALENDAR],
+                start_date="2026-11-01T09:00:00",
+                end_date="2026-11-01T12:00:00",
+            )
+            assert len(slots) == 2
+            assert slots[0]["end_date"] == "2026-11-01T10:00:00"
+            assert slots[1]["start_date"] == "2026-11-01T11:00:00"
+        finally:
+            _delete_event_by_uid(uid)
+
+    def test_no_events_entire_range_free(self, connector):
+        """Empty date range should return single free slot."""
+        slots = connector.get_availability(
+            calendar_names=[TEST_CALENDAR],
+            start_date="2099-06-01T09:00:00",
+            end_date="2099-06-01T17:00:00",
+        )
+        assert len(slots) == 1
+        assert slots[0]["duration_minutes"] == 480

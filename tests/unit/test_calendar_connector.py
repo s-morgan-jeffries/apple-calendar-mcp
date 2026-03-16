@@ -483,6 +483,155 @@ class TestGetEvents:
         mock_swift.assert_called_once()
 
 
+# ── get_availability ────────────────────────────────────────────────────────
+
+
+class TestGetAvailability:
+    """Tests for CalendarConnector.get_availability()."""
+
+    def setup_method(self):
+        self.connector = CalendarConnector()
+
+    def _make_event(self, start, end, allday=False, calendar="Work"):
+        return {
+            "uid": "UID-1", "summary": "Event", "start_date": start,
+            "end_date": end, "allday_event": allday, "location": "",
+            "description": "", "url": "", "status": "confirmed",
+            "calendar_name": calendar,
+        }
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_no_events_entire_range_free(self, mock_swift):
+        mock_swift.return_value = "[]"
+        result = self.connector.get_availability(
+            ["Work"], "2026-03-15T09:00:00", "2026-03-15T17:00:00"
+        )
+        assert len(result) == 1
+        assert result[0]["start_date"] == "2026-03-15T09:00:00"
+        assert result[0]["end_date"] == "2026-03-15T17:00:00"
+        assert result[0]["duration_minutes"] == 480
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_single_event_gaps_before_and_after(self, mock_swift):
+        mock_swift.return_value = json.dumps([
+            self._make_event("2026-03-15T10:00:00", "2026-03-15T11:00:00"),
+        ])
+        result = self.connector.get_availability(
+            ["Work"], "2026-03-15T09:00:00", "2026-03-15T17:00:00"
+        )
+        assert len(result) == 2
+        assert result[0]["start_date"] == "2026-03-15T09:00:00"
+        assert result[0]["end_date"] == "2026-03-15T10:00:00"
+        assert result[0]["duration_minutes"] == 60
+        assert result[1]["start_date"] == "2026-03-15T11:00:00"
+        assert result[1]["end_date"] == "2026-03-15T17:00:00"
+        assert result[1]["duration_minutes"] == 360
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_multiple_events_gaps_between(self, mock_swift):
+        mock_swift.return_value = json.dumps([
+            self._make_event("2026-03-15T09:00:00", "2026-03-15T10:00:00"),
+            self._make_event("2026-03-15T11:00:00", "2026-03-15T12:00:00"),
+        ])
+        result = self.connector.get_availability(
+            ["Work"], "2026-03-15T09:00:00", "2026-03-15T13:00:00"
+        )
+        assert len(result) == 2
+        assert result[0]["start_date"] == "2026-03-15T10:00:00"
+        assert result[0]["end_date"] == "2026-03-15T11:00:00"
+        assert result[1]["start_date"] == "2026-03-15T12:00:00"
+        assert result[1]["end_date"] == "2026-03-15T13:00:00"
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_overlapping_events_merged(self, mock_swift):
+        """Two overlapping events across calendars should merge into one busy block."""
+        def swift_side_effect(script_name, args):
+            cal = args[args.index("--calendar") + 1]
+            if cal == "Work":
+                return json.dumps([
+                    self._make_event("2026-03-15T09:00:00", "2026-03-15T11:00:00", calendar="Work"),
+                ])
+            else:
+                return json.dumps([
+                    self._make_event("2026-03-15T10:00:00", "2026-03-15T12:00:00", calendar="Personal"),
+                ])
+        mock_swift.side_effect = swift_side_effect
+        result = self.connector.get_availability(
+            ["Work", "Personal"], "2026-03-15T08:00:00", "2026-03-15T14:00:00"
+        )
+        assert len(result) == 2
+        assert result[0]["start_date"] == "2026-03-15T08:00:00"
+        assert result[0]["end_date"] == "2026-03-15T09:00:00"
+        assert result[1]["start_date"] == "2026-03-15T12:00:00"
+        assert result[1]["end_date"] == "2026-03-15T14:00:00"
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_adjacent_events_no_gap(self, mock_swift):
+        mock_swift.return_value = json.dumps([
+            self._make_event("2026-03-15T09:00:00", "2026-03-15T10:00:00"),
+            self._make_event("2026-03-15T10:00:00", "2026-03-15T11:00:00"),
+        ])
+        result = self.connector.get_availability(
+            ["Work"], "2026-03-15T09:00:00", "2026-03-15T11:00:00"
+        )
+        assert len(result) == 0
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_allday_event_blocks_full_day(self, mock_swift):
+        mock_swift.return_value = json.dumps([
+            self._make_event("2026-03-15", "2026-03-16", allday=True),
+        ])
+        result = self.connector.get_availability(
+            ["Work"], "2026-03-15T00:00:00", "2026-03-16T00:00:00"
+        )
+        assert len(result) == 0
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_events_covering_entire_range(self, mock_swift):
+        mock_swift.return_value = json.dumps([
+            self._make_event("2026-03-15T08:00:00", "2026-03-15T18:00:00"),
+        ])
+        result = self.connector.get_availability(
+            ["Work"], "2026-03-15T09:00:00", "2026-03-15T17:00:00"
+        )
+        assert len(result) == 0
+
+    def test_invalid_start_date_raises(self):
+        with pytest.raises(ValueError, match="Invalid date format"):
+            self.connector.get_availability(["Work"], "not-a-date", "2026-03-16T00:00:00")
+
+    def test_invalid_end_date_raises(self):
+        with pytest.raises(ValueError, match="Invalid date format"):
+            self.connector.get_availability(["Work"], "2026-03-15T00:00:00", "not-a-date")
+
+    def test_empty_calendar_list_raises(self):
+        with pytest.raises(ValueError, match="At least one calendar"):
+            self.connector.get_availability([], "2026-03-15T00:00:00", "2026-03-16T00:00:00")
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_multiple_calendars_combined(self, mock_swift):
+        """Events from multiple calendars should be merged for availability."""
+        def swift_side_effect(script_name, args):
+            cal = args[args.index("--calendar") + 1]
+            if cal == "Work":
+                return json.dumps([
+                    self._make_event("2026-03-15T09:00:00", "2026-03-15T10:00:00", calendar="Work"),
+                ])
+            else:
+                return json.dumps([
+                    self._make_event("2026-03-15T14:00:00", "2026-03-15T15:00:00", calendar="Personal"),
+                ])
+        mock_swift.side_effect = swift_side_effect
+        result = self.connector.get_availability(
+            ["Work", "Personal"], "2026-03-15T08:00:00", "2026-03-15T16:00:00"
+        )
+        assert len(result) == 3
+        assert result[0]["end_date"] == "2026-03-15T09:00:00"
+        assert result[1]["start_date"] == "2026-03-15T10:00:00"
+        assert result[1]["end_date"] == "2026-03-15T14:00:00"
+        assert result[2]["start_date"] == "2026-03-15T15:00:00"
+
+
 # ── update_event ────────────────────────────────────────────────────────────
 
 
