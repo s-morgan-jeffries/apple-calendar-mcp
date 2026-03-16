@@ -78,6 +78,8 @@ Destructive operations require `CALENDAR_TEST_MODE=true` and `CALENDAR_TEST_NAME
 
 **Hard rule:** If you wrote or modified an AppleScript string in the connector, integration tests must cover that operation before merge. Unit tests mock `run_applescript()` and `run_swift_helper()` and cannot catch AppleScript/Swift errors.
 
+**Round-trip testing:** Integration tests must cover round-trip scenarios — if an API returns data (e.g., timestamps, UIDs) that can be used as input to another call, test that the round-trip works. The timezone bug (#37) was missed because no test read event timestamps back and used them to query again.
+
 ## Branch Convention
 
 `{type}/issue-{num}-{description}` — e.g., `feature/issue-1-get-calendars`, `fix/issue-5-date-parsing`
