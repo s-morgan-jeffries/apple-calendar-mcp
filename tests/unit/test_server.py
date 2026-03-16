@@ -197,6 +197,85 @@ class TestGetEventsTool:
         assert "Error" in result
 
 
+class TestGetAvailabilityTool:
+    """Tests for the get_availability MCP tool."""
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_returns_formatted_free_slots(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.get_availability.return_value = [
+            {"start_date": "2026-03-15T09:00:00", "end_date": "2026-03-15T10:00:00", "duration_minutes": 60},
+            {"start_date": "2026-03-15T11:00:00", "end_date": "2026-03-15T13:00:00", "duration_minutes": 120},
+        ]
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import get_availability
+        result = get_availability(calendar_names=["Work"], start_date="2026-03-15T09:00:00", end_date="2026-03-15T17:00:00")
+        assert "2 free slot(s)" in result
+        assert "1h" in result
+        assert "2h" in result
+        assert isinstance(result, str)
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_returns_no_free_time_message(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.get_availability.return_value = []
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import get_availability
+        result = get_availability(calendar_names=["Work"], start_date="2026-03-15T09:00:00", end_date="2026-03-15T17:00:00")
+        assert "No free time" in result
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_returns_error_string_on_failure(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.get_availability.side_effect = ValueError("Calendar 'Foo' not found")
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import get_availability
+        result = get_availability(calendar_names=["Foo"], start_date="2026-03-15T09:00:00", end_date="2026-03-15T17:00:00")
+        assert "Error" in result
+        assert isinstance(result, str)
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_passes_calendar_names_list(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.get_availability.return_value = []
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import get_availability
+        get_availability(calendar_names=["Work", "Personal"], start_date="2026-03-15T09:00:00", end_date="2026-03-15T17:00:00")
+        mock_client.get_availability.assert_called_once_with(
+            calendar_names=["Work", "Personal"],
+            start_date="2026-03-15T09:00:00",
+            end_date="2026-03-15T17:00:00",
+        )
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_formats_duration_hours_and_minutes(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.get_availability.return_value = [
+            {"start_date": "2026-03-15T09:00:00", "end_date": "2026-03-15T10:30:00", "duration_minutes": 90},
+        ]
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import get_availability
+        result = get_availability(calendar_names=["Work"], start_date="2026-03-15T09:00:00", end_date="2026-03-15T17:00:00")
+        assert "1h 30m" in result
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_formats_duration_minutes_only(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.get_availability.return_value = [
+            {"start_date": "2026-03-15T09:00:00", "end_date": "2026-03-15T09:30:00", "duration_minutes": 30},
+        ]
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import get_availability
+        result = get_availability(calendar_names=["Work"], start_date="2026-03-15T09:00:00", end_date="2026-03-15T17:00:00")
+        assert "30m" in result
+
+
 class TestUpdateEventTool:
     """Tests for the update_event MCP tool."""
 
