@@ -44,6 +44,30 @@ end tell'''
         pass  # Best-effort cleanup
 
 
+class TestCalendarManagementIntegration:
+    """Integration tests for create_calendar and delete_calendar."""
+
+    def test_create_and_delete_calendar(self, connector):
+        """Create a calendar, verify it exists, delete it, verify it's gone."""
+        cal_name = "MCP-Test-Calendar-2"
+        try:
+            result = connector.create_calendar(cal_name)
+            assert result["name"] == cal_name
+
+            calendars = connector.get_calendars()
+            names = [c["name"] for c in calendars]
+            assert cal_name in names
+        finally:
+            try:
+                connector.delete_calendar(cal_name)
+            except Exception:
+                pass
+
+        calendars = connector.get_calendars()
+        names = [c["name"] for c in calendars]
+        assert cal_name not in names
+
+
 class TestGetCalendarsIntegration:
     """Integration tests for get_calendars against real Calendar.app."""
 

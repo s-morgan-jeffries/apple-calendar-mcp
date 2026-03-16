@@ -627,3 +627,43 @@ end toHex
 '''
         result = run_applescript(script)
         return json.loads(result)
+
+    def create_calendar(self, name: str) -> dict[str, str]:
+        """Create a new calendar in Apple Calendar.
+
+        Args:
+            name: Name for the new calendar
+
+        Returns:
+            Dict with 'name' key of the created calendar
+
+        Raises:
+            subprocess.CalledProcessError: If AppleScript execution fails
+        """
+        escaped = self._escape_applescript_string(name)
+        run_applescript(
+            f'tell application "Calendar" to make new calendar with properties {{name:"{escaped}"}}'
+        )
+        return {"name": name}
+
+    def delete_calendar(self, name: str) -> dict[str, str]:
+        """Delete a calendar from Apple Calendar.
+
+        Args:
+            name: Name of the calendar to delete
+
+        Returns:
+            Dict with 'name' key of the deleted calendar
+
+        Raises:
+            CalendarSafetyError: If safety checks block the target calendar
+            ValueError: If the calendar doesn't exist
+            subprocess.CalledProcessError: If AppleScript execution fails
+        """
+        self._verify_calendar_safety(name)
+        escaped = self._escape_applescript_string(name)
+        try:
+            run_applescript(f'tell application "Calendar" to delete calendar "{escaped}"')
+        except subprocess.CalledProcessError as e:
+            raise ValueError(f"Calendar '{name}' not found or could not be deleted") from e
+        return {"name": name}
