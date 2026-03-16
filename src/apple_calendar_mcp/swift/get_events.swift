@@ -72,8 +72,11 @@ func outputError(_ error: String, _ message: String) {
 }
 
 func eventToDict(_ event: EKEvent) -> [String: Any] {
-    let df = ISO8601DateFormatter()
-    df.formatOptions = [.withInternetDateTime]
+    // Use local time (no Z suffix) so returned timestamps match query parameter conventions.
+    // This ensures round-trips work: read a timestamp, use it to query again.
+    let df = DateFormatter()
+    df.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+    df.locale = Locale(identifier: "en_US_POSIX")
 
     var dict: [String: Any] = [
         "uid": event.calendarItemIdentifier,

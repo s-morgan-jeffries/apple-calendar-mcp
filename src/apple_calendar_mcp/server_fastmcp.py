@@ -18,7 +18,7 @@ EVENTS: Events have summary (title), start/end dates, location, description (not
 
 RECURRING EVENTS: Recurring events share the same UID across all occurrences. Each occurrence has a unique occurrence_date. The is_recurring field indicates if an event is part of a series. The recurrence_rule field contains the iCalendar RRULE (e.g., "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE,FR"). Note: update_event by UID modifies the entire series — single-occurrence modification is not yet supported.
 
-DATES: All dates use ISO 8601 format (e.g., "2026-03-15" or "2026-03-15T14:30:00"). The server handles conversion to/from AppleScript's locale-dependent date format.
+DATES: All dates use ISO 8601 format in local time, without timezone suffix (e.g., "2026-03-15" or "2026-03-15T14:30:00"). Returned event timestamps are also in local time. Do NOT append "Z" to dates — they are not UTC.
 """)
 
 # Initialize Calendar client (lazy)

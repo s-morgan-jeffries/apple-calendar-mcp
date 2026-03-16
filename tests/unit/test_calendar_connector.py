@@ -507,8 +507,8 @@ class TestGetEvents:
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_parses_json_response(self, mock_swift):
         mock_swift.return_value = json.dumps([
-            {"uid": "ABC-123", "summary": "Meeting", "start_date": "2026-03-15T14:00:00Z",
-             "end_date": "2026-03-15T15:00:00Z", "allday_event": False, "location": "",
+            {"uid": "ABC-123", "summary": "Meeting", "start_date": "2026-03-15T14:00:00",
+             "end_date": "2026-03-15T15:00:00", "allday_event": False, "location": "",
              "description": "", "url": "", "status": "confirmed", "calendar_name": "Work"},
         ])
         result = self.connector.get_events("Work", "2026-03-15T00:00:00", "2026-03-16T00:00:00")
