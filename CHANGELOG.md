@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-03-16
+
+### Added
+
+- Recurring event support: read recurrence fields from `get_events`, create recurring events with RRULE syntax (#43)
+- `create_calendar` and `delete_calendar` tools (#45)
+- Comprehensive integration test suite: round-trip, workflow, timezone, error handling tests (#46)
+- Production config unit tests verifying safety check behavior (#46)
+- Recurring events research documented in gap analysis (#34)
+
+### Fixed
+
+- Safety checks now only enabled during tests (`CALENDAR_TEST_MODE=true`), not in production (#36)
+- EventKit store refresh (`refreshSourcesIfNecessary`) for recently-created events (#36)
+
 ## [0.2.0] - 2026-03-16
 
 ### Added
