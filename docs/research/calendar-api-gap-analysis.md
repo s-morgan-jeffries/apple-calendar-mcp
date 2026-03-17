@@ -163,10 +163,12 @@ All write operations implemented and tested via AppleScript:
 | Feature | UI Available | AppleScript | Status |
 |---------|-------------|-------------|--------|
 | Recurring events | ✅ | ✅ Read + create with RRULE. See Recurring Events section. | Tested 2026-03-16 |
-| Attendees | ✅ | Partial (count works) | Individual attendee properties untested |
-| Alerts/reminders | ✅ | Unknown | Needs testing |
-| Travel time | ✅ | Unknown | Needs testing |
-| Calendar sharing | ✅ | Unknown | Likely not available |
+| Attendees | ✅ | ✅ Read (email, status). ✅ Create via AppleScript. See Attendees section. | Tested 2026-03-16 |
+| Alerts/reminders | ✅ | ✅ Read + create display alarms. See Alerts section. | Tested 2026-03-16 |
+| Travel time | ✅ | EventKit only (structuredLocation with geo coords). | Tested 2026-03-16 |
+| Text search | ✅ | AppleScript works on small calendars, likely slow on large. EventKit: fast client-side filter. | Tested 2026-03-16 |
+| Attachments | ✅ | ❌ Not exposed via EventKit or AppleScript | Tested 2026-03-16 |
+| Calendar sharing | ✅ | Read-only: type, isSubscribed, isImmutable via EventKit | Tested 2026-03-16 |
 
 ---
 
@@ -212,11 +214,93 @@ Each occurrence exposes:
 
 ---
 
+## Attendees (tested 2026-03-16)
+
+### AppleScript
+
+- **Read:** `count of attendees of event` ✅, `email of attendee` ✅, `display name of attendee` ✅ (may be `missing value`), `participation status of attendee` ✅ (returns `accepted`, `unknown`, etc.)
+- **Create:** `make new attendee at end of attendees of event with properties {email:"X"}` ✅ — creates attendee, auto-adds organizer as first attendee
+
+### EventKit
+
+- `EKEvent.attendees` → array of `EKParticipant`
+- Properties: `name` (string), `url` (mailto: URL), `participantRole` (enum: 0=unknown, 1=required, etc.), `participantStatus` (enum: 0=unknown, 2=accepted, etc.)
+
+### Notes
+
+- Creating an attendee via AppleScript auto-adds the calendar owner as organizer (attendee 1 with status "accepted")
+- Attendee email may be `missing value` for the auto-added organizer
+- `display name` is often `missing value` — name comes from contacts, not the event itself
+
+---
+
+## Alerts (tested 2026-03-16)
+
+### AppleScript
+
+- **Read:** `display alarms of event` ✅, `sound alarms of event` ✅
+- **Create:** `make new display alarm at end of display alarms of event with properties {trigger interval:-15}` ✅ (negative minutes = before event)
+- **Properties:** `trigger interval` (integer, minutes relative to event start, negative = before)
+
+### EventKit
+
+- `EKEvent.alarms` → array of `EKAlarm`
+- `EKAlarm.relativeOffset` (Double, seconds relative to event start, negative = before)
+- `EKAlarm.type` (enum: 0=display, 1=audio, 2=procedure, 3=email)
+
+### Notes
+
+- Trigger interval in AppleScript is **minutes**, EventKit uses **seconds**
+- Default calendar alerts (set in Calendar preferences) appear as alarms on events
+
+---
+
+## Travel Time & Structured Location (tested 2026-03-16)
+
+- **AppleScript:** No `travel time` property found
+- **EventKit:** `EKEvent.structuredLocation` provides:
+  - `title` (string) — location name/address
+  - `geoLocation` (CLLocation) — latitude/longitude coordinates
+  - `radius` (Double) — geofence radius in meters
+- Travel time is set via Calendar.app UI but no direct API property found in EventKit for the travel duration itself
+
+---
+
+## Text Search (tested 2026-03-16)
+
+- **AppleScript:** `whose summary contains "X"` ✅ on small calendars. Likely slow/timeout on large calendars (same `whose` clause issue as date filtering).
+- **EventKit:** No predicate-based text search. Must fetch events by date range, then filter client-side with `title.localizedCaseInsensitiveContains()`. Fast — 163 matches from 6 months of events in <1s.
+
+### Recommendation
+
+Implement text search in the connector via EventKit: fetch events by date range, filter by text in Python. Similar to `get_availability` pattern.
+
+---
+
+## Attachments (tested 2026-03-16)
+
+- **Not accessible** via EventKit or AppleScript
+- `EKEvent` does not expose a file attachments array
+- Notes/description field can contain text but not file references
+- Calendar.app supports attachments in the UI but the API doesn't expose them
+
+---
+
+## Calendar Properties (tested 2026-03-16)
+
+EventKit exposes additional calendar metadata:
+- `EKCalendar.type` — enum: 1=CalDAV, 2=Exchange, 4=Birthday, etc.
+- `EKCalendar.isSubscribed` — boolean
+- `EKCalendar.isImmutable` — boolean (true for Birthdays, system calendars)
+- `EKCalendar.source` — the account/source the calendar belongs to
+
+---
+
 ## Open Questions
 
 1. ~~**Event filtering on large calendars:**~~ Solved — EventKit via Swift helper provides sub-second queries on any calendar size.
-2. ~~**Recurring event modification:**~~ Answered — AppleScript modification via `whose uid` affects the entire series. Single-occurrence modification requires EventKit's `.thisEvent` span. See Recurring Events section.
-3. **Attendee properties:** What fields are available on attendee objects?
-4. ~~**Calendar creation:**~~ Answered — `make new calendar with properties {name:"X"}` works. Used in test setup.
-5. **Alert/reminder access:** Can we read/set event alerts via AppleScript?
-6. ~~**EventKit alternative:**~~ Partially answered — EventKit via Swift helper is used for reads. Write migration depends on Claude Desktop usability testing (#33).
+2. ~~**Recurring event modification:**~~ Answered — see Recurring Events section.
+3. ~~**Attendee properties:**~~ Answered — see Attendees section.
+4. ~~**Calendar creation:**~~ Answered — `make new calendar with properties {name:"X"}` works.
+5. ~~**Alert/reminder access:**~~ Answered — see Alerts section.
+6. ~~**EventKit alternative:**~~ Partially answered — EventKit via Swift helper is used for reads. Write migration depends on usability testing.
