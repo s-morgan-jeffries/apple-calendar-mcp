@@ -374,30 +374,22 @@ end tell'''
         if not uids:
             raise ValueError("At least one event UID must be provided")
 
-        cal_escaped = self._escape_applescript_string(calendar_name)
-        deleted_uids = []
-        not_found_uids = []
-
+        args = ["--calendar", calendar_name]
         for uid in uids:
-            uid_escaped = self._escape_applescript_string(uid)
-            script = f'''tell application "Calendar"
-    tell calendar "{cal_escaped}"
-        set matchingEvents to (every event whose uid is "{uid_escaped}")
-        if (count of matchingEvents) is 0 then
-            error "Event not found: {uid_escaped}"
-        end if
-        repeat with evt in matchingEvents
-            delete evt
-        end repeat
-    end tell
-end tell'''
-            try:
-                run_applescript(script)
-                deleted_uids.append(uid)
-            except subprocess.CalledProcessError:
-                not_found_uids.append(uid)
+            args += ["--uid", uid]
 
-        return {"deleted_uids": deleted_uids, "not_found_uids": not_found_uids}
+        result = run_swift_helper("delete_events", args)
+        parsed = json.loads(result)
+
+        if isinstance(parsed, dict) and "error" in parsed:
+            if parsed["error"] == "calendar_access_denied":
+                raise PermissionError(parsed["message"])
+            elif parsed["error"] == "calendar_not_found":
+                raise ValueError(parsed["message"])
+            else:
+                raise RuntimeError(parsed["message"])
+
+        return {"deleted_uids": parsed["deleted_uids"], "not_found_uids": parsed["not_found_uids"]}
 
     def _parse_iso_datetime(self, date_str: str) -> datetime:
         """Parse an ISO 8601 date string to a naive local-time datetime.
