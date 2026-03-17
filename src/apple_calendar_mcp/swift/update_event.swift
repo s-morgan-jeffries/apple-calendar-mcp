@@ -16,6 +16,8 @@ struct UpdateEventArgs {
     var url: String?
     var clearUrl = false
     var allday: Bool?
+    var occurrenceDate: String?
+    var span: EKSpan = .thisEvent
     var updatedFields: [String] = []
 }
 
@@ -52,6 +54,10 @@ func parseArgs() -> UpdateEventArgs? {
             result.clearUrl = true; result.updatedFields.append("url")
         case "--allday":
             i += 1; if i < args.count { result.allday = args[i] == "true"; result.updatedFields.append("allday_event") }
+        case "--occurrence-date":
+            i += 1; if i < args.count { result.occurrenceDate = args[i] }
+        case "--span":
+            i += 1; if i < args.count { result.span = args[i] == "future_events" ? .futureEvents : .thisEvent }
         default:
             break
         }
@@ -67,7 +73,8 @@ func parseArgs() -> UpdateEventArgs? {
         location: result.location, clearLocation: result.clearLocation,
         description: result.description, clearDescription: result.clearDescription,
         url: result.url, clearUrl: result.clearUrl,
-        allday: result.allday, updatedFields: result.updatedFields
+        allday: result.allday, occurrenceDate: result.occurrenceDate,
+        span: result.span, updatedFields: result.updatedFields
     )
     return result
 }
@@ -131,9 +138,15 @@ if !accessGranted {
 
 store.refreshSourcesIfNecessary()
 
-// Find event by UID
+// Find event by UID (and optionally by occurrence date)
 let items = store.calendarItems(withExternalIdentifier: parsed.uid)
-let matches = items.compactMap { $0 as? EKEvent }.filter { $0.calendar.title == parsed.calendar }
+var matches = items.compactMap { $0 as? EKEvent }.filter { $0.calendar.title == parsed.calendar }
+
+// If occurrence date specified, find the specific occurrence
+if let occDateStr = parsed.occurrenceDate, let occDate = parseISO8601(occDateStr) {
+    let tolerance: TimeInterval = 60 // 1 minute tolerance
+    matches = matches.filter { abs($0.occurrenceDate.timeIntervalSince(occDate)) < tolerance }
+}
 
 guard let event = matches.first else {
     outputError("event_not_found", "Event not found: \(parsed.uid)")
@@ -177,7 +190,7 @@ if let allday = parsed.allday {
 
 // Save
 do {
-    try store.save(event, span: .thisEvent)
+    try store.save(event, span: parsed.span)
 } catch {
     outputError("save_failed", "Failed to save event: \(error.localizedDescription)")
     exit(0)

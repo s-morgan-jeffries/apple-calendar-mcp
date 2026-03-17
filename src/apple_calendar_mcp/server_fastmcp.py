@@ -16,7 +16,7 @@ CALENDAR IDENTIFICATION: Calendars are identified by name (not UID — UIDs are 
 
 EVENTS: Events have summary (title), start/end dates, location, description (notes), URL, status, and recurrence. Events are identified by their UID (UUID format).
 
-RECURRING EVENTS: Recurring events share the same UID across all occurrences. Each occurrence has a unique occurrence_date. The is_recurring field indicates if an event is part of a series. The recurrence_rule field contains the iCalendar RRULE (e.g., "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE,FR"). Note: update_event by UID modifies the entire series — single-occurrence modification is not yet supported.
+RECURRING EVENTS: Recurring events share the same UID across all occurrences. Each occurrence has a unique occurrence_date. The is_recurring field indicates if an event is part of a series. The recurrence_rule field contains the iCalendar RRULE (e.g., "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE,FR"). To modify or delete a specific occurrence, pass occurrence_date and span="this_event". To modify or delete the series from a point onward, use span="future_events".
 
 DATES: All dates use ISO 8601 format in local time, without timezone suffix (e.g., "2026-03-15" or "2026-03-15T14:30:00"). Returned event timestamps are also in local time. Do NOT append "Z" to dates — they are not UTC.
 """)
@@ -274,6 +274,8 @@ def update_event(
     description: str | None = None,
     url: str | None = None,
     allday_event: bool | None = None,
+    occurrence_date: str = "",
+    span: str = "this_event",
 ) -> str:
     """Update an existing event's properties by UID.
 
@@ -281,6 +283,9 @@ def update_event(
     To clear a text field (location, description, url), pass an empty string "".
 
     Use get_events first to find the event's UID and calendar_name.
+
+    For recurring events: use occurrence_date to target a specific occurrence,
+    and span to control whether the change affects just this occurrence or the series.
 
     Args:
         calendar_name: Exact name of the calendar containing the event
@@ -292,6 +297,8 @@ def update_event(
         description: New description/notes, or "" to clear (optional)
         url: New URL, or "" to clear (optional)
         allday_event: New all-day status (optional)
+        occurrence_date: For recurring events, the occurrence_date from get_events to target a specific occurrence (optional)
+        span: "this_event" to update one occurrence, "future_events" to update this and all future occurrences (default: "this_event")
     """
     client = get_client()
     try:
@@ -305,6 +312,8 @@ def update_event(
             description=description,
             url=url,
             allday_event=allday_event,
+            occurrence_date=occurrence_date or None,
+            span=span,
         )
     except Exception as e:
         return f"Error updating event: {e}"
@@ -317,6 +326,7 @@ def update_event(
 def delete_events(
     calendar_name: str,
     event_uid: str | list[str],
+    span: str = "this_event",
 ) -> str:
     """Delete one or more events from a calendar by UID.
 
@@ -325,15 +335,19 @@ def delete_events(
 
     Use get_events first to find the event UID(s) and calendar_name.
 
+    For recurring events: use span to control deletion scope.
+
     Args:
         calendar_name: Exact name of the calendar containing the event(s)
         event_uid: UID of a single event (str) or list of UIDs to delete
+        span: "this_event" to delete one occurrence, "future_events" to delete the series from this point onward (default: "this_event")
     """
     client = get_client()
     try:
         result = client.delete_events(
             calendar_name=calendar_name,
             event_uids=event_uid,
+            span=span,
         )
     except Exception as e:
         return f"Error deleting event(s): {e}"
