@@ -238,9 +238,9 @@ class TestGetCalendars:
     def setup_method(self):
         self.connector = CalendarConnector()
 
-    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
-    def test_returns_list_of_calendar_dicts(self, mock_run):
-        mock_run.return_value = json.dumps([
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_returns_list_of_calendar_dicts(self, mock_swift):
+        mock_swift.return_value = json.dumps([
             {"name": "Personal", "writable": True, "description": "", "color": "#0072FF"},
             {"name": "Work", "writable": True, "description": "", "color": "#FF0023"},
         ])
@@ -250,9 +250,9 @@ class TestGetCalendars:
         assert result[0]["name"] == "Personal"
         assert result[1]["name"] == "Work"
 
-    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
-    def test_calendar_has_expected_keys(self, mock_run):
-        mock_run.return_value = json.dumps([
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_calendar_has_expected_keys(self, mock_swift):
+        mock_swift.return_value = json.dumps([
             {"name": "Personal", "writable": True, "description": "my cal", "color": "#0072FF"},
         ])
         result = self.connector.get_calendars()
@@ -262,36 +262,42 @@ class TestGetCalendars:
         assert "description" in cal
         assert "color" in cal
 
-    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
-    def test_empty_calendar_list(self, mock_run):
-        mock_run.return_value = json.dumps([])
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_empty_calendar_list(self, mock_swift):
+        mock_swift.return_value = json.dumps([])
         result = self.connector.get_calendars()
         assert result == []
 
-    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
-    def test_read_only_calendar(self, mock_run):
-        mock_run.return_value = json.dumps([
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_read_only_calendar(self, mock_swift):
+        mock_swift.return_value = json.dumps([
             {"name": "Holidays", "writable": False, "description": "US Holidays", "color": "#8882FE"},
         ])
         result = self.connector.get_calendars()
         assert result[0]["writable"] is False
 
-    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
-    def test_calendar_with_empty_description(self, mock_run):
-        mock_run.return_value = json.dumps([
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_calendar_with_empty_description(self, mock_swift):
+        mock_swift.return_value = json.dumps([
             {"name": "Work", "writable": True, "description": "", "color": "#FF0000"},
         ])
         result = self.connector.get_calendars()
         assert result[0]["description"] == ""
 
-    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
-    def test_calls_applescript(self, mock_run):
-        """Verify get_calendars executes an AppleScript command."""
-        mock_run.return_value = json.dumps([])
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_calls_swift_helper(self, mock_swift):
+        """Verify get_calendars uses the Swift helper."""
+        mock_swift.return_value = json.dumps([])
         self.connector.get_calendars()
-        mock_run.assert_called_once()
-        script = mock_run.call_args[0][0]
-        assert "Calendar" in script
+        mock_swift.assert_called_once_with("get_calendars", [])
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_handles_access_denied(self, mock_swift):
+        mock_swift.return_value = json.dumps(
+            {"error": "calendar_access_denied", "message": "Access denied"}
+        )
+        with pytest.raises(PermissionError, match="Access denied"):
+            self.connector.get_calendars()
 
 
 # ── create_calendar ─────────────────────────────────────────────────────────
