@@ -164,55 +164,34 @@ class CalendarConnector:
             subprocess.CalledProcessError: If AppleScript execution fails
         """
         self._verify_calendar_safety(calendar_name)
+        self._validate_date(start_date)
+        self._validate_date(end_date)
 
-        # Convert dates (validates format)
-        as_start = self._iso_to_applescript_date(start_date)
-        as_end = self._iso_to_applescript_date(end_date)
-
-        # Escape user-provided strings
-        cal_escaped = self._escape_applescript_string(calendar_name)
-        summary_escaped = self._escape_applescript_string(summary)
-
-        # Build allday property
-        allday_str = "true" if allday_event else "false"
-
-        # Build recurrence property (included in creation properties, not set separately)
-        recurrence_prop = ""
-        if recurrence_rule:
-            rule_escaped = self._escape_applescript_string(recurrence_rule)
-            recurrence_prop = f', recurrence:"{rule_escaped}"'
-
-        # Build optional property setters
-        optional_lines = []
+        args = ["--calendar", calendar_name, "--summary", summary,
+                "--start", start_date, "--end", end_date]
         if location:
-            loc_escaped = self._escape_applescript_string(location)
-            optional_lines.append(
-                f'        set location of newEvent to "{loc_escaped}"'
-            )
+            args += ["--location", location]
         if description:
-            desc_escaped = self._escape_applescript_string(description)
-            optional_lines.append(
-                f'        set description of newEvent to "{desc_escaped}"'
-            )
+            args += ["--description", description]
         if url:
-            url_escaped = self._escape_applescript_string(url)
-            optional_lines.append(
-                f'        set url of newEvent to "{url_escaped}"'
-            )
+            args += ["--url", url]
+        if allday_event:
+            args += ["--allday"]
+        if recurrence_rule:
+            args += ["--recurrence", recurrence_rule]
 
-        optional_block = "\n".join(optional_lines)
-        if optional_block:
-            optional_block = "\n" + optional_block
+        result = run_swift_helper("create_event", args)
+        parsed = json.loads(result)
 
-        script = f'''tell application "Calendar"
-    tell calendar "{cal_escaped}"
-        set newEvent to make new event at end of events with properties {{summary:"{summary_escaped}", start date:date "{as_start}", end date:date "{as_end}", allday event:{allday_str}{recurrence_prop}}}
-{optional_block}
-        return uid of newEvent
-    end tell
-end tell'''
+        if isinstance(parsed, dict) and "error" in parsed:
+            if parsed["error"] == "calendar_access_denied":
+                raise PermissionError(parsed["message"])
+            elif parsed["error"] == "calendar_not_found":
+                raise ValueError(parsed["message"])
+            else:
+                raise RuntimeError(parsed["message"])
 
-        return run_applescript(script).strip()
+        return parsed["uid"]
 
     def _validate_date(self, date_str: str) -> None:
         """Validate that a string is a valid ISO 8601 date.

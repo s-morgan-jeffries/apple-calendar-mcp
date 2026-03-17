@@ -366,9 +366,9 @@ class TestCreateEvent:
     def setup_method(self):
         self.connector = CalendarConnector(enable_safety_checks=False)
 
-    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
-    def test_creates_event_with_required_fields(self, mock_run):
-        mock_run.return_value = "3290DD8F-17E9-4DCC-B5FA-764655253E7A"
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_creates_event_with_required_fields(self, mock_swift):
+        mock_swift.return_value = json.dumps({"uid": "3290DD8F-17E9-4DCC-B5FA-764655253E7A"})
         result = self.connector.create_event(
             calendar_name="MCP-Test-Calendar",
             summary="Team Meeting",
@@ -376,16 +376,14 @@ class TestCreateEvent:
             end_date="2026-03-15T15:00:00",
         )
         assert result == "3290DD8F-17E9-4DCC-B5FA-764655253E7A"
-        script = mock_run.call_args[0][0]
-        assert 'calendar "MCP-Test-Calendar"' in script
-        assert "make new event" in script
-        assert "Team Meeting" in script
-        assert "March 15, 2026 02:00:00 PM" in script
-        assert "March 15, 2026 03:00:00 PM" in script
+        mock_swift.assert_called_once_with("create_event", [
+            "--calendar", "MCP-Test-Calendar", "--summary", "Team Meeting",
+            "--start", "2026-03-15T14:00:00", "--end", "2026-03-15T15:00:00",
+        ])
 
-    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
-    def test_creates_event_with_all_optional_fields(self, mock_run):
-        mock_run.return_value = "ABCD-1234"
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_creates_event_with_all_optional_fields(self, mock_swift):
+        mock_swift.return_value = json.dumps({"uid": "ABCD-1234"})
         self.connector.create_event(
             calendar_name="MCP-Test-Calendar",
             summary="Lunch",
@@ -395,14 +393,17 @@ class TestCreateEvent:
             description="Discuss project updates",
             url="https://example.com/meeting",
         )
-        script = mock_run.call_args[0][0]
-        assert "Conference Room A" in script
-        assert "Discuss project updates" in script
-        assert "https://example.com/meeting" in script
+        args = mock_swift.call_args[0][1]
+        assert "--location" in args
+        assert "Conference Room A" in args
+        assert "--description" in args
+        assert "Discuss project updates" in args
+        assert "--url" in args
+        assert "https://example.com/meeting" in args
 
-    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
-    def test_creates_allday_event(self, mock_run):
-        mock_run.return_value = "ALLDAY-UID"
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_creates_allday_event(self, mock_swift):
+        mock_swift.return_value = json.dumps({"uid": "ALLDAY-UID"})
         self.connector.create_event(
             calendar_name="MCP-Test-Calendar",
             summary="Holiday",
@@ -410,22 +411,8 @@ class TestCreateEvent:
             end_date="2026-03-16",
             allday_event=True,
         )
-        script = mock_run.call_args[0][0]
-        assert "allday event:true" in script
-
-    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
-    def test_escapes_special_characters(self, mock_run):
-        mock_run.return_value = "ESC-UID"
-        self.connector.create_event(
-            calendar_name="MCP-Test-Calendar",
-            summary='Meeting with "quotes"',
-            start_date="2026-03-15T14:00:00",
-            end_date="2026-03-15T15:00:00",
-            location='Room "B"',
-        )
-        script = mock_run.call_args[0][0]
-        assert '\\"quotes\\"' in script
-        assert 'Room \\"B\\"' in script
+        args = mock_swift.call_args[0][1]
+        assert "--allday" in args
 
     def test_invalid_start_date_raises_error(self):
         with pytest.raises(ValueError, match="Invalid date format"):
@@ -446,37 +433,38 @@ class TestCreateEvent:
                 end_date="2026-03-15T15:00:00",
             )
 
-    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
-    def test_applescript_failure_raises_exception(self, mock_run):
-        mock_run.side_effect = subprocess.CalledProcessError(
-            returncode=1, cmd="osascript", stderr="Calendar not found"
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_calendar_not_found_raises_error(self, mock_swift):
+        mock_swift.return_value = json.dumps(
+            {"error": "calendar_not_found", "message": "Calendar 'Nope' not found."}
         )
-        with pytest.raises(subprocess.CalledProcessError):
+        with pytest.raises(ValueError, match="not found"):
             self.connector.create_event(
-                calendar_name="MCP-Test-Calendar",
+                calendar_name="Nope",
                 summary="Test",
                 start_date="2026-03-15T14:00:00",
                 end_date="2026-03-15T15:00:00",
             )
 
-    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
-    def test_optional_fields_omitted_when_not_provided(self, mock_run):
-        mock_run.return_value = "UID-123"
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_optional_fields_omitted_when_not_provided(self, mock_swift):
+        mock_swift.return_value = json.dumps({"uid": "UID-123"})
         self.connector.create_event(
             calendar_name="MCP-Test-Calendar",
             summary="Simple Event",
             start_date="2026-03-15T14:00:00",
             end_date="2026-03-15T15:00:00",
         )
-        script = mock_run.call_args[0][0]
-        assert "location" not in script.lower() or "set location" not in script
-        assert "description" not in script.lower() or "set description" not in script
-        assert "set url" not in script
-        assert "recurrence" not in script
+        args = mock_swift.call_args[0][1]
+        assert "--location" not in args
+        assert "--description" not in args
+        assert "--url" not in args
+        assert "--allday" not in args
+        assert "--recurrence" not in args
 
-    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
-    def test_creates_recurring_event(self, mock_run):
-        mock_run.return_value = "REC-UID"
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_creates_recurring_event(self, mock_swift):
+        mock_swift.return_value = json.dumps({"uid": "REC-UID"})
         self.connector.create_event(
             calendar_name="MCP-Test-Calendar",
             summary="Weekly Standup",
@@ -484,8 +472,9 @@ class TestCreateEvent:
             end_date="2026-07-01T09:30:00",
             recurrence_rule="FREQ=WEEKLY;BYDAY=MO,WE,FR",
         )
-        script = mock_run.call_args[0][0]
-        assert 'recurrence:"FREQ=WEEKLY;BYDAY=MO,WE,FR"' in script
+        args = mock_swift.call_args[0][1]
+        assert "--recurrence" in args
+        assert "FREQ=WEEKLY;BYDAY=MO,WE,FR" in args
 
 
 # ── get_events ──────────────────────────────────────────────────────────────
