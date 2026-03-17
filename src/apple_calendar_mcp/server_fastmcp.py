@@ -226,6 +226,45 @@ def get_events(
     return f"Found {len(events)} event(s) in '{calendar_name}':\n\n" + "\n".join(lines)
 
 
+@mcp.tool()
+def search_events(
+    query: str,
+    calendar_name: str = "",
+    start_date: str = "",
+    end_date: str = "",
+) -> str:
+    """Search events by text across one or all calendars.
+
+    Searches event summaries, descriptions, and locations with case-insensitive
+    matching. If no calendar is specified, searches all calendars. If no date
+    range is specified, searches from 1 month ago to 6 months from now.
+
+    Args:
+        query: Text to search for in event titles, descriptions, and locations
+        calendar_name: Calendar to search (optional — searches all calendars if empty)
+        start_date: Start of date range in ISO 8601 format (optional)
+        end_date: End of date range in ISO 8601 format (optional)
+    """
+    client = get_client()
+    try:
+        events = client.search_events(
+            query=query,
+            calendar_name=calendar_name or None,
+            start_date=start_date or None,
+            end_date=end_date or None,
+        )
+    except Exception as e:
+        return f"Error searching events: {e}"
+
+    if not events:
+        scope = f"in '{calendar_name}'" if calendar_name else "across all calendars"
+        return f"No events matching '{query}' found {scope}."
+
+    lines = [_format_event(event) for event in events]
+    scope = f"in '{calendar_name}'" if calendar_name else "across all calendars"
+    return f"Found {len(events)} event(s) matching '{query}' {scope}:\n\n" + "\n".join(lines)
+
+
 def _format_free_slot(slot: dict) -> str:
     """Format a free time slot as human-readable text."""
     hours = slot["duration_minutes"] // 60
