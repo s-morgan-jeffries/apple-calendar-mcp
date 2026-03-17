@@ -3,7 +3,7 @@
 An MCP server bridging Claude and Apple Calendar via AppleScript and EventKit on macOS.
 
 **Stack:** Python 3.10+, FastMCP, AppleScript (via `osascript`), Swift/EventKit (via `swift`)
-**Version:** v0.3.0 | **Tests:** 134 unit, 37 integration | **Coverage:** TBD
+**Version:** v0.3.1 | **Tests:** 134 unit, 38 integration | **Coverage:** TBD
 
 ## Commands
 
