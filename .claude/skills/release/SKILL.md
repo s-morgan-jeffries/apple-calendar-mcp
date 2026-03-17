@@ -153,6 +153,12 @@ After the user approves the PR:
    git describe --tags --abbrev=0  # Should return vX.Y.Z
    ```
 
+6. **Create the GitHub Release** using the CHANGELOG entry as release notes:
+   ```bash
+   gh release create vX.Y.Z --title "Release vX.Y.Z" --latest --notes "..."
+   ```
+   Extract the relevant section from CHANGELOG.md for the release notes body.
+
 ## Phase 9: Close Milestone
 
 After the tag is pushed, close the milestone:
