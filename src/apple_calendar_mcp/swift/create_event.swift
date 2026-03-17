@@ -13,6 +13,7 @@ struct CreateEventArgs {
     var url: String?
     var allday: Bool = false
     var recurrence: String?
+    var alertMinutes: [Int] = []
 }
 
 func parseArgs() -> CreateEventArgs? {
@@ -26,6 +27,7 @@ func parseArgs() -> CreateEventArgs? {
     var url: String?
     var allday = false
     var recurrence: String?
+    var alertMinutes: [Int] = []
 
     var i = 1
     while i < args.count {
@@ -48,6 +50,8 @@ func parseArgs() -> CreateEventArgs? {
             allday = true
         case "--recurrence":
             i += 1; if i < args.count { recurrence = args[i] }
+        case "--alert":
+            i += 1; if i < args.count, let mins = Int(args[i]) { alertMinutes.append(mins) }
         default:
             break
         }
@@ -63,6 +67,7 @@ func parseArgs() -> CreateEventArgs? {
     result.url = url
     result.allday = allday
     result.recurrence = recurrence
+    result.alertMinutes = alertMinutes
     return result
 }
 
@@ -224,6 +229,9 @@ if let urlStr = parsed.url, let url = URL(string: urlStr) {
 }
 if let rrule = parsed.recurrence, let rule = parseRecurrenceRule(rrule) {
     event.addRecurrenceRule(rule)
+}
+for mins in parsed.alertMinutes {
+    event.addAlarm(EKAlarm(relativeOffset: TimeInterval(-mins * 60)))
 }
 
 do {

@@ -208,6 +208,7 @@ class TestCreateEventTool:
             url="https://example.com",
             allday_event=True,
             recurrence_rule=None,
+            alert_minutes=None,
         )
 
     @patch("apple_calendar_mcp.server_fastmcp.get_client")
