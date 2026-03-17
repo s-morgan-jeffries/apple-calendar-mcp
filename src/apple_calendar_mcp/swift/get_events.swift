@@ -13,11 +13,12 @@ func printUsage() {
     FileHandle.standardError.write(Data(msg.utf8))
 }
 
-func parseArgs() -> (calendar: String, start: String, end: String)? {
+func parseArgs() -> (calendar: String, start: String, end: String, query: String?)? {
     let args = CommandLine.arguments
     var calendar: String?
     var start: String?
     var end: String?
+    var query: String?
 
     var i = 1
     while i < args.count {
@@ -28,6 +29,8 @@ func parseArgs() -> (calendar: String, start: String, end: String)? {
             i += 1; if i < args.count { start = args[i] }
         case "--end":
             i += 1; if i < args.count { end = args[i] }
+        case "--query":
+            i += 1; if i < args.count { query = args[i] }
         default:
             break
         }
@@ -37,7 +40,7 @@ func parseArgs() -> (calendar: String, start: String, end: String)? {
     guard let cal = calendar, let s = start, let e = end else {
         return nil
     }
-    return (cal, s, e)
+    return (cal, s, e, query)
 }
 
 // MARK: - Date Parsing
@@ -208,7 +211,17 @@ guard let calendar = allCalendars.first(where: { $0.title == parsed.calendar }) 
 
 // Query events
 let predicate = store.predicateForEvents(withStart: startDate, end: endDate, calendars: [calendar])
-let events = store.events(matching: predicate)
+var events = store.events(matching: predicate)
+
+// Filter by query text (case-insensitive match on title, notes, location)
+if let query = parsed.query {
+    let q = query.lowercased()
+    events = events.filter { event in
+        (event.title ?? "").lowercased().contains(q) ||
+        (event.notes ?? "").lowercased().contains(q) ||
+        (event.location ?? "").lowercased().contains(q)
+    }
+}
 
 // Build JSON output
 let eventDicts = events.map { eventToDict($0) }

@@ -245,10 +245,55 @@ class CalendarConnector:
         self._validate_date(start_date)
         self._validate_date(end_date)
 
-        return self._run_swift_helper_json(
-            "get_events",
-            ["--calendar", calendar_name, "--start", start_date, "--end", end_date],
-        )
+        args = ["--calendar", calendar_name, "--start", start_date, "--end", end_date]
+        return self._run_swift_helper_json("get_events", args)
+
+    def search_events(
+        self,
+        query: str,
+        calendar_name: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+    ) -> list[dict[str, Any]]:
+        """Search events by text across one or all calendars.
+
+        Searches event summaries, descriptions, and locations with
+        case-insensitive matching.
+
+        Args:
+            query: Text to search for
+            calendar_name: Calendar to search (optional — searches all if omitted)
+            start_date: Start of date range (optional — defaults to 1 month ago)
+            end_date: End of date range (optional — defaults to 6 months from now)
+
+        Returns:
+            List of matching event dicts.
+        """
+        if not start_date:
+            start_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%dT00:00:00")
+        if not end_date:
+            end_date = (datetime.now() + timedelta(days=180)).strftime("%Y-%m-%dT00:00:00")
+
+        self._validate_date(start_date)
+        self._validate_date(end_date)
+
+        if calendar_name:
+            calendars = [calendar_name]
+        else:
+            cal_list = self.get_calendars()
+            calendars = [c["name"] for c in cal_list]
+
+        all_results = []
+        for cal in calendars:
+            args = ["--calendar", cal, "--start", start_date, "--end", end_date, "--query", query]
+            try:
+                events = self._run_swift_helper_json("get_events", args)
+                if isinstance(events, list):
+                    all_results.extend(events)
+            except ValueError:
+                continue  # skip calendars that error (e.g., not found)
+
+        return all_results
 
     def update_event(
         self,
