@@ -16,6 +16,8 @@ struct UpdateEventArgs {
     var url: String?
     var clearUrl = false
     var allday: Bool?
+    var alertMinutes: [Int] = []
+    var clearAlerts = false
     var occurrenceDate: String?
     var span: EKSpan = .thisEvent
     var updatedFields: [String] = []
@@ -54,6 +56,12 @@ func parseArgs() -> UpdateEventArgs? {
             result.clearUrl = true; result.updatedFields.append("url")
         case "--allday":
             i += 1; if i < args.count { result.allday = args[i] == "true"; result.updatedFields.append("allday_event") }
+        case "--alert":
+            i += 1; if i < args.count, let mins = Int(args[i]) { result.alertMinutes.append(mins) }
+            if !result.updatedFields.contains("alerts") { result.updatedFields.append("alerts") }
+        case "--clear-alerts":
+            result.clearAlerts = true
+            if !result.updatedFields.contains("alerts") { result.updatedFields.append("alerts") }
         case "--occurrence-date":
             i += 1; if i < args.count { result.occurrenceDate = args[i] }
         case "--span":
@@ -73,7 +81,8 @@ func parseArgs() -> UpdateEventArgs? {
         location: result.location, clearLocation: result.clearLocation,
         description: result.description, clearDescription: result.clearDescription,
         url: result.url, clearUrl: result.clearUrl,
-        allday: result.allday, occurrenceDate: result.occurrenceDate,
+        allday: result.allday, alertMinutes: result.alertMinutes,
+        clearAlerts: result.clearAlerts, occurrenceDate: result.occurrenceDate,
         span: result.span, updatedFields: result.updatedFields
     )
     return result
@@ -186,6 +195,12 @@ if let urlStr = parsed.url, let url = URL(string: urlStr) {
 }
 if let allday = parsed.allday {
     event.isAllDay = allday
+}
+if parsed.clearAlerts || !parsed.alertMinutes.isEmpty {
+    event.alarms = nil
+    for mins in parsed.alertMinutes {
+        event.addAlarm(EKAlarm(relativeOffset: TimeInterval(-mins * 60)))
+    }
 }
 
 // Save

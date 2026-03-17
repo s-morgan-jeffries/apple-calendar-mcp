@@ -116,6 +116,11 @@ func eventToDict(_ event: EKEvent) -> [String: Any] {
         dict["recurrence_rule"] = NSNull()
     }
 
+    // Alerts
+    dict["alerts"] = (event.alarms ?? []).map { alarm in
+        ["minutes_before": Int(alarm.relativeOffset / -60)] as [String: Int]
+    }
+
     // Attendees (read-only — EventKit cannot add attendees programmatically)
     dict["attendees"] = (event.attendees ?? []).map { att in
         [

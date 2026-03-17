@@ -155,6 +155,7 @@ class CalendarConnector:
         url: Optional[str] = None,
         allday_event: bool = False,
         recurrence_rule: Optional[str] = None,
+        alert_minutes: Optional[list[int]] = None,
     ) -> str:
         """Create a new event in a specified calendar.
 
@@ -168,6 +169,7 @@ class CalendarConnector:
             url: URL associated with the event (optional)
             allday_event: Whether this is an all-day event
             recurrence_rule: iCalendar RRULE string (optional, e.g. "FREQ=WEEKLY;BYDAY=MO,WE,FR")
+            alert_minutes: List of alert times in minutes before event (optional, e.g. [15, 60])
 
         Returns:
             The UID of the created event
@@ -193,6 +195,9 @@ class CalendarConnector:
             args += ["--allday"]
         if recurrence_rule:
             args += ["--recurrence", recurrence_rule]
+        if alert_minutes:
+            for mins in alert_minutes:
+                args += ["--alert", str(mins)]
 
         parsed = self._run_swift_helper_json("create_event", args)
         return parsed["uid"]
@@ -256,6 +261,7 @@ class CalendarConnector:
         description: str | None = None,
         url: str | None = None,
         allday_event: bool | None = None,
+        alert_minutes: list[int] | None = None,
         occurrence_date: str | None = None,
         span: str = "this_event",
     ) -> dict[str, Any]:
@@ -298,6 +304,14 @@ class CalendarConnector:
         args, updated_fields = self._build_update_args(
             calendar_name, event_uid, fields, occurrence_date, span
         )
+
+        if alert_minutes is not None:
+            if len(alert_minutes) == 0:
+                args += ["--clear-alerts"]
+            else:
+                for mins in alert_minutes:
+                    args += ["--alert", str(mins)]
+            updated_fields.append("alerts")
 
         if not updated_fields:
             raise ValueError("At least one field must be provided to update")
