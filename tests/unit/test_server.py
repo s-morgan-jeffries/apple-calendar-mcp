@@ -502,6 +502,7 @@ class TestDeleteEventsTool:
         mock_client.delete_events.assert_called_once_with(
             calendar_name="Work",
             event_uids=["UID-1", "UID-2"],
+            span="this_event",
         )
 
 

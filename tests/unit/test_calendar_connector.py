@@ -799,6 +799,32 @@ class TestUpdateEvent:
         with pytest.raises(ValueError, match="Event not found"):
             self.connector.update_event("MCP-Test-Calendar", "BAD-UID", summary="X")
 
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_passes_occurrence_date(self, mock_swift):
+        mock_swift.return_value = json.dumps({"uid": "REC-123", "updated_fields": ["summary"]})
+        self.connector.update_event("MCP-Test-Calendar", "REC-123",
+                                    summary="Modified", occurrence_date="2027-01-05T10:00:00")
+        args = mock_swift.call_args[0][1]
+        assert "--occurrence-date" in args
+        assert "2027-01-05T10:00:00" in args
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_passes_span_future_events(self, mock_swift):
+        mock_swift.return_value = json.dumps({"uid": "REC-123", "updated_fields": ["summary"]})
+        self.connector.update_event("MCP-Test-Calendar", "REC-123",
+                                    summary="Series Update", span="future_events")
+        args = mock_swift.call_args[0][1]
+        assert "--span" in args
+        assert "future_events" in args
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_default_span_not_passed(self, mock_swift):
+        mock_swift.return_value = json.dumps({"uid": "ABC-123", "updated_fields": ["summary"]})
+        self.connector.update_event("MCP-Test-Calendar", "ABC-123", summary="X")
+        args = mock_swift.call_args[0][1]
+        assert "--span" not in args
+        assert "--occurrence-date" not in args
+
 
 # ── delete_events ──────────────────────────────────────────────────────────
 
@@ -857,3 +883,18 @@ class TestDeleteEvents:
         result = self.connector.delete_events("MCP-Test-Calendar", ["UID-1", "UID-2", "UID-3"])
         assert result["deleted_uids"] == ["UID-1", "UID-3"]
         assert result["not_found_uids"] == ["UID-2"]
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_passes_span_future_events(self, mock_swift):
+        mock_swift.return_value = json.dumps({"deleted_uids": ["REC-123"], "not_found_uids": []})
+        self.connector.delete_events("MCP-Test-Calendar", "REC-123", span="future_events")
+        args = mock_swift.call_args[0][1]
+        assert "--span" in args
+        assert "future_events" in args
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_default_span_not_passed(self, mock_swift):
+        mock_swift.return_value = json.dumps({"deleted_uids": ["ABC-123"], "not_found_uids": []})
+        self.connector.delete_events("MCP-Test-Calendar", "ABC-123")
+        args = mock_swift.call_args[0][1]
+        assert "--span" not in args

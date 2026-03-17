@@ -3,10 +3,11 @@ import Foundation
 
 // MARK: - Argument Parsing
 
-func parseArgs() -> (calendar: String, uids: [String])? {
+func parseArgs() -> (calendar: String, uids: [String], span: EKSpan)? {
     let args = CommandLine.arguments
     var calendar: String?
     var uids: [String] = []
+    var span: EKSpan = .thisEvent
 
     var i = 1
     while i < args.count {
@@ -15,6 +16,8 @@ func parseArgs() -> (calendar: String, uids: [String])? {
             i += 1; if i < args.count { calendar = args[i] }
         case "--uid":
             i += 1; if i < args.count { uids.append(args[i]) }
+        case "--span":
+            i += 1; if i < args.count { span = args[i] == "future_events" ? .futureEvents : .thisEvent }
         default:
             break
         }
@@ -24,7 +27,7 @@ func parseArgs() -> (calendar: String, uids: [String])? {
     guard let cal = calendar, !uids.isEmpty else {
         return nil
     }
-    return (cal, uids)
+    return (cal, uids, span)
 }
 
 // MARK: - JSON Output
@@ -84,8 +87,15 @@ for uid in parsed.uids {
         notFoundUids.append(uid)
     } else {
         do {
-            for event in matches {
-                try store.remove(event, span: .thisEvent, commit: false)
+            if parsed.span == .futureEvents {
+                // For futureEvents, remove the first match with futureEvents span
+                // (this deletes the series from this occurrence onward)
+                try store.remove(matches.first!, span: .futureEvents, commit: false)
+            } else {
+                // For thisEvent, remove all matching occurrences individually
+                for event in matches {
+                    try store.remove(event, span: .thisEvent, commit: false)
+                }
             }
             deletedUids.append(uid)
         } catch {
