@@ -60,35 +60,6 @@ def run_swift_helper(script_name: str, args: list[str], timeout: int = 30) -> st
     return result.stdout.strip()
 
 
-# AppleScript helper functions for JSON escaping
-#
-# NOTE: These helpers will be embedded in every AppleScript block that returns JSON.
-# AppleScript does not support imports or modules, so each block must be
-# completely self-contained. This duplication is intentional.
-#
-# DO NOT attempt to refactor this duplication — it will break AppleScript execution.
-APPLESCRIPT_JSON_HELPERS = '''
--- Helper to escape JSON strings
-on escapeJSON(txt)
-    set txt to my replaceText(txt, "\\\\", "\\\\\\\\")
-    set txt to my replaceText(txt, "\\"", "\\\\\\"")
-    set txt to my replaceText(txt, linefeed, "\\\\n")
-    set txt to my replaceText(txt, return, "\\\\r")
-    set txt to my replaceText(txt, tab, "\\\\t")
-    return txt
-end escapeJSON
-
--- Helper to replace text
-on replaceText(sourceText, oldText, newText)
-    set AppleScript's text item delimiters to oldText
-    set textItems to text items of sourceText
-    set AppleScript's text item delimiters to newText
-    set resultText to textItems as text
-    set AppleScript's text item delimiters to ""
-    return resultText
-end replaceText
-'''
-
 
 class CalendarSafetyError(Exception):
     """Raised when calendar safety checks fail."""
@@ -564,69 +535,25 @@ end tell'''
     def get_calendars(self) -> list[dict[str, Any]]:
         """Get all calendars from Apple Calendar.
 
+        Uses EventKit via Swift helper for fast native access.
+
         Returns:
             List of calendar dicts with keys: name, writable, description, color.
-            Note: Calendar UIDs are not accessible via AppleScript (AppleEvent error -10000).
             Calendars are identified by name. Duplicate names may exist across accounts.
+
+        Raises:
+            PermissionError: If EventKit calendar access is denied
         """
-        script = f'''
-{APPLESCRIPT_JSON_HELPERS}
+        result = run_swift_helper("get_calendars", [])
+        parsed = json.loads(result)
 
-tell application "Calendar"
-    set calNames to name of every calendar
-    set calWritable to writable of every calendar
-    set calDescs to description of every calendar
-    set calColors to color of every calendar
-    set calCount to count of calNames
-    set jsonResult to "["
-    repeat with i from 1 to calCount
-        set calName to item i of calNames
-        set calWrite to item i of calWritable
-        set calDesc to item i of calDescs
-        -- Colors are returned as list of {{R, G, B}} per calendar (16-bit values)
-        set calColor to item i of calColors
-        set colorR to item 1 of calColor
-        set colorG to item 2 of calColor
-        set colorB to item 3 of calColor
-        -- Convert 16-bit RGB to hex
-        set hexR to my toHex(colorR div 256)
-        set hexG to my toHex(colorG div 256)
-        set hexB to my toHex(colorB div 256)
-        set hexColor to "#" & hexR & hexG & hexB
+        if isinstance(parsed, dict) and "error" in parsed:
+            if parsed["error"] == "calendar_access_denied":
+                raise PermissionError(parsed["message"])
+            else:
+                raise ValueError(parsed["message"])
 
-        -- Handle missing description
-        if calDesc is missing value then
-            set calDesc to ""
-        end if
-
-        -- Handle boolean writable
-        if calWrite then
-            set writeStr to "true"
-        else
-            set writeStr to "false"
-        end if
-
-        set jsonItem to "{{\\"name\\":\\"" & my escapeJSON(calName) & "\\",\\"writable\\":" & writeStr & ",\\"description\\":\\"" & my escapeJSON(calDesc) & "\\",\\"color\\":\\"" & hexColor & "\\"}}"
-        if i > 1 then
-            set jsonResult to jsonResult & ","
-        end if
-        set jsonResult to jsonResult & jsonItem
-    end repeat
-    set jsonResult to jsonResult & "]"
-    return jsonResult
-end tell
-
-on toHex(val)
-    set hexChars to "0123456789ABCDEF"
-    if val < 0 then set val to 0
-    if val > 255 then set val to 255
-    set hi to (val div 16) + 1
-    set lo to (val mod 16) + 1
-    return (character hi of hexChars) & (character lo of hexChars)
-end toHex
-'''
-        result = run_applescript(script)
-        return json.loads(result)
+        return parsed
 
     def create_calendar(self, name: str) -> dict[str, str]:
         """Create a new calendar in Apple Calendar.
