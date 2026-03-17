@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-03-17
+
+### Changed
+
+- Migrated `get_calendars` from AppleScript to EventKit/Swift — 18x faster (#54)
+- Migrated `create_event` from AppleScript to EventKit/Swift — 3x faster (#55)
+- Migrated `delete_events` from AppleScript to EventKit/Swift — 6x single, 29x batch (#56)
+- Migrated `update_event` from AppleScript to EventKit/Swift — 6x faster (#57)
+- Removed `APPLESCRIPT_JSON_HELPERS` and AppleScript date conversion (no longer needed)
+- Updated architecture: all event operations now use EventKit/Swift
+
+### Added
+
+- Single-occurrence modify for recurring events via `occurrence_date` + `span` parameters (#58)
+- Series delete for recurring events via `span="future_events"` (#58)
+- Batch commit support for delete operations via `EKEventStore.commit()` (#56)
+- RRULE parsing in Swift for recurring event creation (#55)
+
 ## [0.3.1] - 2026-03-16
 
 ### Fixed

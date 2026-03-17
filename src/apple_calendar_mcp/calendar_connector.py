@@ -130,6 +130,20 @@ class CalendarConnector:
         # Format for AppleScript: "March 15, 2026 02:30:00 PM"
         return dt.strftime("%B %d, %Y %I:%M:%S %p")
 
+    def _run_swift_helper_json(self, script_name: str, args: list[str]) -> dict:
+        """Run a Swift helper and parse JSON response, raising on errors."""
+        result = run_swift_helper(script_name, args)
+        parsed = json.loads(result)
+        if isinstance(parsed, dict) and "error" in parsed:
+            error_map = {
+                "calendar_access_denied": PermissionError,
+                "calendar_not_found": ValueError,
+                "event_not_found": ValueError,
+            }
+            exc_type = error_map.get(parsed["error"], RuntimeError)
+            raise exc_type(parsed["message"])
+        return parsed
+
     def create_event(
         self,
         calendar_name: str,
@@ -180,17 +194,7 @@ class CalendarConnector:
         if recurrence_rule:
             args += ["--recurrence", recurrence_rule]
 
-        result = run_swift_helper("create_event", args)
-        parsed = json.loads(result)
-
-        if isinstance(parsed, dict) and "error" in parsed:
-            if parsed["error"] == "calendar_access_denied":
-                raise PermissionError(parsed["message"])
-            elif parsed["error"] == "calendar_not_found":
-                raise ValueError(parsed["message"])
-            else:
-                raise RuntimeError(parsed["message"])
-
+        parsed = self._run_swift_helper_json("create_event", args)
         return parsed["uid"]
 
     def _validate_date(self, date_str: str) -> None:
@@ -236,20 +240,10 @@ class CalendarConnector:
         self._validate_date(start_date)
         self._validate_date(end_date)
 
-        result = run_swift_helper(
+        return self._run_swift_helper_json(
             "get_events",
             ["--calendar", calendar_name, "--start", start_date, "--end", end_date],
         )
-        parsed = json.loads(result)
-
-        # Handle error responses from Swift helper
-        if isinstance(parsed, dict) and "error" in parsed:
-            if parsed["error"] == "calendar_access_denied":
-                raise PermissionError(parsed["message"])
-            else:
-                raise ValueError(parsed["message"])
-
-        return parsed
 
     def update_event(
         self,
@@ -292,62 +286,67 @@ class CalendarConnector:
         """
         self._verify_calendar_safety(calendar_name)
 
-        args = ["--calendar", calendar_name, "--uid", event_uid]
-        updated_fields = []
-
-        if summary is not None:
-            args += ["--summary", summary]
-            updated_fields.append("summary")
-        if start_date is not None:
-            self._validate_date(start_date)
-            args += ["--start", start_date]
-            updated_fields.append("start_date")
-        if end_date is not None:
-            self._validate_date(end_date)
-            args += ["--end", end_date]
-            updated_fields.append("end_date")
-        if location is not None:
-            if location == "":
-                args += ["--clear-location"]
-            else:
-                args += ["--location", location]
-            updated_fields.append("location")
-        if description is not None:
-            if description == "":
-                args += ["--clear-description"]
-            else:
-                args += ["--description", description]
-            updated_fields.append("description")
-        if url is not None:
-            if url == "":
-                args += ["--clear-url"]
-            else:
-                args += ["--url", url]
-            updated_fields.append("url")
-        if allday_event is not None:
-            args += ["--allday", "true" if allday_event else "false"]
-            updated_fields.append("allday_event")
+        fields = {
+            "summary": summary,
+            "start_date": start_date,
+            "end_date": end_date,
+            "location": location,
+            "description": description,
+            "url": url,
+            "allday_event": allday_event,
+        }
+        args, updated_fields = self._build_update_args(
+            calendar_name, event_uid, fields, occurrence_date, span
+        )
 
         if not updated_fields:
             raise ValueError("At least one field must be provided to update")
+
+        self._run_swift_helper_json("update_event", args)
+        return {"uid": event_uid, "updated_fields": updated_fields}
+
+    def _build_update_args(
+        self,
+        calendar_name: str,
+        event_uid: str,
+        fields: dict,
+        occurrence_date: str | None,
+        span: str,
+    ) -> tuple[list[str], list[str]]:
+        """Build CLI args and updated_fields list for update_event Swift helper."""
+        args = ["--calendar", calendar_name, "--uid", event_uid]
+        updated_fields = []
+
+        flag_map = {
+            "summary": "--summary",
+            "start_date": "--start",
+            "end_date": "--end",
+            "location": "--location",
+            "description": "--description",
+            "url": "--url",
+        }
+        clearable = {"location", "description", "url"}
+        date_fields = {"start_date", "end_date"}
+
+        for field_name, value in fields.items():
+            if value is None:
+                continue
+            if field_name == "allday_event":
+                args += ["--allday", "true" if value else "false"]
+            elif field_name in clearable and value == "":
+                args += [f"--clear-{field_name}"]
+            else:
+                if field_name in date_fields:
+                    self._validate_date(value)
+                args += [flag_map[field_name], value]
+            updated_fields.append(field_name)
 
         if occurrence_date:
             args += ["--occurrence-date", occurrence_date]
         if span != "this_event":
             args += ["--span", span]
 
-        result = run_swift_helper("update_event", args)
-        parsed = json.loads(result)
-
-        if isinstance(parsed, dict) and "error" in parsed:
-            if parsed["error"] == "calendar_access_denied":
-                raise PermissionError(parsed["message"])
-            elif parsed["error"] == "event_not_found":
-                raise ValueError(f"Event not found: {event_uid}")
-            else:
-                raise RuntimeError(parsed["message"])
-
-        return {"uid": event_uid, "updated_fields": updated_fields}
+        return args, updated_fields
 
     def delete_events(
         self,
@@ -381,17 +380,7 @@ class CalendarConnector:
         if span != "this_event":
             args += ["--span", span]
 
-        result = run_swift_helper("delete_events", args)
-        parsed = json.loads(result)
-
-        if isinstance(parsed, dict) and "error" in parsed:
-            if parsed["error"] == "calendar_access_denied":
-                raise PermissionError(parsed["message"])
-            elif parsed["error"] == "calendar_not_found":
-                raise ValueError(parsed["message"])
-            else:
-                raise RuntimeError(parsed["message"])
-
+        parsed = self._run_swift_helper_json("delete_events", args)
         return {"deleted_uids": parsed["deleted_uids"], "not_found_uids": parsed["not_found_uids"]}
 
     def _parse_iso_datetime(self, date_str: str) -> datetime:
@@ -518,16 +507,7 @@ class CalendarConnector:
         Raises:
             PermissionError: If EventKit calendar access is denied
         """
-        result = run_swift_helper("get_calendars", [])
-        parsed = json.loads(result)
-
-        if isinstance(parsed, dict) and "error" in parsed:
-            if parsed["error"] == "calendar_access_denied":
-                raise PermissionError(parsed["message"])
-            else:
-                raise ValueError(parsed["message"])
-
-        return parsed
+        return self._run_swift_helper_json("get_calendars", [])
 
     def create_calendar(self, name: str) -> dict[str, str]:
         """Create a new calendar in Apple Calendar.
