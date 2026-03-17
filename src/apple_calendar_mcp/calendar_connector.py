@@ -289,65 +289,56 @@ class CalendarConnector:
         """
         self._verify_calendar_safety(calendar_name)
 
-        # Build set lines and track updated fields
-        set_lines = []
+        args = ["--calendar", calendar_name, "--uid", event_uid]
         updated_fields = []
 
-        # String fields: property name in AppleScript → (field_name, value)
-        string_fields = [
-            ("summary", "summary", summary),
-            ("location", "location", location),
-            ("description", "description", description),
-            ("url", "url", url),
-        ]
-        for as_prop, field_name, value in string_fields:
-            if value is not None:
-                escaped = self._escape_applescript_string(value)
-                set_lines.append(f'        set {as_prop} of evt to "{escaped}"')
-                updated_fields.append(field_name)
-
-        # Date fields: handle ordering to avoid start > end constraint
-        if start_date is not None and end_date is not None:
-            as_start = self._iso_to_applescript_date(start_date)
-            as_end = self._iso_to_applescript_date(end_date)
-            set_lines.append('        set end date of evt to date "December 31, 2099 11:59:59 PM"')
-            set_lines.append(f'        set start date of evt to date "{as_start}"')
-            set_lines.append(f'        set end date of evt to date "{as_end}"')
-            updated_fields.extend(["start_date", "end_date"])
-        elif start_date is not None:
-            as_date = self._iso_to_applescript_date(start_date)
-            set_lines.append(f'        set start date of evt to date "{as_date}"')
+        if summary is not None:
+            args += ["--summary", summary]
+            updated_fields.append("summary")
+        if start_date is not None:
+            self._validate_date(start_date)
+            args += ["--start", start_date]
             updated_fields.append("start_date")
-        elif end_date is not None:
-            as_date = self._iso_to_applescript_date(end_date)
-            set_lines.append(f'        set end date of evt to date "{as_date}"')
+        if end_date is not None:
+            self._validate_date(end_date)
+            args += ["--end", end_date]
             updated_fields.append("end_date")
-
+        if location is not None:
+            if location == "":
+                args += ["--clear-location"]
+            else:
+                args += ["--location", location]
+            updated_fields.append("location")
+        if description is not None:
+            if description == "":
+                args += ["--clear-description"]
+            else:
+                args += ["--description", description]
+            updated_fields.append("description")
+        if url is not None:
+            if url == "":
+                args += ["--clear-url"]
+            else:
+                args += ["--url", url]
+            updated_fields.append("url")
         if allday_event is not None:
-            allday_str = "true" if allday_event else "false"
-            set_lines.append(f"        set allday event of evt to {allday_str}")
+            args += ["--allday", "true" if allday_event else "false"]
             updated_fields.append("allday_event")
 
         if not updated_fields:
             raise ValueError("At least one field must be provided to update")
 
-        cal_escaped = self._escape_applescript_string(calendar_name)
-        uid_escaped = self._escape_applescript_string(event_uid)
-        set_block = "\n".join(set_lines)
+        result = run_swift_helper("update_event", args)
+        parsed = json.loads(result)
 
-        script = f'''tell application "Calendar"
-    tell calendar "{cal_escaped}"
-        set matchingEvents to (every event whose uid is "{uid_escaped}")
-        if (count of matchingEvents) is 0 then
-            error "Event not found: {uid_escaped}"
-        end if
-        set evt to item 1 of matchingEvents
-{set_block}
-        return uid of evt
-    end tell
-end tell'''
+        if isinstance(parsed, dict) and "error" in parsed:
+            if parsed["error"] == "calendar_access_denied":
+                raise PermissionError(parsed["message"])
+            elif parsed["error"] == "event_not_found":
+                raise ValueError(f"Event not found: {event_uid}")
+            else:
+                raise RuntimeError(parsed["message"])
 
-        run_applescript(script)
         return {"uid": event_uid, "updated_fields": updated_fields}
 
     def delete_events(

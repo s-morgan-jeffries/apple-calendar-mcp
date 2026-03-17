@@ -58,12 +58,15 @@ Planned (filed as issues): `update_events`
 
 **Performance:** `whose` clause with date filtering timed out on large calendars (5600+ events). AppleScript event reads are fundamentally too slow (~9s/event for index access, ~18s/property-batch for 306 events). `get_events` uses EventKit via Swift helper instead.
 
-## Hybrid Architecture
+## Architecture
 
-- **Writes** (create, update, delete): AppleScript via `osascript` — fast for single-event operations
-- **Reads** (get_events): Swift/EventKit via `swift` subprocess — native date-range queries, sub-second on any calendar size
+All event operations use Swift/EventKit via `swift` subprocess for native performance:
 
-The Swift helper at `src/apple_calendar_mcp/swift/get_events.swift` uses `EKEventStore` for fast predicate-based queries. First run triggers a macOS calendar access permission dialog.
+- **Reads** (get_events, get_calendars, get_availability): EventKit predicate queries, sub-second
+- **Writes** (create_event, update_event, delete_events): EventKit save/remove with batch commit
+- **Calendar management** (create_calendar, delete_calendar): AppleScript (simple, fast enough)
+
+Swift helpers at `src/apple_calendar_mcp/swift/` use `EKEventStore`. First run triggers a macOS calendar access permission dialog. Scripts are interpreted by `swift` (cached after first compilation).
 
 ## Calendar Safety
 
