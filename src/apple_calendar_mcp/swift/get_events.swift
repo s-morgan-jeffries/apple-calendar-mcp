@@ -116,7 +116,42 @@ func eventToDict(_ event: EKEvent) -> [String: Any] {
         dict["recurrence_rule"] = NSNull()
     }
 
+    // Attendees (read-only — EventKit cannot add attendees programmatically)
+    dict["attendees"] = (event.attendees ?? []).map { att in
+        [
+            "name": att.name ?? "",
+            "email": att.url.absoluteString.replacingOccurrences(of: "mailto:", with: ""),
+            "role": participantRoleString(att.participantRole),
+            "status": participantStatusString(att.participantStatus),
+        ] as [String: String]
+    }
+
     return dict
+}
+
+func participantRoleString(_ role: EKParticipantRole) -> String {
+    switch role {
+    case .unknown: return "unknown"
+    case .required: return "required"
+    case .optional: return "optional"
+    case .chair: return "chair"
+    case .nonParticipant: return "non_participant"
+    @unknown default: return "unknown"
+    }
+}
+
+func participantStatusString(_ status: EKParticipantStatus) -> String {
+    switch status {
+    case .unknown: return "unknown"
+    case .pending: return "pending"
+    case .accepted: return "accepted"
+    case .declined: return "declined"
+    case .tentative: return "tentative"
+    case .delegated: return "delegated"
+    case .completed: return "completed"
+    case .inProcess: return "in_process"
+    @unknown default: return "unknown"
+    }
 }
 
 // MARK: - Main

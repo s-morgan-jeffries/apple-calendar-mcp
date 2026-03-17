@@ -283,6 +283,26 @@ class TestGetEventsTool:
         assert "FREQ=WEEKLY" in result
 
     @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_formats_attendees(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.get_events.return_value = [
+            {"uid": "ATT-123", "summary": "Team Meeting", "start_date": "2026-07-01T14:00:00",
+             "end_date": "2026-07-01T15:00:00", "allday_event": False, "location": "",
+             "description": "", "url": "", "status": "confirmed", "calendar_name": "Work",
+             "attendees": [
+                 {"name": "Alice", "email": "alice@example.com", "role": "required", "status": "accepted"},
+                 {"name": "", "email": "bob@example.com", "role": "optional", "status": "pending"},
+             ]},
+        ]
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import get_events
+        result = get_events(calendar_name="Work", start_date="2026-07-01", end_date="2026-07-02")
+        assert "Attendees (2)" in result
+        assert "Alice" in result
+        assert "bob@example.com" in result
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
     def test_returns_no_events_message(self, mock_get_client):
         mock_client = MagicMock()
         mock_client.get_events.return_value = []

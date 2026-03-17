@@ -564,6 +564,38 @@ class TestGetEvents:
         assert event["is_detached"] is False
         assert event["occurrence_date"] == "2026-07-01T09:00:00"
 
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_attendees_returned(self, mock_swift):
+        mock_swift.return_value = json.dumps([
+            {"uid": "ATT-123", "summary": "Team Meeting", "start_date": "2026-07-01T14:00:00",
+             "end_date": "2026-07-01T15:00:00", "allday_event": False, "location": "",
+             "description": "", "url": "", "status": "confirmed", "calendar_name": "Work",
+             "is_recurring": False, "recurrence_rule": None, "is_detached": False,
+             "occurrence_date": "2026-07-01T14:00:00",
+             "attendees": [
+                 {"name": "Alice", "email": "alice@example.com", "role": "required", "status": "accepted"},
+                 {"name": "", "email": "bob@example.com", "role": "optional", "status": "pending"},
+             ]},
+        ])
+        result = self.connector.get_events("Work", "2026-07-01", "2026-07-02")
+        event = result[0]
+        assert len(event["attendees"]) == 2
+        assert event["attendees"][0]["name"] == "Alice"
+        assert event["attendees"][0]["email"] == "alice@example.com"
+        assert event["attendees"][1]["role"] == "optional"
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_empty_attendees_returned(self, mock_swift):
+        mock_swift.return_value = json.dumps([
+            {"uid": "NO-ATT", "summary": "Solo Event", "start_date": "2026-07-01T10:00:00",
+             "end_date": "2026-07-01T11:00:00", "allday_event": False, "location": "",
+             "description": "", "url": "", "status": "confirmed", "calendar_name": "Work",
+             "is_recurring": False, "recurrence_rule": None, "is_detached": False,
+             "occurrence_date": "2026-07-01T10:00:00", "attendees": []},
+        ])
+        result = self.connector.get_events("Work", "2026-07-01", "2026-07-02")
+        assert result[0]["attendees"] == []
+
 
 # ── get_availability ────────────────────────────────────────────────────────
 
