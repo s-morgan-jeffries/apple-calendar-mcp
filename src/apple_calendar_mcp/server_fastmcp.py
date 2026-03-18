@@ -10,11 +10,11 @@ from .calendar_connector import CalendarConnector
 # Create FastMCP server
 mcp = FastMCP("apple-calendar-mcp", instructions="""Apple Calendar is the built-in macOS calendar application. This MCP server provides tools to interact with it.
 
-CALENDARS: Each calendar has a name, writable status, description, and color. Calendar names are NOT guaranteed unique — the same name can appear across different accounts (e.g., two "Family" calendars from iCloud and Google). Use description to disambiguate when needed.
+CALENDARS: Each calendar has a name, writable status, type (caldav, subscription, birthday, local), description, and color. Calendar names are NOT guaranteed unique — the same name can appear across different accounts (e.g., two "Family" calendars from iCloud and Google). Use description to disambiguate when needed.
 
 CALENDAR IDENTIFICATION: Calendars are identified by name (not UID — UIDs are not accessible via AppleScript). When specifying a calendar, use the exact name as returned by get_calendars.
 
-EVENTS: Events have summary (title), start/end dates, location, description (notes), URL, status, recurrence, and attendees. Events are identified by their UID (UUID format). Attendees are read-only — they cannot be added via this server (use Calendar.app or email invitations).
+EVENTS: Events have summary (title), start/end dates, location, description (notes), URL, status, recurrence, attendees, and editability info. Events are identified by their UID (UUID format). The is_editable field indicates whether the event can be modified — events on read-only calendars or events where you are not the organizer (invited events) are not editable. Attendees are read-only — they cannot be added via this server (use Calendar.app or email invitations).
 
 RECURRING EVENTS: Recurring events share the same UID across all occurrences. Each occurrence has a unique occurrence_date. The is_recurring field indicates if an event is part of a series. The recurrence_rule field contains the iCalendar RRULE (e.g., "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE,FR"). To modify or delete a specific occurrence, pass occurrence_date and span="this_event". To modify or delete the series from a point onward, use span="future_events".
 
