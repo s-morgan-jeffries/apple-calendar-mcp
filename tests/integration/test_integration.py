@@ -678,6 +678,52 @@ class TestRecurringEventsIntegration:
             delete_test_calendar(TEST_CALENDAR)
             create_test_calendar(TEST_CALENDAR)
 
+    def test_reschedule_single_occurrence(self, connector):
+        """Reschedule one occurrence of a recurring event — should create standalone event (#82)."""
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Reschedule Test",
+            start_date="2028-06-05T10:00:00",
+            end_date="2028-06-05T11:00:00",
+            recurrence_rule="FREQ=WEEKLY;COUNT=3",
+            location="Room A",
+        )
+        try:
+            # Verify 3 occurrences: Jun 5, 12, 19
+            events = connector.get_events(TEST_CALENDAR, "2028-06-01", "2028-06-30")
+            series = [e for e in events if e["uid"] == uid]
+            assert len(series) == 3
+
+            # Reschedule the Jun 12 occurrence to 2pm
+            result = connector.update_event(
+                TEST_CALENDAR, uid,
+                start_date="2028-06-12T14:00:00",
+                end_date="2028-06-12T15:00:00",
+                occurrence_date="2028-06-12T10:00:00",
+                span="this_event",
+            )
+
+            # Check results
+            events = connector.get_events(TEST_CALENDAR, "2028-06-01", "2028-06-30")
+
+            # Series should still have occurrences (Jun 5 and Jun 19 at 10am)
+            remaining_series = [e for e in events if e["uid"] == uid]
+            assert len(remaining_series) >= 2, (
+                f"Series should still have at least 2 occurrences, got {len(remaining_series)}"
+            )
+
+            # A standalone event should exist at 2pm on Jun 12 with same summary and location
+            jun12_events = [e for e in events if "2028-06-12" in e["start_date"]]
+            assert len(jun12_events) >= 1, "Should have an event on Jun 12 at the new time"
+            rescheduled = [e for e in jun12_events if "14:00" in e["start_date"]]
+            assert len(rescheduled) == 1, f"Should have one event at 2pm on Jun 12, got {len(rescheduled)}"
+            assert rescheduled[0]["summary"] == "Reschedule Test"
+            assert rescheduled[0]["location"] == "Room A"
+        finally:
+            from tests.helpers.calendar_setup import delete_test_calendar, create_test_calendar
+            delete_test_calendar(TEST_CALENDAR)
+            create_test_calendar(TEST_CALENDAR)
+
 
 class TestRoundTripIntegration:
     """Round-trip tests: create → read → use returned data to query again."""
