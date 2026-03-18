@@ -326,6 +326,7 @@ def update_event(
     url: str | None = None,
     allday_event: bool | None = None,
     alert_minutes: str = "",
+    recurrence_rule: str | None = None,
     occurrence_date: str = "",
     span: str = "this_event",
 ) -> str:
@@ -350,6 +351,7 @@ def update_event(
         url: New URL, or "" to clear (optional)
         allday_event: New all-day status (optional)
         alert_minutes: Comma-separated minutes before event to alert (e.g., "15,60"), or "none" to clear all alerts (optional)
+        recurrence_rule: iCalendar RRULE string to set/change recurrence (e.g., "FREQ=WEEKLY;BYDAY=MO,WE,FR"), or "" to remove recurrence (optional)
         occurrence_date: For recurring events, the occurrence_date from get_events to target a specific occurrence (optional)
         span: "this_event" to update one occurrence, "future_events" to update this and all future occurrences (default: "this_event")
     """
@@ -358,6 +360,10 @@ def update_event(
         parsed_alerts = []
     elif alert_minutes:
         parsed_alerts = [int(m.strip()) for m in alert_minutes.split(",") if m.strip()]
+    # recurrence_rule: None = not provided, "" = clear, "RRULE..." = set
+    parsed_recurrence = None
+    if recurrence_rule is not None:
+        parsed_recurrence = recurrence_rule  # pass through as-is (empty string = clear)
     client = get_client()
     try:
         result = client.update_event(
@@ -371,6 +377,7 @@ def update_event(
             url=url,
             allday_event=allday_event,
             alert_minutes=parsed_alerts,
+            recurrence_rule=parsed_recurrence,
             occurrence_date=occurrence_date or None,
             span=span,
         )

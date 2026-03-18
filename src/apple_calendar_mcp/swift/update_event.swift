@@ -18,6 +18,8 @@ struct UpdateEventArgs {
     var allday: Bool?
     var alertMinutes: [Int] = []
     var clearAlerts = false
+    var recurrence: String?
+    var clearRecurrence = false
     var occurrenceDate: String?
     var span: EKSpan = .thisEvent
     var updatedFields: [String] = []
@@ -62,6 +64,12 @@ func parseArgs() -> UpdateEventArgs? {
         case "--clear-alerts":
             result.clearAlerts = true
             if !result.updatedFields.contains("alerts") { result.updatedFields.append("alerts") }
+        case "--recurrence":
+            i += 1; if i < args.count { result.recurrence = args[i] }
+            if !result.updatedFields.contains("recurrence_rule") { result.updatedFields.append("recurrence_rule") }
+        case "--clear-recurrence":
+            result.clearRecurrence = true
+            if !result.updatedFields.contains("recurrence_rule") { result.updatedFields.append("recurrence_rule") }
         case "--occurrence-date":
             i += 1; if i < args.count { result.occurrenceDate = args[i] }
         case "--span":
@@ -82,7 +90,8 @@ func parseArgs() -> UpdateEventArgs? {
         description: result.description, clearDescription: result.clearDescription,
         url: result.url, clearUrl: result.clearUrl,
         allday: result.allday, alertMinutes: result.alertMinutes,
-        clearAlerts: result.clearAlerts, occurrenceDate: result.occurrenceDate,
+        clearAlerts: result.clearAlerts, recurrence: result.recurrence,
+        clearRecurrence: result.clearRecurrence, occurrenceDate: result.occurrenceDate,
         span: result.span, updatedFields: result.updatedFields
     )
     return result
@@ -102,6 +111,85 @@ func parseISO8601(_ str: String) -> Date? {
         if let date = df.date(from: str) { return date }
     }
     return nil
+}
+
+// MARK: - Recurrence Rule Parsing (duplicated from create_event.swift — Swift scripts can't share code)
+
+func parseDayOfWeek(_ day: String) -> EKRecurrenceDayOfWeek? {
+    let dayMap: [String: EKWeekday] = [
+        "SU": .sunday, "MO": .monday, "TU": .tuesday,
+        "WE": .wednesday, "TH": .thursday, "FR": .friday, "SA": .saturday
+    ]
+    let dayStr = String(day)
+    let letters = dayStr.suffix(2)
+    let prefix = dayStr.dropLast(2)
+
+    guard let weekday = dayMap[String(letters)] else { return nil }
+
+    if prefix.isEmpty {
+        return EKRecurrenceDayOfWeek(weekday)
+    } else if let weekNumber = Int(prefix) {
+        return EKRecurrenceDayOfWeek(weekday, weekNumber: weekNumber)
+    }
+    return nil
+}
+
+func parseUntilDate(_ value: String) -> Date? {
+    let df = DateFormatter()
+    df.locale = Locale(identifier: "en_US_POSIX")
+    for fmt in ["yyyyMMdd'T'HHmmss'Z'", "yyyyMMdd'T'HHmmss", "yyyyMMdd"] {
+        df.dateFormat = fmt
+        if let date = df.date(from: value) { return date }
+    }
+    return parseISO8601(value)
+}
+
+func parseRecurrenceRule(_ rrule: String) -> EKRecurrenceRule? {
+    var frequency: EKRecurrenceFrequency = .daily
+    var interval = 1
+    var end: EKRecurrenceEnd?
+    var daysOfWeek: [EKRecurrenceDayOfWeek]?
+
+    let parts = rrule.split(separator: ";")
+    for part in parts {
+        let kv = part.split(separator: "=", maxSplits: 1)
+        guard kv.count == 2 else { continue }
+        let key = String(kv[0])
+        let value = String(kv[1])
+
+        switch key {
+        case "FREQ":
+            switch value {
+            case "DAILY": frequency = .daily
+            case "WEEKLY": frequency = .weekly
+            case "MONTHLY": frequency = .monthly
+            case "YEARLY": frequency = .yearly
+            default: break
+            }
+        case "INTERVAL":
+            interval = Int(value) ?? 1
+        case "COUNT":
+            if let n = Int(value) { end = EKRecurrenceEnd(occurrenceCount: n) }
+        case "UNTIL":
+            if let date = parseUntilDate(value) { end = EKRecurrenceEnd(end: date) }
+        case "BYDAY":
+            daysOfWeek = value.split(separator: ",").compactMap { parseDayOfWeek(String($0)) }
+        default:
+            break
+        }
+    }
+
+    return EKRecurrenceRule(
+        recurrenceWith: frequency,
+        interval: interval,
+        daysOfTheWeek: daysOfWeek,
+        daysOfTheMonth: nil,
+        monthsOfTheYear: nil,
+        weeksOfTheYear: nil,
+        daysOfTheYear: nil,
+        setPositions: nil,
+        end: end
+    )
 }
 
 // MARK: - JSON Output
@@ -202,10 +290,22 @@ if parsed.clearAlerts || !parsed.alertMinutes.isEmpty {
         event.addAlarm(EKAlarm(relativeOffset: TimeInterval(-mins * 60)))
     }
 }
+if parsed.clearRecurrence {
+    if let rules = event.recurrenceRules {
+        for rule in rules { event.removeRecurrenceRule(rule) }
+    }
+} else if let rruleStr = parsed.recurrence, let rule = parseRecurrenceRule(rruleStr) {
+    // Replace existing rules
+    if let rules = event.recurrenceRules {
+        for r in rules { event.removeRecurrenceRule(r) }
+    }
+    event.addRecurrenceRule(rule)
+}
 
-// Save
+// Save — use .futureEvents when changing recurrence to affect the series
+let saveSpan: EKSpan = (parsed.recurrence != nil || parsed.clearRecurrence) ? .futureEvents : parsed.span
 do {
-    try store.save(event, span: parsed.span)
+    try store.save(event, span: saveSpan)
 } catch {
     outputError("save_failed", "Failed to save event: \(error.localizedDescription)")
     exit(0)
