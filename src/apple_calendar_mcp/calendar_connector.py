@@ -34,13 +34,19 @@ def run_applescript(script: str, timeout: int = 60) -> str:
     return result.stdout.strip()
 
 
-def run_swift_helper(script_name: str, args: list[str], timeout: int = 30) -> str:
+def run_swift_helper(
+    script_name: str,
+    args: list[str],
+    timeout: int = 30,
+    stdin_data: Optional[str] = None,
+) -> str:
     """Execute a Swift helper script and return the result.
 
     Args:
         script_name: Name of the Swift script (without .swift extension)
         args: Command-line arguments to pass to the script
         timeout: Maximum seconds to wait (default: 30)
+        stdin_data: Optional data to pipe to the script's stdin
 
     Returns:
         The stdout output from the Swift script
@@ -56,6 +62,7 @@ def run_swift_helper(script_name: str, args: list[str], timeout: int = 30) -> st
         text=True,
         check=True,
         timeout=timeout,
+        input=stdin_data,
     )
     return result.stdout.strip()
 
@@ -130,9 +137,11 @@ class CalendarConnector:
         # Format for AppleScript: "March 15, 2026 02:30:00 PM"
         return dt.strftime("%B %d, %Y %I:%M:%S %p")
 
-    def _run_swift_helper_json(self, script_name: str, args: list[str]) -> dict:
+    def _run_swift_helper_json(
+        self, script_name: str, args: list[str], stdin_data: Optional[str] = None
+    ) -> dict:
         """Run a Swift helper and parse JSON response, raising on errors."""
-        result = run_swift_helper(script_name, args)
+        result = run_swift_helper(script_name, args, stdin_data=stdin_data)
         parsed = json.loads(result)
         if isinstance(parsed, dict) and "error" in parsed:
             error_map = {
@@ -207,6 +216,32 @@ class CalendarConnector:
 
         parsed = self._run_swift_helper_json("create_event", args)
         return parsed["uid"]
+
+    def create_events(
+        self,
+        calendar_name: str,
+        events: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Create multiple events in a single batch operation.
+
+        Args:
+            calendar_name: Name of the target calendar (all events go to same calendar)
+            events: List of event dicts, each with keys: summary, start, end,
+                    and optional: location, description, url, allday, recurrence,
+                    alerts (list of int), availability, timezone
+
+        Returns:
+            Dict with 'created' (list of {uid, summary}) and 'errors' (list of {index, summary, error})
+        """
+        self._verify_calendar_safety(calendar_name)
+
+        if not events:
+            raise ValueError("At least one event must be provided")
+
+        stdin_data = json.dumps(events)
+        return self._run_swift_helper_json(
+            "create_events", ["--calendar", calendar_name], stdin_data=stdin_data
+        )
 
     def _validate_date(self, date_str: str) -> None:
         """Validate that a string is a valid ISO 8601 date.

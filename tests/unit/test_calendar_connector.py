@@ -289,7 +289,7 @@ class TestGetCalendars:
         """Verify get_calendars uses the Swift helper."""
         mock_swift.return_value = json.dumps([])
         self.connector.get_calendars()
-        mock_swift.assert_called_once_with("get_calendars", [])
+        mock_swift.assert_called_once_with("get_calendars", [], stdin_data=None)
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_handles_access_denied(self, mock_swift):
@@ -379,7 +379,7 @@ class TestCreateEvent:
         mock_swift.assert_called_once_with("create_event", [
             "--calendar", "MCP-Test-Calendar", "--summary", "Team Meeting",
             "--start", "2026-03-15T14:00:00", "--end", "2026-03-15T15:00:00",
-        ])
+        ], stdin_data=None)
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_creates_event_with_all_optional_fields(self, mock_swift):
@@ -497,6 +497,7 @@ class TestGetEvents:
         mock_swift.assert_called_once_with(
             "get_events",
             ["--calendar", "Work", "--start", "2026-03-15T00:00:00", "--end", "2026-03-16T00:00:00"],
+            stdin_data=None,
         )
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
@@ -659,7 +660,7 @@ class TestGetAvailability:
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_overlapping_events_merged(self, mock_swift):
         """Two overlapping events across calendars should merge into one busy block."""
-        def swift_side_effect(script_name, args):
+        def swift_side_effect(script_name, args, stdin_data=None):
             cal = args[args.index("--calendar") + 1]
             if cal == "Work":
                 return json.dumps([
@@ -725,7 +726,7 @@ class TestGetAvailability:
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_multiple_calendars_combined(self, mock_swift):
         """Events from multiple calendars should be merged for availability."""
-        def swift_side_effect(script_name, args):
+        def swift_side_effect(script_name, args, stdin_data=None):
             cal = args[args.index("--calendar") + 1]
             if cal == "Work":
                 return json.dumps([

@@ -166,6 +166,54 @@ def create_event(
     return result
 
 
+@mcp.tool()
+def create_events(
+    calendar_name: str,
+    events: str,
+) -> str:
+    """Create multiple events in a single batch operation.
+
+    More efficient than calling create_event multiple times — all events are
+    created in one operation. All events go to the same calendar.
+
+    Args:
+        calendar_name: Exact name of the target calendar
+        events: JSON array of event objects. Each object has keys: summary (required),
+                start (required, ISO 8601), end (required, ISO 8601), and optional:
+                location, description, url, allday (bool), recurrence (RRULE string),
+                alerts (list of minutes, e.g. [15, 60]), availability ("free"/"busy"/"tentative"),
+                timezone (IANA identifier, e.g. "America/Los_Angeles")
+    """
+    try:
+        event_list = json.loads(events)
+    except json.JSONDecodeError as e:
+        return f"Error: invalid JSON for events parameter: {e}"
+
+    if not isinstance(event_list, list):
+        return "Error: events must be a JSON array"
+
+    client = get_client()
+    try:
+        result = client.create_events(
+            calendar_name=calendar_name,
+            events=event_list,
+        )
+    except Exception as e:
+        return f"Error creating events: {e}"
+
+    created = result.get("created", [])
+    errors = result.get("errors", [])
+
+    parts = [f"Created {len(created)} event(s) in calendar '{calendar_name}'"]
+    for c in created:
+        parts.append(f"  {c['summary']} (UID: {c['uid']})")
+    if errors:
+        parts.append(f"\n{len(errors)} error(s):")
+        for e in errors:
+            parts.append(f"  [{e.get('index', '?')}] {e.get('summary', '?')}: {e.get('error', '?')}")
+    return "\n".join(parts)
+
+
 def _format_event(event: dict) -> str:
     """Format an event dict as human-readable text."""
     result = f"Title: {event['summary']}\n"
