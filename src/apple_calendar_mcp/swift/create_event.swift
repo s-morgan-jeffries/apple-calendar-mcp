@@ -14,6 +14,7 @@ struct CreateEventArgs {
     var allday: Bool = false
     var recurrence: String?
     var alertMinutes: [Int] = []
+    var availability: String?
 }
 
 func parseArgs() -> CreateEventArgs? {
@@ -28,6 +29,7 @@ func parseArgs() -> CreateEventArgs? {
     var allday = false
     var recurrence: String?
     var alertMinutes: [Int] = []
+    var availability: String?
 
     var i = 1
     while i < args.count {
@@ -52,6 +54,8 @@ func parseArgs() -> CreateEventArgs? {
             i += 1; if i < args.count { recurrence = args[i] }
         case "--alert":
             i += 1; if i < args.count, let mins = Int(args[i]) { alertMinutes.append(mins) }
+        case "--availability":
+            i += 1; if i < args.count { availability = args[i] }
         default:
             break
         }
@@ -68,6 +72,7 @@ func parseArgs() -> CreateEventArgs? {
     result.allday = allday
     result.recurrence = recurrence
     result.alertMinutes = alertMinutes
+    result.availability = availability
     return result
 }
 
@@ -172,6 +177,16 @@ func parseUntilDate(_ value: String) -> Date? {
     return parseISO8601(value)
 }
 
+func parseAvailability(_ str: String) -> EKEventAvailability {
+    switch str.lowercased() {
+    case "free": return .free
+    case "busy": return .busy
+    case "tentative": return .tentative
+    case "unavailable": return .unavailable
+    default: return .busy
+    }
+}
+
 // MARK: - JSON Output
 
 func outputError(_ error: String, _ message: String) {
@@ -258,6 +273,9 @@ if let rrule = parsed.recurrence, let rule = parseRecurrenceRule(rrule) {
 }
 for mins in parsed.alertMinutes {
     event.addAlarm(EKAlarm(relativeOffset: TimeInterval(-mins * 60)))
+}
+if let avail = parsed.availability {
+    event.availability = parseAvailability(avail)
 }
 
 do {

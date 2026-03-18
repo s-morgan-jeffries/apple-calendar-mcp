@@ -20,6 +20,7 @@ struct UpdateEventArgs {
     var clearAlerts = false
     var recurrence: String?
     var clearRecurrence = false
+    var availability: String?
     var occurrenceDate: String?
     var span: EKSpan = .thisEvent
     var updatedFields: [String] = []
@@ -70,6 +71,8 @@ func parseArgs() -> UpdateEventArgs? {
         case "--clear-recurrence":
             result.clearRecurrence = true
             if !result.updatedFields.contains("recurrence_rule") { result.updatedFields.append("recurrence_rule") }
+        case "--availability":
+            i += 1; if i < args.count { result.availability = args[i]; result.updatedFields.append("availability") }
         case "--occurrence-date":
             i += 1; if i < args.count { result.occurrenceDate = args[i] }
         case "--span":
@@ -91,7 +94,8 @@ func parseArgs() -> UpdateEventArgs? {
         url: result.url, clearUrl: result.clearUrl,
         allday: result.allday, alertMinutes: result.alertMinutes,
         clearAlerts: result.clearAlerts, recurrence: result.recurrence,
-        clearRecurrence: result.clearRecurrence, occurrenceDate: result.occurrenceDate,
+        clearRecurrence: result.clearRecurrence, availability: result.availability,
+        occurrenceDate: result.occurrenceDate,
         span: result.span, updatedFields: result.updatedFields
     )
     return result
@@ -190,6 +194,16 @@ func parseRecurrenceRule(_ rrule: String) -> EKRecurrenceRule? {
         setPositions: nil,
         end: end
     )
+}
+
+func parseAvailability(_ str: String) -> EKEventAvailability {
+    switch str.lowercased() {
+    case "free": return .free
+    case "busy": return .busy
+    case "tentative": return .tentative
+    case "unavailable": return .unavailable
+    default: return .busy
+    }
 }
 
 // MARK: - JSON Output
@@ -311,6 +325,9 @@ if parsed.clearRecurrence {
         for r in rules { event.removeRecurrenceRule(r) }
     }
     event.addRecurrenceRule(rule)
+}
+if let avail = parsed.availability {
+    event.availability = parseAvailability(avail)
 }
 
 // Determine if this is a date change on a recurring event with .thisEvent
