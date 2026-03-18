@@ -15,6 +15,7 @@ struct CreateEventArgs {
     var recurrence: String?
     var alertMinutes: [Int] = []
     var availability: String?
+    var timezone: String?
 }
 
 func parseArgs() -> CreateEventArgs? {
@@ -30,6 +31,7 @@ func parseArgs() -> CreateEventArgs? {
     var recurrence: String?
     var alertMinutes: [Int] = []
     var availability: String?
+    var timezone: String?
 
     var i = 1
     while i < args.count {
@@ -56,6 +58,8 @@ func parseArgs() -> CreateEventArgs? {
             i += 1; if i < args.count, let mins = Int(args[i]) { alertMinutes.append(mins) }
         case "--availability":
             i += 1; if i < args.count { availability = args[i] }
+        case "--timezone":
+            i += 1; if i < args.count { timezone = args[i] }
         default:
             break
         }
@@ -73,20 +77,22 @@ func parseArgs() -> CreateEventArgs? {
     result.recurrence = recurrence
     result.alertMinutes = alertMinutes
     result.availability = availability
+    result.timezone = timezone
     return result
 }
 
 // MARK: - Date Parsing
 
-func parseISO8601(_ str: String) -> Date? {
-    // Try with timezone (e.g., "2026-03-15T14:00:00Z")
+func parseISO8601(_ str: String, timeZone: TimeZone? = nil) -> Date? {
+    // Try with explicit timezone suffix (e.g., "2026-03-15T14:00:00Z")
     let isoFormatter = ISO8601DateFormatter()
     isoFormatter.formatOptions = [.withInternetDateTime]
     if let date = isoFormatter.date(from: str) { return date }
 
-    // Try without timezone — interpret as local time
+    // Try without timezone suffix — interpret in specified timezone or local
     let df = DateFormatter()
     df.locale = Locale(identifier: "en_US_POSIX")
+    if let tz = timeZone { df.timeZone = tz }
     for fmt in ["yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd"] {
         df.dateFormat = fmt
         if let date = df.date(from: str) { return date }
@@ -212,12 +218,15 @@ guard let parsed = parseArgs() else {
     exit(0)
 }
 
-guard let startDate = parseISO8601(parsed.start) else {
+// Resolve timezone for date parsing
+let eventTimeZone: TimeZone? = parsed.timezone.flatMap { TimeZone(identifier: $0) }
+
+guard let startDate = parseISO8601(parsed.start, timeZone: eventTimeZone) else {
     outputError("invalid_date", "Cannot parse start date: \(parsed.start)")
     exit(0)
 }
 
-guard let endDate = parseISO8601(parsed.end) else {
+guard let endDate = parseISO8601(parsed.end, timeZone: eventTimeZone) else {
     outputError("invalid_date", "Cannot parse end date: \(parsed.end)")
     exit(0)
 }
