@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-03-17
+
+### Added
+
+- Read-only attendee information in `get_events` output: name, email, role, status (#68)
+- Alert/reminder support: read in `get_events`, create/update via `alert_minutes` parameter (#69)
+- `search_events` tool for text search across one or all calendars (#71)
+- GitHub Releases for all tags, updated release workflow to create releases (#74)
+
 ## [0.4.0] - 2026-03-17
 
 ### Changed
