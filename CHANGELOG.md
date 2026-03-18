@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-03-18
+
+### Fixed
+
+- RRULE parser: nth weekday support (`BYDAY=4MO`, `BYDAY=-1FR`) and `UNTIL` end date (#86)
+- Date changes on recurring events: reschedule creates standalone event instead of deleting occurrence (#88)
+- Delete specific occurrence of recurring event via `occurrence_date` parameter (#89)
+
+### Added
+
+- `recurrence_rule` parameter on `update_event` for adding, changing, or removing recurrence (#87)
+- `occurrence_date` parameter on `delete_events` for targeting specific recurring occurrences (#89)
+- Blind eval scenarios for recurrence operations (#86, #87)
+- EventKit recurring event save behavior research documented in gap analysis (#85)
+- 8 new integration tests for recurring event operations (TDD)
+
 ## [0.5.0] - 2026-03-17
 
 ### Added
