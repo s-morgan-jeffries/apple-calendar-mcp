@@ -236,16 +236,27 @@ if !accessGranted {
 store.refreshSourcesIfNecessary()
 
 // Find event by UID (and optionally by occurrence date)
-let items = store.calendarItems(withExternalIdentifier: parsed.uid)
-var matches = items.compactMap { $0 as? EKEvent }.filter { $0.calendar.title == parsed.calendar }
+var event: EKEvent?
 
-// If occurrence date specified, find the specific occurrence
 if let occDateStr = parsed.occurrenceDate, let occDate = parseISO8601(occDateStr) {
-    let tolerance: TimeInterval = 60 // 1 minute tolerance
-    matches = matches.filter { abs($0.occurrenceDate.timeIntervalSince(occDate)) < tolerance }
+    // For specific occurrences: use date predicate (calendarItems only returns base event)
+    let cal = store.calendars(for: .event).first { $0.title == parsed.calendar }
+    if let cal = cal {
+        let dayBefore = occDate.addingTimeInterval(-86400)
+        let dayAfter = occDate.addingTimeInterval(86400)
+        let pred = store.predicateForEvents(withStart: dayBefore, end: dayAfter, calendars: [cal])
+        let tolerance: TimeInterval = 60
+        event = store.events(matching: pred)
+            .filter { $0.calendarItemIdentifier == parsed.uid }
+            .first { abs($0.occurrenceDate.timeIntervalSince(occDate)) < tolerance }
+    }
+} else {
+    // No occurrence date: use calendarItems lookup (works for non-recurring)
+    let items = store.calendarItems(withExternalIdentifier: parsed.uid)
+    event = items.compactMap { $0 as? EKEvent }.first { $0.calendar.title == parsed.calendar }
 }
 
-guard let event = matches.first else {
+guard let event = event else {
     outputError("event_not_found", "Event not found: \(parsed.uid)")
     exit(0)
 }
@@ -302,7 +313,63 @@ if parsed.clearRecurrence {
     event.addRecurrenceRule(rule)
 }
 
-// Save — use .futureEvents when changing recurrence to affect the series
+// Determine if this is a date change on a recurring event with .thisEvent
+let isDateChange = parsed.start != nil || parsed.end != nil
+let isRecurringThisEvent = event.hasRecurrenceRules && parsed.span == .thisEvent && parsed.occurrenceDate != nil
+
+if isDateChange && isRecurringThisEvent {
+    // Emulate Calendar.app: remove occurrence from series, create standalone event at new time
+    let newTitle = parsed.summary ?? event.title ?? ""
+    let newStart = (parsed.start != nil ? parseISO8601(parsed.start!) : nil) ?? event.startDate!
+    let newEnd = (parsed.end != nil ? parseISO8601(parsed.end!) : nil) ?? event.endDate!
+    let newLocation = parsed.clearLocation ? nil : (parsed.location ?? event.location)
+    let newNotes = parsed.clearDescription ? nil : (parsed.description ?? event.notes)
+    let newUrl = parsed.clearUrl ? nil : (parsed.url.flatMap { URL(string: $0) } ?? event.url)
+    let newAllDay = parsed.allday ?? event.isAllDay
+    let newAlarms = event.alarms
+
+    // Remove the occurrence from the series
+    do {
+        try store.remove(event, span: .thisEvent)
+    } catch {
+        outputError("remove_failed", "Failed to remove occurrence: \(error.localizedDescription)")
+        exit(0)
+    }
+
+    // Create standalone event with same properties at new time
+    let newEvent = EKEvent(eventStore: store)
+    newEvent.calendar = event.calendar
+    newEvent.title = newTitle
+    newEvent.startDate = newStart
+    newEvent.endDate = newEnd
+    newEvent.isAllDay = newAllDay
+    newEvent.location = newLocation
+    newEvent.notes = newNotes
+    newEvent.url = newUrl
+    if let alarms = newAlarms {
+        for alarm in alarms { newEvent.addAlarm(EKAlarm(relativeOffset: alarm.relativeOffset)) }
+    }
+
+    do {
+        try store.save(newEvent, span: .thisEvent)
+    } catch {
+        outputError("save_failed", "Failed to create rescheduled event: \(error.localizedDescription)")
+        exit(0)
+    }
+
+    let result: [String: Any] = [
+        "uid": newEvent.calendarItemIdentifier,
+        "updated_fields": parsed.updatedFields,
+        "rescheduled": true,
+    ]
+    if let data = try? JSONSerialization.data(withJSONObject: result, options: [.sortedKeys]),
+       let str = String(data: data, encoding: .utf8) {
+        print(str)
+    }
+    exit(0)
+}
+
+// Normal save path
 let saveSpan: EKSpan = (parsed.recurrence != nil || parsed.clearRecurrence) ? .futureEvents : parsed.span
 do {
     try store.save(event, span: saveSpan)
