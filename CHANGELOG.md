@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-03-18
+
+### Added
+
+- `create_events` batch tool for creating multiple events in one operation via `store.commit()` (#98)
+- Event availability status (free/busy/tentative) on `get_events`, `create_event`, `update_event` (#96)
+- Timezone parameter on `create_event` and `update_event` for cross-timezone scheduling (#97)
+- Calendar `type` field in `get_calendars` output (caldav, subscription, birthday, local, exchange) (#95)
+- Event `is_editable` and `is_organizer` fields in `get_events` for permission awareness (#95)
+- `stdin_data` support in `run_swift_helper()` for piping structured data to Swift subprocesses (#98)
+- Blind eval scenarios for batch create operations (#98)
+
 ## [0.5.1] - 2026-03-18
 
 ### Fixed
