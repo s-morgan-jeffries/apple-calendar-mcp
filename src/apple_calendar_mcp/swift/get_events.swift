@@ -139,7 +139,21 @@ func eventToDict(_ event: EKEvent) -> [String: Any] {
     dict["is_organizer"] = isOrganizer
     dict["is_editable"] = event.calendar.allowsContentModifications && isOrganizer
 
+    // Availability
+    dict["availability"] = availabilityString(event.availability)
+
     return dict
+}
+
+func availabilityString(_ availability: EKEventAvailability) -> String {
+    switch availability {
+    case .notSupported: return "not_supported"
+    case .busy: return "busy"
+    case .free: return "free"
+    case .tentative: return "tentative"
+    case .unavailable: return "unavailable"
+    @unknown default: return "busy"
+    }
 }
 
 func participantRoleString(_ role: EKParticipantRole) -> String {

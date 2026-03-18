@@ -209,6 +209,7 @@ class TestCreateEventTool:
             allday_event=True,
             recurrence_rule=None,
             alert_minutes=None,
+            availability=None,
         )
 
     @patch("apple_calendar_mcp.server_fastmcp.get_client")

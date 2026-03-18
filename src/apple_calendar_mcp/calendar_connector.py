@@ -156,6 +156,7 @@ class CalendarConnector:
         allday_event: bool = False,
         recurrence_rule: Optional[str] = None,
         alert_minutes: Optional[list[int]] = None,
+        availability: Optional[str] = None,
     ) -> str:
         """Create a new event in a specified calendar.
 
@@ -198,6 +199,8 @@ class CalendarConnector:
         if alert_minutes:
             for mins in alert_minutes:
                 args += ["--alert", str(mins)]
+        if availability:
+            args += ["--availability", availability]
 
         parsed = self._run_swift_helper_json("create_event", args)
         return parsed["uid"]
@@ -307,6 +310,7 @@ class CalendarConnector:
         url: str | None = None,
         allday_event: bool | None = None,
         alert_minutes: list[int] | None = None,
+        availability: str | None = None,
         recurrence_rule: str | None = None,
         occurrence_date: str | None = None,
         span: str = "this_event",
@@ -365,6 +369,10 @@ class CalendarConnector:
             else:
                 args += ["--recurrence", recurrence_rule]
             updated_fields.append("recurrence_rule")
+
+        if availability is not None:
+            args += ["--availability", availability]
+            updated_fields.append("availability")
 
         if not updated_fields:
             raise ValueError("At least one field must be provided to update")

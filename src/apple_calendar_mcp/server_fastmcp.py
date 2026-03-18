@@ -117,6 +117,7 @@ def create_event(
     allday_event: bool = False,
     recurrence_rule: str = "",
     alert_minutes: str = "",
+    availability: str = "",
 ) -> str:
     """Create a new event in a specified calendar.
 
@@ -131,6 +132,7 @@ def create_event(
         allday_event: Whether this is an all-day event (default: false). When true, use date-only format for start_date/end_date.
         recurrence_rule: iCalendar RRULE string for recurring events (optional, e.g., "FREQ=WEEKLY;BYDAY=MO,WE,FR" or "FREQ=DAILY;COUNT=10")
         alert_minutes: Comma-separated minutes before event to alert (optional, e.g., "15" or "15,60")
+        availability: Event availability status: "free", "busy", or "tentative" (optional, default: busy)
     """
     parsed_alerts = [int(m.strip()) for m in alert_minutes.split(",") if m.strip()] if alert_minutes else None
     client = get_client()
@@ -146,6 +148,7 @@ def create_event(
             allday_event=allday_event,
             recurrence_rule=recurrence_rule or None,
             alert_minutes=parsed_alerts,
+            availability=availability or None,
         )
     except Exception as e:
         return f"Error creating event: {e}"
@@ -185,6 +188,9 @@ def _format_event(event: dict) -> str:
     if attendees:
         names = [a.get("name") or a.get("email", "unknown") for a in attendees]
         result += f"Attendees ({len(attendees)}): {', '.join(names)}\n"
+    avail = event.get("availability", "busy")
+    if avail and avail != "busy":
+        result += f"Availability: {avail}\n"
     result += f"Status: {event.get('status', 'none')}\n"
     result += f"UID: {event['uid']}\n"
     return result
@@ -326,6 +332,7 @@ def update_event(
     url: str | None = None,
     allday_event: bool | None = None,
     alert_minutes: str = "",
+    availability: str | None = None,
     recurrence_rule: str | None = None,
     occurrence_date: str = "",
     span: str = "this_event",
@@ -351,6 +358,7 @@ def update_event(
         url: New URL, or "" to clear (optional)
         allday_event: New all-day status (optional)
         alert_minutes: Comma-separated minutes before event to alert (e.g., "15,60"), or "none" to clear all alerts (optional)
+        availability: Event availability: "free", "busy", or "tentative" (optional)
         recurrence_rule: iCalendar RRULE string to set/change recurrence (e.g., "FREQ=WEEKLY;BYDAY=MO,WE,FR"), or "" to remove recurrence (optional)
         occurrence_date: For recurring events, the occurrence_date from get_events to target a specific occurrence (optional)
         span: "this_event" to update one occurrence, "future_events" to update this and all future occurrences (default: "this_event")
@@ -377,6 +385,7 @@ def update_event(
             url=url,
             allday_event=allday_event,
             alert_minutes=parsed_alerts,
+            availability=availability,
             recurrence_rule=parsed_recurrence,
             occurrence_date=occurrence_date or None,
             span=span,
