@@ -212,6 +212,33 @@ Each occurrence exposes:
 4. **Delete behavior**: Current `delete_events` with `whose uid` + `delete` removes one occurrence. Deleting all matching events removes the series. Consider adding a `delete_series` flag.
 5. **Occurrence identification**: Need UID + occurrence_date to uniquely identify an occurrence
 
+### EventKit Save Behavior with Recurring Events (tested 2026-03-17)
+
+**Changing date/time with `.thisEvent` DELETES the occurrence.** When saving a recurring event occurrence with modified start/end dates using `span: .thisEvent`, EventKit removes that occurrence entirely rather than detaching it. The series continues with the remaining occurrences, but the modified one is gone. This is why #82 (updating start/end strips recurrence) happens — the occurrence disappears.
+
+**Changing non-date fields with `.thisEvent` works correctly.** Summary, location, description, etc. can be modified on a single occurrence using `.thisEvent` span. The occurrence is detached from the series and retains its changes.
+
+**Adding recurrence to a non-recurring event WORKS.** Call `event.addRecurrenceRule(rule)` then `store.save(event, span: .thisEvent)`. The event becomes recurring with the specified rule. Verified: a one-off event gained 3 weekly occurrences after adding a rule.
+
+**Removing recurrence from a recurring event WORKS.** Call `event.removeRecurrenceRule(rule)` for each rule, then `store.save(event, span: .futureEvents)`. The event becomes a one-off. Verified: 3 occurrences collapsed to 1.
+
+### Advanced RRULE Features in EventKit (tested 2026-03-17)
+
+**Nth weekday of month WORKS.** `EKRecurrenceDayOfWeek(.monday, weekNumber: 4)` correctly produces 4th Monday recurrence. Verified: Jan 26 → Feb 28 → Mar 27 (all 4th Mondays). Our `parseRecurrenceRule()` just needs to parse the numeric prefix from BYDAY values.
+
+**UNTIL end date WORKS.** `EKRecurrenceEnd(end: date)` correctly limits recurrence. Verified: weekly starting Mar 1 with UNTIL Mar 22 produced 3 occurrences (Mar 1, 8, 15). Our parser just needs to handle the UNTIL key.
+
+### Fix Strategy for Issues #79-#84
+
+| Issue | Root Cause | Fix |
+|-------|-----------|-----|
+| #79 BYDAY=NXX ignored | Parser doesn't extract numeric prefix | Parse `4MO` → `EKRecurrenceDayOfWeek(.monday, weekNumber: 4)` |
+| #80 Can't modify recurrence | `update_event` lacks recurrence_rule param | Add `--recurrence` and `--clear-recurrence` to update_event.swift |
+| #81 UNTIL ignored | Parser doesn't handle UNTIL key | Parse UNTIL date → `EKRecurrenceEnd(end: date)` |
+| #82 Date change strips recurrence | `.thisEvent` save with date change deletes occurrence | For date changes on recurring events: warn user, or use `.futureEvents`, or re-apply recurrence rule after save |
+| #83 Can't safely bulk-update alerts | Depends on #82 fix | After #82, `.futureEvents` save should work for alert-only changes |
+| #84 Delete behavior unclear | Documentation gap | Document: `.thisEvent` deletes one occurrence, `.futureEvents` deletes series from that point |
+
 ---
 
 ## Attendees (tested 2026-03-16)
