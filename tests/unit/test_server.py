@@ -524,6 +524,7 @@ class TestDeleteEventsTool:
             calendar_name="Work",
             event_uids=["UID-1", "UID-2"],
             span="this_event",
+            occurrence_date=None,
         )
 
 

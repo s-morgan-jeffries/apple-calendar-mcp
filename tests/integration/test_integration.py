@@ -460,6 +460,67 @@ class TestDeleteEventsIntegration:
         finally:
             _delete_event_by_uid(uid)
 
+    def test_delete_single_occurrence_of_recurring(self, connector):
+        """Delete one occurrence of a recurring event, verify others preserved (#84)."""
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Delete Occurrence Test",
+            start_date="2028-08-07T10:00:00",
+            end_date="2028-08-07T11:00:00",
+            recurrence_rule="FREQ=WEEKLY;COUNT=3",
+        )
+        try:
+            # Verify 3 occurrences: Aug 7, 14, 21
+            events = connector.get_events(TEST_CALENDAR, "2028-08-01", "2028-08-31")
+            series = [e for e in events if e["uid"] == uid]
+            assert len(series) == 3
+
+            # Delete the middle occurrence (Aug 14)
+            result = connector.delete_events(
+                TEST_CALENDAR, uid,
+                span="this_event",
+                occurrence_date="2028-08-14T10:00:00",
+            )
+            assert uid in result["deleted_uids"]
+
+            # Verify 2 remaining occurrences (Aug 7 and 21)
+            events = connector.get_events(TEST_CALENDAR, "2028-08-01", "2028-08-31")
+            remaining = [e for e in events if e["uid"] == uid]
+            assert len(remaining) == 2, f"Expected 2 occurrences after deleting one, got {len(remaining)}"
+            dates = sorted([e["start_date"][:10] for e in remaining])
+            assert "2028-08-14" not in dates, "Deleted occurrence should be gone"
+        finally:
+            from tests.helpers.calendar_setup import delete_test_calendar, create_test_calendar
+            delete_test_calendar(TEST_CALENDAR)
+            create_test_calendar(TEST_CALENDAR)
+
+    def test_delete_recurring_series_with_future_events(self, connector):
+        """Delete a recurring series using span=future_events (#84)."""
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Delete Series Test",
+            start_date="2028-09-02T10:00:00",
+            end_date="2028-09-02T11:00:00",
+            recurrence_rule="FREQ=WEEKLY;COUNT=4",
+        )
+        try:
+            events = connector.get_events(TEST_CALENDAR, "2028-09-01", "2028-09-30")
+            series = [e for e in events if e["uid"] == uid]
+            assert len(series) == 4
+
+            # Delete entire series
+            result = connector.delete_events(TEST_CALENDAR, uid, span="future_events")
+            assert uid in result["deleted_uids"]
+
+            # Verify all gone
+            events = connector.get_events(TEST_CALENDAR, "2028-09-01", "2028-09-30")
+            remaining = [e for e in events if e["uid"] == uid]
+            assert len(remaining) == 0, f"Expected 0 occurrences after deleting series, got {len(remaining)}"
+        finally:
+            from tests.helpers.calendar_setup import delete_test_calendar, create_test_calendar
+            delete_test_calendar(TEST_CALENDAR)
+            create_test_calendar(TEST_CALENDAR)
+
 
 class TestGetAvailabilityIntegration:
     """Integration tests for get_availability against real Calendar.app."""

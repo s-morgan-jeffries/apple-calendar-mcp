@@ -393,6 +393,7 @@ def delete_events(
     calendar_name: str,
     event_uid: str | list[str],
     span: str = "this_event",
+    occurrence_date: str = "",
 ) -> str:
     """Delete one or more events from a calendar by UID.
 
@@ -401,12 +402,15 @@ def delete_events(
 
     Use get_events first to find the event UID(s) and calendar_name.
 
-    For recurring events: use span to control deletion scope.
+    For recurring events: use occurrence_date to target a specific occurrence,
+    and span to control deletion scope. Without occurrence_date, deletes the
+    base event (which may affect the entire series).
 
     Args:
         calendar_name: Exact name of the calendar containing the event(s)
         event_uid: UID of a single event (str) or list of UIDs to delete
         span: "this_event" to delete one occurrence, "future_events" to delete the series from this point onward (default: "this_event")
+        occurrence_date: For recurring events, the occurrence_date from get_events to target a specific occurrence (optional)
     """
     client = get_client()
     try:
@@ -414,6 +418,7 @@ def delete_events(
             calendar_name=calendar_name,
             event_uids=event_uid,
             span=span,
+            occurrence_date=occurrence_date or None,
         )
     except Exception as e:
         return f"Error deleting event(s): {e}"

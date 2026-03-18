@@ -420,6 +420,7 @@ class CalendarConnector:
         calendar_name: str,
         event_uids: str | list[str],
         span: str = "this_event",
+        occurrence_date: Optional[str] = None,
     ) -> dict[str, Any]:
         """Delete one or more events by UID.
 
@@ -427,6 +428,7 @@ class CalendarConnector:
             calendar_name: Name of the calendar containing the events
             event_uids: Single UID string or list of UIDs to delete
             span: "this_event" to delete one occurrence, "future_events" to delete series from this point (default: "this_event")
+            occurrence_date: For recurring events, the date of the specific occurrence to delete (optional)
 
         Returns:
             Dict with 'deleted_uids' and 'not_found_uids' keys
@@ -446,6 +448,8 @@ class CalendarConnector:
             args += ["--uid", uid]
         if span != "this_event":
             args += ["--span", span]
+        if occurrence_date:
+            args += ["--occurrence-date", occurrence_date]
 
         parsed = self._run_swift_helper_json("delete_events", args)
         return {"deleted_uids": parsed["deleted_uids"], "not_found_uids": parsed["not_found_uids"]}
