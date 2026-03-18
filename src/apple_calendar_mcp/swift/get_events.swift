@@ -134,6 +134,11 @@ func eventToDict(_ event: EKEvent) -> [String: Any] {
         ] as [String: String]
     }
 
+    // Editability
+    let isOrganizer = event.organizer?.isCurrentUser ?? true
+    dict["is_organizer"] = isOrganizer
+    dict["is_editable"] = event.calendar.allowsContentModifications && isOrganizer
+
     return dict
 }
 

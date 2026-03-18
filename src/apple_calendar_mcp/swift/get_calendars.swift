@@ -48,12 +48,24 @@ store.refreshSourcesIfNecessary()
 
 let calendars = store.calendars(for: .event)
 
+func calendarTypeString(_ type: EKCalendarType) -> String {
+    switch type {
+    case .local: return "local"
+    case .calDAV: return "caldav"
+    case .exchange: return "exchange"
+    case .subscription: return "subscription"
+    case .birthday: return "birthday"
+    @unknown default: return "unknown"
+    }
+}
+
 let calendarDicts: [[String: Any]] = calendars.map { cal in
     [
         "name": cal.title,
         "writable": cal.allowsContentModifications,
         "description": (cal as EKCalendar).value(forKey: "notes") as? String ?? "",
         "color": cgColorToHex(cal.cgColor),
+        "type": calendarTypeString(cal.type),
     ]
 }
 
