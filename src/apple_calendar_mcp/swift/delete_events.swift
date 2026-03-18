@@ -3,11 +3,12 @@ import Foundation
 
 // MARK: - Argument Parsing
 
-func parseArgs() -> (calendar: String, uids: [String], span: EKSpan)? {
+func parseArgs() -> (calendar: String, uids: [String], span: EKSpan, occurrenceDate: String?)? {
     let args = CommandLine.arguments
     var calendar: String?
     var uids: [String] = []
     var span: EKSpan = .thisEvent
+    var occurrenceDate: String?
 
     var i = 1
     while i < args.count {
@@ -18,6 +19,8 @@ func parseArgs() -> (calendar: String, uids: [String], span: EKSpan)? {
             i += 1; if i < args.count { uids.append(args[i]) }
         case "--span":
             i += 1; if i < args.count { span = args[i] == "future_events" ? .futureEvents : .thisEvent }
+        case "--occurrence-date":
+            i += 1; if i < args.count { occurrenceDate = args[i] }
         default:
             break
         }
@@ -27,7 +30,23 @@ func parseArgs() -> (calendar: String, uids: [String], span: EKSpan)? {
     guard let cal = calendar, !uids.isEmpty else {
         return nil
     }
-    return (cal, uids, span)
+    return (cal, uids, span, occurrenceDate)
+}
+
+// MARK: - Date Parsing
+
+func parseISO8601(_ str: String) -> Date? {
+    let isoFormatter = ISO8601DateFormatter()
+    isoFormatter.formatOptions = [.withInternetDateTime]
+    if let date = isoFormatter.date(from: str) { return date }
+
+    let df = DateFormatter()
+    df.locale = Locale(identifier: "en_US_POSIX")
+    for fmt in ["yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd"] {
+        df.dateFormat = fmt
+        if let date = df.date(from: str) { return date }
+    }
+    return nil
 }
 
 // MARK: - JSON Output
@@ -76,23 +95,34 @@ guard let calendar = allCalendars.first(where: { $0.title == parsed.calendar }) 
     exit(0)
 }
 
-// Delete events by UID using direct calendarItem lookup
+// Delete events by UID
 var deletedUids: [String] = []
 var notFoundUids: [String] = []
 
 for uid in parsed.uids {
-    let items = store.calendarItems(withExternalIdentifier: uid)
-    let matches = items.compactMap { $0 as? EKEvent }.filter { $0.calendar.title == parsed.calendar }
+    var matches: [EKEvent] = []
+
+    // If occurrence_date provided, use predicate-based lookup (for recurring events)
+    if let occDateStr = parsed.occurrenceDate, let occDate = parseISO8601(occDateStr) {
+        let dayBefore = occDate.addingTimeInterval(-86400)
+        let dayAfter = occDate.addingTimeInterval(86400)
+        let pred = store.predicateForEvents(withStart: dayBefore, end: dayAfter, calendars: [calendar])
+        let tolerance: TimeInterval = 60
+        matches = store.events(matching: pred)
+            .filter { $0.calendarItemIdentifier == uid && abs($0.occurrenceDate.timeIntervalSince(occDate)) < tolerance }
+    } else {
+        // No occurrence date: use calendarItems lookup
+        let items = store.calendarItems(withExternalIdentifier: uid)
+        matches = items.compactMap { $0 as? EKEvent }.filter { $0.calendar.title == parsed.calendar }
+    }
+
     if matches.isEmpty {
         notFoundUids.append(uid)
     } else {
         do {
             if parsed.span == .futureEvents {
-                // For futureEvents, remove the first match with futureEvents span
-                // (this deletes the series from this occurrence onward)
                 try store.remove(matches.first!, span: .futureEvents, commit: false)
             } else {
-                // For thisEvent, remove all matching occurrences individually
                 for event in matches {
                     try store.remove(event, span: .thisEvent, commit: false)
                 }
