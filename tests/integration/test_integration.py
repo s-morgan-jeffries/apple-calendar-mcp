@@ -535,6 +535,93 @@ class TestRecurringEventsIntegration:
             delete_test_calendar(TEST_CALENDAR)
             create_test_calendar(TEST_CALENDAR)
 
+    def test_monthly_nth_weekday_recurrence(self, connector):
+        """Create monthly event on 4th Monday — verify correct dates (#79)."""
+        # Jan 26 2028 is a 4th Monday
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="4th Monday Test",
+            start_date="2028-01-26T10:00:00",
+            end_date="2028-01-26T11:00:00",
+            recurrence_rule="FREQ=MONTHLY;BYDAY=4MO;COUNT=3",
+        )
+        try:
+            events = connector.get_events(
+                calendar_name=TEST_CALENDAR,
+                start_date="2028-01-01",
+                end_date="2028-04-30",
+            )
+            recurring = [e for e in events if e["uid"] == uid]
+            assert len(recurring) == 3, f"Expected 3 occurrences, got {len(recurring)}"
+
+            # Verify dates are all 4th Mondays
+            dates = sorted([e["start_date"][:10] for e in recurring])
+            assert dates[0] == "2028-01-26"  # 4th Monday of Jan
+            assert dates[1] == "2028-02-28"  # 4th Monday of Feb
+            assert dates[2] == "2028-03-27"  # 4th Monday of Mar
+        finally:
+            from tests.helpers.calendar_setup import delete_test_calendar, create_test_calendar
+            delete_test_calendar(TEST_CALENDAR)
+            create_test_calendar(TEST_CALENDAR)
+
+    def test_recurrence_with_until_end_date(self, connector):
+        """Create weekly event with UNTIL — verify recurrence stops (#81)."""
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Until Test",
+            start_date="2028-03-01T10:00:00",
+            end_date="2028-03-01T11:00:00",
+            recurrence_rule="FREQ=WEEKLY;UNTIL=20280322T000000",
+        )
+        try:
+            events = connector.get_events(
+                calendar_name=TEST_CALENDAR,
+                start_date="2028-03-01",
+                end_date="2028-04-30",
+            )
+            recurring = [e for e in events if e["uid"] == uid]
+            # Should have ~3 occurrences (Mar 1, 8, 15) — Mar 22 is the UNTIL date
+            assert len(recurring) <= 4, f"Should stop by March 22, got {len(recurring)} occurrences"
+            assert len(recurring) >= 3, f"Should have at least 3 occurrences, got {len(recurring)}"
+
+            # No occurrence should be on or after March 22
+            for e in recurring:
+                assert e["start_date"][:10] < "2028-03-22", (
+                    f"Occurrence {e['start_date']} should be before UNTIL date 2028-03-22"
+                )
+        finally:
+            from tests.helpers.calendar_setup import delete_test_calendar, create_test_calendar
+            delete_test_calendar(TEST_CALENDAR)
+            create_test_calendar(TEST_CALENDAR)
+
+    def test_last_friday_recurrence(self, connector):
+        """Create monthly event on last Friday (BYDAY=-1FR) — verify correct dates (#79)."""
+        # Jan 27 2028 is the last Friday of January
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Last Friday Test",
+            start_date="2028-01-28T10:00:00",
+            end_date="2028-01-28T11:00:00",
+            recurrence_rule="FREQ=MONTHLY;BYDAY=-1FR;COUNT=3",
+        )
+        try:
+            events = connector.get_events(
+                calendar_name=TEST_CALENDAR,
+                start_date="2028-01-01",
+                end_date="2028-04-30",
+            )
+            recurring = [e for e in events if e["uid"] == uid]
+            assert len(recurring) == 3, f"Expected 3 occurrences, got {len(recurring)}"
+
+            dates = sorted([e["start_date"][:10] for e in recurring])
+            assert dates[0] == "2028-01-28"  # Last Friday of Jan
+            assert dates[1] == "2028-02-25"  # Last Friday of Feb
+            assert dates[2] == "2028-03-31"  # Last Friday of Mar
+        finally:
+            from tests.helpers.calendar_setup import delete_test_calendar, create_test_calendar
+            delete_test_calendar(TEST_CALENDAR)
+            create_test_calendar(TEST_CALENDAR)
+
 
 class TestRoundTripIntegration:
     """Round-trip tests: create → read → use returned data to query again."""
