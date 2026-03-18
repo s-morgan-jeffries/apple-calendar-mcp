@@ -28,10 +28,35 @@ Give an agent access to the apple-calendar-mcp tools with NO additional instruct
 **Expected:** Agent calls `get_calendars()` first. If multiple "Family" calendars exist, agent asks for clarification or uses description to disambiguate.
 **Pass criteria:** Agent doesn't blindly pick one of the duplicate calendars — it either asks or explains the ambiguity.
 
+### Scenario 5: Weekly recurring with simple BYDAY
+**Prompt:** "Set up a recurring meeting called 'Sprint Planning' every Monday and Wednesday at 2pm for an hour on my Work calendar."
+**Expected:** Agent calls `create_event` with `recurrence_rule="FREQ=WEEKLY;BYDAY=MO,WE"`.
+**Pass criteria:** Agent produces a valid RRULE with FREQ=WEEKLY and BYDAY containing MO and WE. Start/end dates set correctly for the first occurrence.
+
+### Scenario 6: Monthly nth weekday recurrence
+**Prompt:** "Create a recurring event called 'Board Meeting' on the 4th Tuesday of every month at 3pm for 2 hours on my Work calendar."
+**Expected:** Agent calls `create_event` with `recurrence_rule="FREQ=MONTHLY;BYDAY=4TU"` or equivalent.
+**Pass criteria:** Agent produces an RRULE with `BYDAY=4TU` (or `4TU` somewhere in a valid RRULE). Start date should be the next 4th Tuesday.
+
+### Scenario 7: Complex recurrence with UNTIL
+**Prompt:** "I need a weekly team lunch every Friday starting this week until Christmas on my Work calendar. 12pm to 1pm."
+**Expected:** Agent calls `create_event` with `recurrence_rule="FREQ=WEEKLY;BYDAY=FR;UNTIL=YYYYMMDD"` where UNTIL is Dec 25 of the current year.
+**Pass criteria:** Agent produces a valid RRULE with FREQ=WEEKLY, BYDAY=FR, and an UNTIL date near Dec 25. UNTIL format should be YYYYMMDD or YYYYMMDDTHHMMSS.
+
+### Scenario 8: Last weekday of month
+**Prompt:** "Schedule 'Month-End Review' on the last Friday of every month at 4pm for 1 hour on Work, for the next 6 months."
+**Expected:** Agent calls `create_event` with `recurrence_rule="FREQ=MONTHLY;BYDAY=-1FR;COUNT=6"` or uses UNTIL.
+**Pass criteria:** Agent produces an RRULE with `BYDAY=-1FR` and either COUNT=6 or an appropriate UNTIL date.
+
+### Scenario 9: Every N months
+**Prompt:** "Set up a quarterly planning session — every 3 months on the 2nd Wednesday, starting next month, for 3 hours. Put it on Work."
+**Expected:** Agent calls `create_event` with `recurrence_rule="FREQ=MONTHLY;INTERVAL=3;BYDAY=2WE"`.
+**Pass criteria:** Agent produces an RRULE with FREQ=MONTHLY, INTERVAL=3, and BYDAY=2WE. Start date should be the 2nd Wednesday of next month.
+
 ## Scoring
-- 4/4 pass: Tool descriptions are clear
-- 3/4 pass: Minor description improvements needed
-- 2/4 or fewer: Rewrite descriptions before release
+- 8/9 or 9/9 pass: Tool descriptions are clear
+- 6-7/9 pass: Minor description improvements needed
+- 5/9 or fewer: Rewrite descriptions before release
 
 ## Results
 _Run these scenarios before each release that changes tool descriptions._

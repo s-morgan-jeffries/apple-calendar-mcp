@@ -91,11 +91,31 @@ func parseISO8601(_ str: String) -> Date? {
 
 // MARK: - Recurrence Rule Parsing
 
+func parseDayOfWeek(_ day: String) -> EKRecurrenceDayOfWeek? {
+    let dayMap: [String: EKWeekday] = [
+        "SU": .sunday, "MO": .monday, "TU": .tuesday,
+        "WE": .wednesday, "TH": .thursday, "FR": .friday, "SA": .saturday
+    ]
+    // Parse optional numeric prefix: "4MO" → weekNumber=4, day="MO"
+    // "-1FR" → weekNumber=-1, day="FR"
+    let dayStr = String(day)
+    let letters = dayStr.suffix(2)
+    let prefix = dayStr.dropLast(2)
+
+    guard let weekday = dayMap[String(letters)] else { return nil }
+
+    if prefix.isEmpty {
+        return EKRecurrenceDayOfWeek(weekday)
+    } else if let weekNumber = Int(prefix) {
+        return EKRecurrenceDayOfWeek(weekday, weekNumber: weekNumber)
+    }
+    return nil
+}
+
 func parseRecurrenceRule(_ rrule: String) -> EKRecurrenceRule? {
-    // Parse common RRULE components
     var frequency: EKRecurrenceFrequency = .daily
     var interval = 1
-    var count: Int?
+    var end: EKRecurrenceEnd?
     var daysOfWeek: [EKRecurrenceDayOfWeek]?
 
     let parts = rrule.split(separator: ";")
@@ -117,21 +137,15 @@ func parseRecurrenceRule(_ rrule: String) -> EKRecurrenceRule? {
         case "INTERVAL":
             interval = Int(value) ?? 1
         case "COUNT":
-            count = Int(value)
+            if let n = Int(value) { end = EKRecurrenceEnd(occurrenceCount: n) }
+        case "UNTIL":
+            if let date = parseUntilDate(value) { end = EKRecurrenceEnd(end: date) }
         case "BYDAY":
-            let dayMap: [String: EKWeekday] = [
-                "SU": .sunday, "MO": .monday, "TU": .tuesday,
-                "WE": .wednesday, "TH": .thursday, "FR": .friday, "SA": .saturday
-            ]
-            daysOfWeek = value.split(separator: ",").compactMap { day in
-                dayMap[String(day)].map { EKRecurrenceDayOfWeek($0) }
-            }
+            daysOfWeek = value.split(separator: ",").compactMap { parseDayOfWeek(String($0)) }
         default:
             break
         }
     }
-
-    let end: EKRecurrenceEnd? = count.map { EKRecurrenceEnd(occurrenceCount: $0) }
 
     return EKRecurrenceRule(
         recurrenceWith: frequency,
@@ -144,6 +158,18 @@ func parseRecurrenceRule(_ rrule: String) -> EKRecurrenceRule? {
         setPositions: nil,
         end: end
     )
+}
+
+func parseUntilDate(_ value: String) -> Date? {
+    // Try formats: "20280322T000000Z", "20280322T000000", "20280322"
+    let df = DateFormatter()
+    df.locale = Locale(identifier: "en_US_POSIX")
+    for fmt in ["yyyyMMdd'T'HHmmss'Z'", "yyyyMMdd'T'HHmmss", "yyyyMMdd"] {
+        df.dateFormat = fmt
+        if let date = df.date(from: value) { return date }
+    }
+    // Also try ISO 8601 format
+    return parseISO8601(value)
 }
 
 // MARK: - JSON Output
