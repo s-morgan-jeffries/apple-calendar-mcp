@@ -307,13 +307,14 @@ class CalendarConnector:
         url: str | None = None,
         allday_event: bool | None = None,
         alert_minutes: list[int] | None = None,
+        recurrence_rule: str | None = None,
         occurrence_date: str | None = None,
         span: str = "this_event",
     ) -> dict[str, Any]:
         """Update an existing event's properties by UID.
 
         Only provided fields are updated; omitted fields (None) are left unchanged.
-        Pass an empty string to clear a text field.
+        Pass an empty string to clear a text field. Pass empty string for recurrence_rule to remove recurrence.
 
         Args:
             calendar_name: Name of the calendar containing the event
@@ -357,6 +358,13 @@ class CalendarConnector:
                 for mins in alert_minutes:
                     args += ["--alert", str(mins)]
             updated_fields.append("alerts")
+
+        if recurrence_rule is not None:
+            if recurrence_rule == "":
+                args += ["--clear-recurrence"]
+            else:
+                args += ["--recurrence", recurrence_rule]
+            updated_fields.append("recurrence_rule")
 
         if not updated_fields:
             raise ValueError("At least one field must be provided to update")
