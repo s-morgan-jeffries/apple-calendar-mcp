@@ -118,6 +118,7 @@ def create_event(
     recurrence_rule: str = "",
     alert_minutes: str = "",
     availability: str = "",
+    timezone: str = "",
 ) -> str:
     """Create a new event in a specified calendar.
 
@@ -133,6 +134,7 @@ def create_event(
         recurrence_rule: iCalendar RRULE string for recurring events (optional, e.g., "FREQ=WEEKLY;BYDAY=MO,WE,FR" or "FREQ=DAILY;COUNT=10")
         alert_minutes: Comma-separated minutes before event to alert (optional, e.g., "15" or "15,60")
         availability: Event availability status: "free", "busy", or "tentative" (optional, default: busy)
+        timezone: IANA timezone for interpreting start/end times (optional, e.g., "America/Los_Angeles", "US/Eastern"). When provided, times are interpreted in that timezone instead of the system's local timezone.
     """
     parsed_alerts = [int(m.strip()) for m in alert_minutes.split(",") if m.strip()] if alert_minutes else None
     client = get_client()
@@ -149,6 +151,7 @@ def create_event(
             recurrence_rule=recurrence_rule or None,
             alert_minutes=parsed_alerts,
             availability=availability or None,
+            timezone=timezone or None,
         )
     except Exception as e:
         return f"Error creating event: {e}"
@@ -333,6 +336,7 @@ def update_event(
     allday_event: bool | None = None,
     alert_minutes: str = "",
     availability: str | None = None,
+    timezone: str = "",
     recurrence_rule: str | None = None,
     occurrence_date: str = "",
     span: str = "this_event",
@@ -386,6 +390,7 @@ def update_event(
             allday_event=allday_event,
             alert_minutes=parsed_alerts,
             availability=availability,
+            timezone=timezone or None,
             recurrence_rule=parsed_recurrence,
             occurrence_date=occurrence_date or None,
             span=span,

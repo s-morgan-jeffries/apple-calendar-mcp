@@ -21,6 +21,7 @@ struct UpdateEventArgs {
     var recurrence: String?
     var clearRecurrence = false
     var availability: String?
+    var timezone: String?
     var occurrenceDate: String?
     var span: EKSpan = .thisEvent
     var updatedFields: [String] = []
@@ -73,6 +74,8 @@ func parseArgs() -> UpdateEventArgs? {
             if !result.updatedFields.contains("recurrence_rule") { result.updatedFields.append("recurrence_rule") }
         case "--availability":
             i += 1; if i < args.count { result.availability = args[i]; result.updatedFields.append("availability") }
+        case "--timezone":
+            i += 1; if i < args.count { result.timezone = args[i] }
         case "--occurrence-date":
             i += 1; if i < args.count { result.occurrenceDate = args[i] }
         case "--span":
@@ -95,6 +98,7 @@ func parseArgs() -> UpdateEventArgs? {
         allday: result.allday, alertMinutes: result.alertMinutes,
         clearAlerts: result.clearAlerts, recurrence: result.recurrence,
         clearRecurrence: result.clearRecurrence, availability: result.availability,
+        timezone: result.timezone,
         occurrenceDate: result.occurrenceDate,
         span: result.span, updatedFields: result.updatedFields
     )
@@ -103,13 +107,14 @@ func parseArgs() -> UpdateEventArgs? {
 
 // MARK: - Date Parsing
 
-func parseISO8601(_ str: String) -> Date? {
+func parseISO8601(_ str: String, timeZone: TimeZone? = nil) -> Date? {
     let isoFormatter = ISO8601DateFormatter()
     isoFormatter.formatOptions = [.withInternetDateTime]
     if let date = isoFormatter.date(from: str) { return date }
 
     let df = DateFormatter()
     df.locale = Locale(identifier: "en_US_POSIX")
+    if let tz = timeZone { df.timeZone = tz }
     for fmt in ["yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd"] {
         df.dateFormat = fmt
         if let date = df.date(from: str) { return date }
@@ -275,17 +280,20 @@ guard let event = event else {
     exit(0)
 }
 
+// Resolve timezone for date parsing
+let eventTimeZone: TimeZone? = parsed.timezone.flatMap { TimeZone(identifier: $0) }
+
 // Apply updates
 if let summary = parsed.summary {
     event.title = summary
 }
-if let startStr = parsed.start, let startDate = parseISO8601(startStr) {
+if let startStr = parsed.start, let startDate = parseISO8601(startStr, timeZone: eventTimeZone) {
     event.startDate = startDate
 } else if parsed.start != nil {
     outputError("invalid_date", "Cannot parse start date: \(parsed.start!)")
     exit(0)
 }
-if let endStr = parsed.end, let endDate = parseISO8601(endStr) {
+if let endStr = parsed.end, let endDate = parseISO8601(endStr, timeZone: eventTimeZone) {
     event.endDate = endDate
 } else if parsed.end != nil {
     outputError("invalid_date", "Cannot parse end date: \(parsed.end!)")
@@ -337,8 +345,8 @@ let isRecurringThisEvent = event.hasRecurrenceRules && parsed.span == .thisEvent
 if isDateChange && isRecurringThisEvent {
     // Emulate Calendar.app: remove occurrence from series, create standalone event at new time
     let newTitle = parsed.summary ?? event.title ?? ""
-    let newStart = (parsed.start != nil ? parseISO8601(parsed.start!) : nil) ?? event.startDate!
-    let newEnd = (parsed.end != nil ? parseISO8601(parsed.end!) : nil) ?? event.endDate!
+    let newStart = (parsed.start != nil ? parseISO8601(parsed.start!, timeZone: eventTimeZone) : nil) ?? event.startDate!
+    let newEnd = (parsed.end != nil ? parseISO8601(parsed.end!, timeZone: eventTimeZone) : nil) ?? event.endDate!
     let newLocation = parsed.clearLocation ? nil : (parsed.location ?? event.location)
     let newNotes = parsed.clearDescription ? nil : (parsed.description ?? event.notes)
     let newUrl = parsed.clearUrl ? nil : (parsed.url.flatMap { URL(string: $0) } ?? event.url)
