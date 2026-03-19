@@ -555,6 +555,50 @@ class TestGetAvailabilityIntegration:
         assert len(slots) == 1
         assert slots[0]["duration_minutes"] == 480
 
+    def test_min_duration_filters_short_slots(self, connector):
+        """Create event leaving short gaps, verify min_duration filters them."""
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Availability Filter Test",
+            start_date="2099-07-01T09:20:00",
+            end_date="2099-07-01T10:00:00",
+        )
+        try:
+            # Without filter: 9:00-9:20 (20m) and 10:00-12:00 (120m)
+            all_slots = connector.get_availability(
+                calendar_names=[TEST_CALENDAR],
+                start_date="2099-07-01T09:00:00",
+                end_date="2099-07-01T12:00:00",
+            )
+            assert len(all_slots) == 2
+
+            # With filter: only 10:00-12:00 (120m) passes
+            filtered = connector.get_availability(
+                calendar_names=[TEST_CALENDAR],
+                start_date="2099-07-01T09:00:00",
+                end_date="2099-07-01T12:00:00",
+                min_duration_minutes=30,
+            )
+            assert len(filtered) == 1
+            assert filtered[0]["start_date"] == "2099-07-01T10:00:00"
+            assert filtered[0]["duration_minutes"] == 120
+        finally:
+            _delete_event_by_uid(uid)
+
+    def test_working_hours_clips_range(self, connector):
+        """Working hours clip free slots to the specified window."""
+        slots = connector.get_availability(
+            calendar_names=[TEST_CALENDAR],
+            start_date="2099-08-01T00:00:00",
+            end_date="2099-08-02T00:00:00",
+            working_hours_start="09:00",
+            working_hours_end="17:00",
+        )
+        assert len(slots) == 1
+        assert slots[0]["start_date"] == "2099-08-01T09:00:00"
+        assert slots[0]["end_date"] == "2099-08-01T17:00:00"
+        assert slots[0]["duration_minutes"] == 480
+
 
 class TestRecurringEventsIntegration:
     """Integration tests for recurring event handling."""

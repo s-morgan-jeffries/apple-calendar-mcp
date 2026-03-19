@@ -389,6 +389,9 @@ class TestGetAvailabilityTool:
             calendar_names=["Work", "Personal"],
             start_date="2026-03-15T09:00:00",
             end_date="2026-03-15T17:00:00",
+            min_duration_minutes=None,
+            working_hours_start=None,
+            working_hours_end=None,
         )
 
     @patch("apple_calendar_mcp.server_fastmcp.get_client")
@@ -414,6 +417,65 @@ class TestGetAvailabilityTool:
         from apple_calendar_mcp.server_fastmcp import get_availability
         result = get_availability(calendar_names=["Work"], start_date="2026-03-15T09:00:00", end_date="2026-03-15T17:00:00")
         assert "30m" in result
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_passes_filter_params_through(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.get_availability.return_value = []
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import get_availability
+        get_availability(
+            calendar_names=["Work"],
+            start_date="2026-03-15T09:00:00",
+            end_date="2026-03-15T17:00:00",
+            min_duration_minutes=45,
+            working_hours_start="09:00",
+            working_hours_end="17:00",
+        )
+        mock_client.get_availability.assert_called_once_with(
+            calendar_names=["Work"],
+            start_date="2026-03-15T09:00:00",
+            end_date="2026-03-15T17:00:00",
+            min_duration_minutes=45,
+            working_hours_start="09:00",
+            working_hours_end="17:00",
+        )
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_output_includes_filter_description(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.get_availability.return_value = [
+            {"start_date": "2026-03-15T09:00:00", "end_date": "2026-03-15T10:00:00", "duration_minutes": 60},
+        ]
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import get_availability
+        result = get_availability(
+            calendar_names=["Work"],
+            start_date="2026-03-15T09:00:00",
+            end_date="2026-03-15T17:00:00",
+            min_duration_minutes=45,
+            working_hours_start="09:00",
+            working_hours_end="17:00",
+        )
+        assert ">= 45 min" in result
+        assert "09:00-17:00" in result
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_no_filter_description_without_params(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.get_availability.return_value = []
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import get_availability
+        result = get_availability(
+            calendar_names=["Work"],
+            start_date="2026-03-15T09:00:00",
+            end_date="2026-03-15T17:00:00",
+        )
+        assert ">=" not in result
+        assert "09:00-17:00" not in result
 
 
 class TestUpdateEventTool:

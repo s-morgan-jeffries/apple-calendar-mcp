@@ -581,11 +581,74 @@ class CalendarConnector:
 
         return merged
 
+    @staticmethod
+    def _parse_time_string(time_str: str) -> tuple[int, int]:
+        """Parse 'HH:MM' time string to (hour, minute) tuple."""
+        parts = time_str.split(":")
+        if len(parts) != 2:
+            raise ValueError(
+                f"Invalid time format '{time_str}'. Expected 'HH:MM' (e.g., '09:00')"
+            )
+        try:
+            hour, minute = int(parts[0]), int(parts[1])
+        except ValueError:
+            raise ValueError(
+                f"Invalid time format '{time_str}'. Expected 'HH:MM' (e.g., '09:00')"
+            )
+        if not (0 <= hour <= 23 and 0 <= minute <= 59):
+            raise ValueError(
+                f"Invalid time '{time_str}'. Hour must be 0-23, minute must be 0-59"
+            )
+        return (hour, minute)
+
+    def _clip_to_working_hours(
+        self,
+        slots: list[dict[str, Any]],
+        wh_start: tuple[int, int],
+        wh_end: tuple[int, int],
+    ) -> list[dict[str, Any]]:
+        """Clip free slots to working hours, splitting multi-day slots per day."""
+        clipped: list[dict[str, Any]] = []
+        for slot in slots:
+            slot_start = self._parse_iso_datetime(slot["start_date"])
+            slot_end = self._parse_iso_datetime(slot["end_date"])
+
+            current_day = slot_start.date()
+            end_day = slot_end.date()
+            if slot_end.time() == datetime.min.time() and end_day > current_day:
+                end_day -= timedelta(days=1)
+
+            while current_day <= end_day:
+                wh_begin = datetime(
+                    current_day.year, current_day.month, current_day.day,
+                    wh_start[0], wh_start[1],
+                )
+                wh_finish = datetime(
+                    current_day.year, current_day.month, current_day.day,
+                    wh_end[0], wh_end[1],
+                )
+                clipped_start = max(slot_start, wh_begin)
+                clipped_end = min(slot_end, wh_finish)
+
+                if clipped_start < clipped_end:
+                    duration = int((clipped_end - clipped_start).total_seconds() / 60)
+                    clipped.append({
+                        "start_date": clipped_start.isoformat(),
+                        "end_date": clipped_end.isoformat(),
+                        "duration_minutes": duration,
+                    })
+                current_day += timedelta(days=1)
+
+        return clipped
+
     def get_availability(
         self,
         calendar_names: list[str],
         start_date: str,
         end_date: str,
+        min_duration_minutes: int | None = None,
+        working_hours_start: str | None = None,
+        working_hours_end: str | None = None,
     ) -> list[dict[str, Any]]:
         """Get free time slots across one or more calendars.
 
@@ -596,6 +659,9 @@ class CalendarConnector:
             calendar_names: List of calendar names to check
             start_date: Start of range in ISO 8601 format
             end_date: End of range in ISO 8601 format
+            min_duration_minutes: Only return slots of at least this many minutes
+            working_hours_start: Start of working hours as 'HH:MM' (e.g., '09:00')
+            working_hours_end: End of working hours as 'HH:MM' (e.g., '17:00')
 
         Returns:
             List of dicts with 'start_date', 'end_date', 'duration_minutes' keys
@@ -605,6 +671,23 @@ class CalendarConnector:
             ValueError: If date format is invalid, calendar not found, or no calendars provided
             PermissionError: If EventKit calendar access is denied
         """
+        if min_duration_minutes is not None and min_duration_minutes < 1:
+            raise ValueError("min_duration_minutes must be a positive integer")
+
+        wh_start = None
+        wh_end = None
+        if working_hours_start is not None or working_hours_end is not None:
+            if working_hours_start is None or working_hours_end is None:
+                raise ValueError(
+                    "Both working_hours_start and working_hours_end must be provided together"
+                )
+            wh_start = self._parse_time_string(working_hours_start)
+            wh_end = self._parse_time_string(working_hours_end)
+            if wh_start >= wh_end:
+                raise ValueError(
+                    "working_hours_start must be before working_hours_end"
+                )
+
         if not calendar_names:
             raise ValueError("At least one calendar name must be provided")
 
@@ -640,6 +723,14 @@ class CalendarConnector:
                 "end_date": range_end.isoformat(),
                 "duration_minutes": duration,
             })
+
+        if wh_start is not None and wh_end is not None:
+            free_slots = self._clip_to_working_hours(free_slots, wh_start, wh_end)
+
+        if min_duration_minutes is not None:
+            free_slots = [
+                s for s in free_slots if s["duration_minutes"] >= min_duration_minutes
+            ]
 
         return free_slots
 
