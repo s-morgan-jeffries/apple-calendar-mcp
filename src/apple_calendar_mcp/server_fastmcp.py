@@ -390,6 +390,9 @@ def get_availability(
     calendar_names: list[str],
     start_date: str,
     end_date: str,
+    min_duration_minutes: int | None = None,
+    working_hours_start: str | None = None,
+    working_hours_end: str | None = None,
 ) -> str:
     """Find free time slots across one or more calendars.
 
@@ -402,6 +405,9 @@ def get_availability(
         calendar_names: List of calendar names to check for combined availability
         start_date: Start of range in ISO 8601 format (e.g., "2026-03-15T09:00:00")
         end_date: End of range in ISO 8601 format (e.g., "2026-03-15T17:00:00")
+        min_duration_minutes: Only return slots of at least this many minutes (e.g., 45)
+        working_hours_start: Start of working hours as HH:MM (e.g., "09:00")
+        working_hours_end: End of working hours as HH:MM (e.g., "17:00")
     """
     client = get_client()
     try:
@@ -409,16 +415,26 @@ def get_availability(
             calendar_names=calendar_names,
             start_date=start_date,
             end_date=end_date,
+            min_duration_minutes=min_duration_minutes,
+            working_hours_start=working_hours_start,
+            working_hours_end=working_hours_end,
         )
     except Exception as e:
         return f"Error checking availability: {e}"
 
     cal_list = ", ".join(f"'{c}'" for c in calendar_names)
+    filters = []
+    if min_duration_minutes:
+        filters.append(f">= {min_duration_minutes} min")
+    if working_hours_start and working_hours_end:
+        filters.append(f"{working_hours_start}-{working_hours_end}")
+    filter_desc = f" ({', '.join(filters)})" if filters else ""
+
     if not slots:
-        return f"No free time in {cal_list} between {start_date} and {end_date}."
+        return f"No free time in {cal_list} between {start_date} and {end_date}{filter_desc}."
 
     lines = [_format_free_slot(slot) for slot in slots]
-    return f"Found {len(slots)} free slot(s) across {cal_list}:\n\n" + "\n".join(lines)
+    return f"Found {len(slots)} free slot(s) across {cal_list}{filter_desc}:\n\n" + "\n".join(lines)
 
 
 @mcp.tool()

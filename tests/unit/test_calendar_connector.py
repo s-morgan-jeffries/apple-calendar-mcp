@@ -747,6 +747,194 @@ class TestGetAvailability:
         assert result[2]["start_date"] == "2026-03-15T15:00:00"
 
 
+# ── get_availability: smart filtering ──────────────────────────────────────
+
+
+class TestGetAvailabilityFiltering:
+    """Tests for get_availability min_duration and working_hours params."""
+
+    def setup_method(self):
+        self.connector = CalendarConnector()
+
+    def _make_event(self, start, end):
+        return {
+            "uid": "UID-1", "summary": "Event", "start_date": start,
+            "end_date": end, "allday_event": False, "location": "",
+            "description": "", "url": "", "status": "confirmed",
+            "calendar_name": "Work",
+        }
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_min_duration_filters_short_slots(self, mock_swift):
+        """Slots shorter than min_duration_minutes are excluded."""
+        mock_swift.return_value = json.dumps([
+            self._make_event("2026-03-15T10:00:00", "2026-03-15T10:30:00"),
+            self._make_event("2026-03-15T12:00:00", "2026-03-15T13:00:00"),
+        ])
+        result = self.connector.get_availability(
+            ["Work"], "2026-03-15T09:00:00", "2026-03-15T17:00:00",
+            min_duration_minutes=45,
+        )
+        # 9:00-10:00 (60m) ✓, 10:30-12:00 (90m) ✓, 13:00-17:00 (240m) ✓
+        assert len(result) == 3
+        assert all(s["duration_minutes"] >= 45 for s in result)
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_min_duration_excludes_all(self, mock_swift):
+        """All slots shorter than threshold → empty result."""
+        mock_swift.return_value = json.dumps([
+            self._make_event("2026-03-15T09:30:00", "2026-03-15T10:00:00"),
+        ])
+        result = self.connector.get_availability(
+            ["Work"], "2026-03-15T09:00:00", "2026-03-15T10:30:00",
+            min_duration_minutes=60,
+        )
+        # 9:00-9:30 (30m) ✗, 10:00-10:30 (30m) ✗
+        assert len(result) == 0
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_working_hours_clips_single_day(self, mock_swift):
+        """Free slot clipped to working hours window."""
+        mock_swift.return_value = "[]"
+        result = self.connector.get_availability(
+            ["Work"], "2026-03-15T00:00:00", "2026-03-16T00:00:00",
+            working_hours_start="09:00", working_hours_end="17:00",
+        )
+        assert len(result) == 1
+        assert result[0]["start_date"] == "2026-03-15T09:00:00"
+        assert result[0]["end_date"] == "2026-03-15T17:00:00"
+        assert result[0]["duration_minutes"] == 480
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_working_hours_clips_partial_overlap(self, mock_swift):
+        """Slot starting before working hours gets clipped to start."""
+        mock_swift.return_value = json.dumps([
+            self._make_event("2026-03-15T12:00:00", "2026-03-15T13:00:00"),
+        ])
+        result = self.connector.get_availability(
+            ["Work"], "2026-03-15T06:00:00", "2026-03-15T20:00:00",
+            working_hours_start="09:00", working_hours_end="17:00",
+        )
+        # 6:00-12:00 clipped to 9:00-12:00 (180m), 13:00-20:00 clipped to 13:00-17:00 (240m)
+        assert len(result) == 2
+        assert result[0]["start_date"] == "2026-03-15T09:00:00"
+        assert result[0]["end_date"] == "2026-03-15T12:00:00"
+        assert result[0]["duration_minutes"] == 180
+        assert result[1]["start_date"] == "2026-03-15T13:00:00"
+        assert result[1]["end_date"] == "2026-03-15T17:00:00"
+        assert result[1]["duration_minutes"] == 240
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_working_hours_slot_outside_window(self, mock_swift):
+        """Slot entirely outside working hours is excluded."""
+        mock_swift.return_value = json.dumps([
+            self._make_event("2026-03-15T09:00:00", "2026-03-15T17:00:00"),
+        ])
+        result = self.connector.get_availability(
+            ["Work"], "2026-03-15T06:00:00", "2026-03-15T20:00:00",
+            working_hours_start="09:00", working_hours_end="17:00",
+        )
+        # 6:00-9:00 outside WH, 17:00-20:00 outside WH → both excluded
+        assert len(result) == 0
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_working_hours_multi_day_split(self, mock_swift):
+        """Multi-day free slot split into per-day working hour windows."""
+        mock_swift.return_value = "[]"
+        result = self.connector.get_availability(
+            ["Work"], "2026-03-15T00:00:00", "2026-03-18T00:00:00",
+            working_hours_start="09:00", working_hours_end="17:00",
+        )
+        # 3 days: Mar 15, 16, 17 → 3 slots of 8h each
+        assert len(result) == 3
+        assert result[0]["start_date"] == "2026-03-15T09:00:00"
+        assert result[0]["end_date"] == "2026-03-15T17:00:00"
+        assert result[1]["start_date"] == "2026-03-16T09:00:00"
+        assert result[2]["start_date"] == "2026-03-17T09:00:00"
+        assert all(s["duration_minutes"] == 480 for s in result)
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_combined_working_hours_and_min_duration(self, mock_swift):
+        """Working hours clip first, then min_duration filters remainders."""
+        mock_swift.return_value = json.dumps([
+            self._make_event("2026-03-15T09:00:00", "2026-03-15T09:30:00"),
+            self._make_event("2026-03-15T12:00:00", "2026-03-15T16:45:00"),
+        ])
+        result = self.connector.get_availability(
+            ["Work"], "2026-03-15T06:00:00", "2026-03-15T20:00:00",
+            min_duration_minutes=30,
+            working_hours_start="09:00", working_hours_end="17:00",
+        )
+        # After WH clip: 9:30-12:00 (150m) ✓, 16:45-17:00 (15m) ✗
+        assert len(result) == 1
+        assert result[0]["start_date"] == "2026-03-15T09:30:00"
+        assert result[0]["duration_minutes"] == 150
+
+    def test_working_hours_start_only_raises(self):
+        with pytest.raises(ValueError, match="Both working_hours"):
+            self.connector.get_availability(
+                ["Work"], "2026-03-15T09:00:00", "2026-03-15T17:00:00",
+                working_hours_start="09:00",
+            )
+
+    def test_working_hours_end_only_raises(self):
+        with pytest.raises(ValueError, match="Both working_hours"):
+            self.connector.get_availability(
+                ["Work"], "2026-03-15T09:00:00", "2026-03-15T17:00:00",
+                working_hours_end="17:00",
+            )
+
+    def test_invalid_time_format_raises(self):
+        with pytest.raises(ValueError, match="Invalid time format"):
+            self.connector.get_availability(
+                ["Work"], "2026-03-15T09:00:00", "2026-03-15T17:00:00",
+                working_hours_start="9am", working_hours_end="5pm",
+            )
+
+    def test_working_hours_start_after_end_raises(self):
+        with pytest.raises(ValueError, match="must be before"):
+            self.connector.get_availability(
+                ["Work"], "2026-03-15T09:00:00", "2026-03-15T17:00:00",
+                working_hours_start="17:00", working_hours_end="09:00",
+            )
+
+    def test_min_duration_zero_raises(self):
+        with pytest.raises(ValueError, match="positive integer"):
+            self.connector.get_availability(
+                ["Work"], "2026-03-15T09:00:00", "2026-03-15T17:00:00",
+                min_duration_minutes=0,
+            )
+
+    def test_min_duration_negative_raises(self):
+        with pytest.raises(ValueError, match="positive integer"):
+            self.connector.get_availability(
+                ["Work"], "2026-03-15T09:00:00", "2026-03-15T17:00:00",
+                min_duration_minutes=-10,
+            )
+
+
+class TestParseTimeString:
+    """Tests for CalendarConnector._parse_time_string()."""
+
+    def test_valid_time(self):
+        assert CalendarConnector._parse_time_string("09:00") == (9, 0)
+        assert CalendarConnector._parse_time_string("17:30") == (17, 30)
+        assert CalendarConnector._parse_time_string("00:00") == (0, 0)
+        assert CalendarConnector._parse_time_string("23:59") == (23, 59)
+
+    def test_invalid_format(self):
+        with pytest.raises(ValueError, match="Invalid time format"):
+            CalendarConnector._parse_time_string("9am")
+
+    def test_out_of_range_hour(self):
+        with pytest.raises(ValueError, match="Hour must be 0-23"):
+            CalendarConnector._parse_time_string("25:00")
+
+    def test_out_of_range_minute(self):
+        with pytest.raises(ValueError, match="minute must be 0-59"):
+            CalendarConnector._parse_time_string("09:60")
+
+
 # ── update_event ────────────────────────────────────────────────────────────
 
 
