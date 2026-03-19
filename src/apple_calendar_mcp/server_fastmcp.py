@@ -14,7 +14,7 @@ CALENDARS: Each calendar has a name, writable status, type (caldav, subscription
 
 CALENDAR IDENTIFICATION: Calendars are identified by name (not UID — UIDs are not accessible via AppleScript). When specifying a calendar, use the exact name as returned by get_calendars.
 
-EVENTS: Events have summary (title), start/end dates, location, description (notes), URL, status, recurrence, attendees, and editability info. Events are identified by their UID (UUID format). The is_editable field indicates whether the event can be modified — events on read-only calendars or events where you are not the organizer (invited events) are not editable. Attendees are read-only — they cannot be added via this server (use Calendar.app or email invitations).
+EVENTS: Events have summary (title), start/end dates, location, notes, URL, status, recurrence, attendees, and editability info. Events are identified by their UID (UUID format). The is_editable field indicates whether the event can be modified — events on read-only calendars or events where you are not the organizer (invited events) are not editable. Attendees are read-only — they cannot be added via this server (use Calendar.app or email invitations).
 
 RECURRING EVENTS: Recurring events share the same UID across all occurrences. Each occurrence has a unique occurrence_date. The is_recurring field indicates if an event is part of a series. The recurrence_rule field contains the iCalendar RRULE (e.g., "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE,FR"). To modify or delete a specific occurrence, pass occurrence_date and span="this_event". To modify or delete the series from a point onward, use span="future_events".
 
@@ -112,7 +112,7 @@ def create_event(
     start_date: str,
     end_date: str,
     location: str = "",
-    description: str = "",
+    notes: str = "",
     url: str = "",
     allday_event: bool = False,
     recurrence_rule: str = "",
@@ -128,7 +128,7 @@ def create_event(
         start_date: Start date/time in ISO 8601 format (e.g., "2026-03-15" for all-day, "2026-03-15T14:30:00" for timed)
         end_date: End date/time in ISO 8601 format (must be after start_date)
         location: Event location (optional)
-        description: Event notes/description (optional)
+        notes: Event notes (optional)
         url: URL associated with the event (optional)
         allday_event: Whether this is an all-day event (default: false). When true, use date-only format for start_date/end_date.
         recurrence_rule: iCalendar RRULE string for recurring events (optional, e.g., "FREQ=WEEKLY;BYDAY=MO,WE,FR" or "FREQ=DAILY;COUNT=10")
@@ -145,7 +145,7 @@ def create_event(
             start_date=start_date,
             end_date=end_date,
             location=location or None,
-            description=description or None,
+            notes=notes or None,
             url=url or None,
             allday_event=allday_event,
             recurrence_rule=recurrence_rule or None,
@@ -180,7 +180,7 @@ def create_events(
         calendar_name: Exact name of the target calendar
         events: JSON array of event objects. Each object has keys: summary (required),
                 start (required, ISO 8601), end (required, ISO 8601), and optional:
-                location, description, url, allday (bool), recurrence (RRULE string),
+                location, notes, url, allday (bool), recurrence (RRULE string),
                 alerts (list of minutes, e.g. [15, 60]), availability ("free"/"busy"/"tentative"),
                 timezone (IANA identifier, e.g. "America/Los_Angeles")
     """
@@ -228,9 +228,9 @@ def update_events(
         calendar_name: Exact name of the calendar containing the events
         updates: JSON array of update objects. Each object must have "uid" (required)
                  and at least one field to update: summary, start (ISO 8601), end (ISO 8601),
-                 location, description, url, allday (bool), alerts (list of minutes),
+                 location, notes, url, allday (bool), alerts (list of minutes),
                  availability ("free"/"busy"/"tentative"), timezone (IANA identifier),
-                 recurrence (RRULE string), clear_location (bool), clear_description (bool),
+                 recurrence (RRULE string), clear_location (bool), clear_notes (bool),
                  clear_url (bool), clear_alerts (bool), clear_recurrence (bool)
     """
     try:
@@ -273,8 +273,8 @@ def _format_event(event: dict) -> str:
         result += "All-day event\n"
     if event.get("location"):
         result += f"Location: {event['location']}\n"
-    if event.get("description"):
-        result += f"Description: {event['description']}\n"
+    if event.get("notes"):
+        result += f"Notes: {event['notes']}\n"
     if event.get("url"):
         result += f"URL: {event['url']}\n"
     if event.get("is_recurring"):
@@ -342,12 +342,12 @@ def search_events(
 ) -> str:
     """Search events by text across one or all calendars.
 
-    Searches event summaries, descriptions, and locations with case-insensitive
+    Searches event summaries, notes, and locations with case-insensitive
     matching. If no calendar is specified, searches all calendars. If no date
     range is specified, searches from 1 month ago to 6 months from now.
 
     Args:
-        query: Text to search for in event titles, descriptions, and locations
+        query: Text to search for in event titles, notes, and locations
         calendar_name: Calendar to search (optional — searches all calendars if empty)
         start_date: Start of date range in ISO 8601 format (optional)
         end_date: End of date range in ISO 8601 format (optional)
@@ -445,7 +445,7 @@ def update_event(
     start_date: str | None = None,
     end_date: str | None = None,
     location: str | None = None,
-    description: str | None = None,
+    notes: str | None = None,
     url: str | None = None,
     allday_event: bool | None = None,
     alert_minutes: str = "",
@@ -458,7 +458,7 @@ def update_event(
     """Update an existing event's properties by UID.
 
     Only provided fields are updated; omitted fields are left unchanged.
-    To clear a text field (location, description, url), pass an empty string "".
+    To clear a text field (location, notes, url), pass an empty string "".
 
     Use get_events first to find the event's UID and calendar_name.
 
@@ -472,7 +472,7 @@ def update_event(
         start_date: New start date/time in ISO 8601 format (optional)
         end_date: New end date/time in ISO 8601 format (optional)
         location: New location, or "" to clear (optional)
-        description: New description/notes, or "" to clear (optional)
+        notes: New notes, or "" to clear (optional)
         url: New URL, or "" to clear (optional)
         allday_event: New all-day status (optional)
         alert_minutes: Comma-separated minutes before event to alert (e.g., "15,60"), or "none" to clear all alerts (optional)
@@ -499,7 +499,7 @@ def update_event(
             start_date=start_date,
             end_date=end_date,
             location=location,
-            description=description,
+            notes=notes,
             url=url,
             allday_event=allday_event,
             alert_minutes=parsed_alerts,

@@ -9,7 +9,7 @@ struct CreateEventArgs {
     let start: String
     let end: String
     var location: String?
-    var description: String?
+    var notes: String?
     var url: String?
     var allday: Bool = false
     var recurrence: String?
@@ -25,7 +25,7 @@ func parseArgs() -> CreateEventArgs? {
     var start: String?
     var end: String?
     var location: String?
-    var description: String?
+    var notes: String?
     var url: String?
     var allday = false
     var recurrence: String?
@@ -46,8 +46,8 @@ func parseArgs() -> CreateEventArgs? {
             i += 1; if i < args.count { end = args[i] }
         case "--location":
             i += 1; if i < args.count { location = args[i] }
-        case "--description":
-            i += 1; if i < args.count { description = args[i] }
+        case "--notes":
+            i += 1; if i < args.count { notes = args[i] }
         case "--url":
             i += 1; if i < args.count { url = args[i] }
         case "--allday":
@@ -71,7 +71,7 @@ func parseArgs() -> CreateEventArgs? {
     }
     var result = CreateEventArgs(calendar: cal, summary: sum, start: s, end: e)
     result.location = location
-    result.description = description
+    result.notes = notes
     result.url = url
     result.allday = allday
     result.recurrence = recurrence
@@ -271,8 +271,8 @@ event.isAllDay = parsed.allday
 if let location = parsed.location {
     event.location = location
 }
-if let description = parsed.description {
-    event.notes = description
+if let notes = parsed.notes {
+    event.notes = notes
 }
 if let urlStr = parsed.url, let url = URL(string: urlStr) {
     event.url = url

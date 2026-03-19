@@ -176,7 +176,7 @@ for (index, eventData) in eventsJson.enumerated() {
     event.isAllDay = eventData["allday"] as? Bool ?? false
 
     if let location = eventData["location"] as? String { event.location = location }
-    if let description = eventData["description"] as? String { event.notes = description }
+    if let notes = eventData["notes"] as? String { event.notes = notes }
     if let urlStr = eventData["url"] as? String, let url = URL(string: urlStr) { event.url = url }
     if let rrule = eventData["recurrence"] as? String, let rule = parseRecurrenceRule(rrule) {
         event.addRecurrenceRule(rule)

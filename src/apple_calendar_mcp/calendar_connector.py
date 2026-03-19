@@ -160,7 +160,7 @@ class CalendarConnector:
         start_date: str,
         end_date: str,
         location: Optional[str] = None,
-        description: Optional[str] = None,
+        notes: Optional[str] = None,
         url: Optional[str] = None,
         allday_event: bool = False,
         recurrence_rule: Optional[str] = None,
@@ -176,7 +176,7 @@ class CalendarConnector:
             start_date: Start date/time in ISO 8601 format
             end_date: End date/time in ISO 8601 format
             location: Event location (optional)
-            description: Event notes (optional)
+            notes: Event notes (optional)
             url: URL associated with the event (optional)
             allday_event: Whether this is an all-day event
             recurrence_rule: iCalendar RRULE string (optional, e.g. "FREQ=WEEKLY;BYDAY=MO,WE,FR")
@@ -198,8 +198,8 @@ class CalendarConnector:
                 "--start", start_date, "--end", end_date]
         if location:
             args += ["--location", location]
-        if description:
-            args += ["--description", description]
+        if notes:
+            args += ["--notes", notes]
         if url:
             args += ["--url", url]
         if allday_event:
@@ -227,7 +227,7 @@ class CalendarConnector:
         Args:
             calendar_name: Name of the target calendar (all events go to same calendar)
             events: List of event dicts, each with keys: summary, start, end,
-                    and optional: location, description, url, allday, recurrence,
+                    and optional: location, notes, url, allday, recurrence,
                     alerts (list of int), availability, timezone
 
         Returns:
@@ -253,9 +253,9 @@ class CalendarConnector:
         Args:
             calendar_name: Name of the calendar containing the events
             updates: List of update dicts, each with 'uid' (required) and optional fields
-                     to update: summary, start, end, location, description, url, allday,
+                     to update: summary, start, end, location, notes, url, allday,
                      alerts, availability, timezone, recurrence, clear_location,
-                     clear_description, clear_url, clear_alerts, clear_recurrence
+                     clear_notes, clear_url, clear_alerts, clear_recurrence
 
         Returns:
             Dict with 'updated' (list of {uid, summary, updated_fields}) and 'errors'
@@ -304,7 +304,7 @@ class CalendarConnector:
 
         Returns:
             List of event dicts with keys: uid, summary, start_date, end_date,
-            allday_event, location, description, url, status, calendar_name.
+            allday_event, location, notes, url, status, calendar_name.
 
         Raises:
             ValueError: If date format is invalid or calendar not found
@@ -325,7 +325,7 @@ class CalendarConnector:
     ) -> list[dict[str, Any]]:
         """Search events by text across one or all calendars.
 
-        Searches event summaries, descriptions, and locations with
+        Searches event summaries, notes, and locations with
         case-insensitive matching.
 
         Args:
@@ -371,7 +371,7 @@ class CalendarConnector:
         start_date: str | None = None,
         end_date: str | None = None,
         location: str | None = None,
-        description: str | None = None,
+        notes: str | None = None,
         url: str | None = None,
         allday_event: bool | None = None,
         alert_minutes: list[int] | None = None,
@@ -393,7 +393,7 @@ class CalendarConnector:
             start_date: New start date/time in ISO 8601 format (optional)
             end_date: New end date/time in ISO 8601 format (optional)
             location: New location (optional, "" to clear)
-            description: New description (optional, "" to clear)
+            notes: New notes (optional, "" to clear)
             url: New URL (optional, "" to clear)
             allday_event: New all-day status (optional)
             occurrence_date: For recurring events, the date of the specific occurrence to update (optional)
@@ -413,7 +413,7 @@ class CalendarConnector:
             "start_date": start_date,
             "end_date": end_date,
             "location": location,
-            "description": description,
+            "notes": notes,
             "url": url,
             "allday_event": allday_event,
         }
@@ -466,10 +466,10 @@ class CalendarConnector:
             "start_date": "--start",
             "end_date": "--end",
             "location": "--location",
-            "description": "--description",
+            "notes": "--notes",
             "url": "--url",
         }
-        clearable = {"location", "description", "url"}
+        clearable = {"location", "notes", "url"}
         date_fields = {"start_date", "end_date"}
 
         for field_name, value in fields.items():

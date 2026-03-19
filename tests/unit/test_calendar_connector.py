@@ -390,13 +390,13 @@ class TestCreateEvent:
             start_date="2026-03-15T12:00:00",
             end_date="2026-03-15T13:00:00",
             location="Conference Room A",
-            description="Discuss project updates",
+            notes="Discuss project updates",
             url="https://example.com/meeting",
         )
         args = mock_swift.call_args[0][1]
         assert "--location" in args
         assert "Conference Room A" in args
-        assert "--description" in args
+        assert "--notes" in args
         assert "Discuss project updates" in args
         assert "--url" in args
         assert "https://example.com/meeting" in args
@@ -505,7 +505,7 @@ class TestGetEvents:
         mock_swift.return_value = json.dumps([
             {"uid": "ABC-123", "summary": "Meeting", "start_date": "2026-03-15T14:00:00",
              "end_date": "2026-03-15T15:00:00", "allday_event": False, "location": "",
-             "description": "", "url": "", "status": "confirmed", "calendar_name": "Work"},
+             "notes": "", "url": "", "status": "confirmed", "calendar_name": "Work"},
         ])
         result = self.connector.get_events("Work", "2026-03-15T00:00:00", "2026-03-16T00:00:00")
         assert isinstance(result, list)
@@ -554,7 +554,7 @@ class TestGetEvents:
         mock_swift.return_value = json.dumps([
             {"uid": "REC-123", "summary": "Weekly Standup", "start_date": "2026-07-01T09:00:00",
              "end_date": "2026-07-01T09:30:00", "allday_event": False, "location": "",
-             "description": "", "url": "", "status": "confirmed", "calendar_name": "Work",
+             "notes": "", "url": "", "status": "confirmed", "calendar_name": "Work",
              "is_recurring": True, "recurrence_rule": "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE,FR",
              "is_detached": False, "occurrence_date": "2026-07-01T09:00:00"},
         ])
@@ -570,7 +570,7 @@ class TestGetEvents:
         mock_swift.return_value = json.dumps([
             {"uid": "ATT-123", "summary": "Team Meeting", "start_date": "2026-07-01T14:00:00",
              "end_date": "2026-07-01T15:00:00", "allday_event": False, "location": "",
-             "description": "", "url": "", "status": "confirmed", "calendar_name": "Work",
+             "notes": "", "url": "", "status": "confirmed", "calendar_name": "Work",
              "is_recurring": False, "recurrence_rule": None, "is_detached": False,
              "occurrence_date": "2026-07-01T14:00:00",
              "attendees": [
@@ -590,7 +590,7 @@ class TestGetEvents:
         mock_swift.return_value = json.dumps([
             {"uid": "NO-ATT", "summary": "Solo Event", "start_date": "2026-07-01T10:00:00",
              "end_date": "2026-07-01T11:00:00", "allday_event": False, "location": "",
-             "description": "", "url": "", "status": "confirmed", "calendar_name": "Work",
+             "notes": "", "url": "", "status": "confirmed", "calendar_name": "Work",
              "is_recurring": False, "recurrence_rule": None, "is_detached": False,
              "occurrence_date": "2026-07-01T10:00:00", "attendees": []},
         ])
@@ -611,7 +611,7 @@ class TestGetAvailability:
         return {
             "uid": "UID-1", "summary": "Event", "start_date": start,
             "end_date": end, "allday_event": allday, "location": "",
-            "description": "", "url": "", "status": "confirmed",
+            "notes": "", "url": "", "status": "confirmed",
             "calendar_name": calendar,
         }
 
@@ -760,7 +760,7 @@ class TestGetAvailabilityFiltering:
         return {
             "uid": "UID-1", "summary": "Event", "start_date": start,
             "end_date": end, "allday_event": False, "location": "",
-            "description": "", "url": "", "status": "confirmed",
+            "notes": "", "url": "", "status": "confirmed",
             "calendar_name": "Work",
         }
 
