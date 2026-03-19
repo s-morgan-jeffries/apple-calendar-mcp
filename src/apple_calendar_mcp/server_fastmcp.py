@@ -214,6 +214,56 @@ def create_events(
     return "\n".join(parts)
 
 
+@mcp.tool()
+def update_events(
+    calendar_name: str,
+    updates: str,
+) -> str:
+    """Update multiple events in a single batch operation.
+
+    More efficient than calling update_event multiple times. All events must be
+    on the same calendar.
+
+    Args:
+        calendar_name: Exact name of the calendar containing the events
+        updates: JSON array of update objects. Each object must have "uid" (required)
+                 and at least one field to update: summary, start (ISO 8601), end (ISO 8601),
+                 location, description, url, allday (bool), alerts (list of minutes),
+                 availability ("free"/"busy"/"tentative"), timezone (IANA identifier),
+                 recurrence (RRULE string), clear_location (bool), clear_description (bool),
+                 clear_url (bool), clear_alerts (bool), clear_recurrence (bool)
+    """
+    try:
+        update_list = json.loads(updates)
+    except json.JSONDecodeError as e:
+        return f"Error: invalid JSON for updates parameter: {e}"
+
+    if not isinstance(update_list, list):
+        return "Error: updates must be a JSON array"
+
+    client = get_client()
+    try:
+        result = client.update_events(
+            calendar_name=calendar_name,
+            updates=update_list,
+        )
+    except Exception as e:
+        return f"Error updating events: {e}"
+
+    updated = result.get("updated", [])
+    errors = result.get("errors", [])
+
+    parts = [f"Updated {len(updated)} event(s) in calendar '{calendar_name}'"]
+    for u in updated:
+        fields = ", ".join(u.get("updated_fields", []))
+        parts.append(f"  {u.get('summary', '?')} — {fields}")
+    if errors:
+        parts.append(f"\n{len(errors)} error(s):")
+        for e in errors:
+            parts.append(f"  [{e.get('index', '?')}] {e.get('uid', '?')}: {e.get('error', '?')}")
+    return "\n".join(parts)
+
+
 def _format_event(event: dict) -> str:
     """Format an event dict as human-readable text."""
     result = f"Title: {event['summary']}\n"

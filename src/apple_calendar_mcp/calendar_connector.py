@@ -243,6 +243,33 @@ class CalendarConnector:
             "create_events", ["--calendar", calendar_name], stdin_data=stdin_data
         )
 
+    def update_events(
+        self,
+        calendar_name: str,
+        updates: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Update multiple events in a single batch operation.
+
+        Args:
+            calendar_name: Name of the calendar containing the events
+            updates: List of update dicts, each with 'uid' (required) and optional fields
+                     to update: summary, start, end, location, description, url, allday,
+                     alerts, availability, timezone, recurrence, clear_location,
+                     clear_description, clear_url, clear_alerts, clear_recurrence
+
+        Returns:
+            Dict with 'updated' (list of {uid, summary, updated_fields}) and 'errors'
+        """
+        self._verify_calendar_safety(calendar_name)
+
+        if not updates:
+            raise ValueError("At least one update must be provided")
+
+        stdin_data = json.dumps(updates)
+        return self._run_swift_helper_json(
+            "update_events", ["--calendar", calendar_name], stdin_data=stdin_data
+        )
+
     def _validate_date(self, date_str: str) -> None:
         """Validate that a string is a valid ISO 8601 date.
 
