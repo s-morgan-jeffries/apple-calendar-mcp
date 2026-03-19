@@ -155,14 +155,14 @@ end tell'''
             _delete_event_by_uid(uid)
 
     def test_creates_event_with_optional_fields(self, connector):
-        """Creating an event with location, description, and URL should succeed."""
+        """Creating an event with location, notes, and URL should succeed."""
         uid = connector.create_event(
             calendar_name=TEST_CALENDAR,
             summary="Full Event Test",
             start_date="2026-06-15T09:00:00",
             end_date="2026-06-15T10:00:00",
             location="Conference Room B",
-            description="Test description with details",
+            notes="Test description with details",
             url="https://example.com/test",
         )
         try:
@@ -262,7 +262,7 @@ class TestGetEventsIntegration:
             assert len(test_events) == 1
             event = test_events[0]
             for key in ["uid", "summary", "start_date", "end_date", "allday_event",
-                         "location", "description", "url", "status", "calendar_name"]:
+                         "location", "notes", "url", "status", "calendar_name"]:
                 assert key in event, f"Missing key '{key}' in event"
             assert event["location"] == "Test Location"
             assert event["calendar_name"] == TEST_CALENDAR
@@ -841,7 +841,7 @@ class TestRoundTripIntegration:
             start_date="2027-03-01T14:00:00",
             end_date="2027-03-01T15:00:00",
             location="Conference Room",
-            description="Testing round-trip",
+            notes="Testing round-trip",
             url="https://example.com/test",
         )
         try:
@@ -851,7 +851,7 @@ class TestRoundTripIntegration:
             event = matches[0]
             assert event["summary"] == "Round Trip Test"
             assert event["location"] == "Conference Room"
-            assert event["description"] == "Testing round-trip"
+            assert event["notes"] == "Testing round-trip"
             assert event["url"] == "https://example.com/test"
             assert event["calendar_name"] == TEST_CALENDAR
         finally:

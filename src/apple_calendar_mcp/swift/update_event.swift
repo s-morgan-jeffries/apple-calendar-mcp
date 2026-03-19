@@ -11,8 +11,8 @@ struct UpdateEventArgs {
     var end: String?
     var location: String?
     var clearLocation = false
-    var description: String?
-    var clearDescription = false
+    var notes: String?
+    var clearNotes = false
     var url: String?
     var clearUrl = false
     var allday: Bool?
@@ -50,10 +50,10 @@ func parseArgs() -> UpdateEventArgs? {
             i += 1; if i < args.count { result.location = args[i]; result.updatedFields.append("location") }
         case "--clear-location":
             result.clearLocation = true; result.updatedFields.append("location")
-        case "--description":
-            i += 1; if i < args.count { result.description = args[i]; result.updatedFields.append("description") }
-        case "--clear-description":
-            result.clearDescription = true; result.updatedFields.append("description")
+        case "--notes":
+            i += 1; if i < args.count { result.notes = args[i]; result.updatedFields.append("notes") }
+        case "--clear-notes":
+            result.clearNotes = true; result.updatedFields.append("notes")
         case "--url":
             i += 1; if i < args.count { result.url = args[i]; result.updatedFields.append("url") }
         case "--clear-url":
@@ -93,7 +93,7 @@ func parseArgs() -> UpdateEventArgs? {
         calendar: cal, uid: u,
         summary: result.summary, start: result.start, end: result.end,
         location: result.location, clearLocation: result.clearLocation,
-        description: result.description, clearDescription: result.clearDescription,
+        notes: result.notes, clearNotes: result.clearNotes,
         url: result.url, clearUrl: result.clearUrl,
         allday: result.allday, alertMinutes: result.alertMinutes,
         clearAlerts: result.clearAlerts, recurrence: result.recurrence,
@@ -304,9 +304,9 @@ if let location = parsed.location {
 } else if parsed.clearLocation {
     event.location = nil
 }
-if let description = parsed.description {
-    event.notes = description
-} else if parsed.clearDescription {
+if let notes = parsed.notes {
+    event.notes = notes
+} else if parsed.clearNotes {
     event.notes = nil
 }
 if let urlStr = parsed.url, let url = URL(string: urlStr) {
@@ -348,7 +348,7 @@ if isDateChange && isRecurringThisEvent {
     let newStart = (parsed.start != nil ? parseISO8601(parsed.start!, timeZone: eventTimeZone) : nil) ?? event.startDate!
     let newEnd = (parsed.end != nil ? parseISO8601(parsed.end!, timeZone: eventTimeZone) : nil) ?? event.endDate!
     let newLocation = parsed.clearLocation ? nil : (parsed.location ?? event.location)
-    let newNotes = parsed.clearDescription ? nil : (parsed.description ?? event.notes)
+    let newNotes = parsed.clearNotes ? nil : (parsed.notes ?? event.notes)
     let newUrl = parsed.clearUrl ? nil : (parsed.url.flatMap { URL(string: $0) } ?? event.url)
     let newAllDay = parsed.allday ?? event.isAllDay
     let newAlarms = event.alarms

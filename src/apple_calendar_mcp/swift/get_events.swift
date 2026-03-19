@@ -91,7 +91,7 @@ func eventToDict(_ event: EKEvent) -> [String: Any] {
     ]
 
     dict["location"] = event.location ?? ""
-    dict["description"] = event.notes ?? ""
+    dict["notes"] = event.notes ?? ""
     dict["url"] = event.url?.absoluteString ?? ""
 
     switch event.status {

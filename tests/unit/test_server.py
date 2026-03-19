@@ -194,7 +194,7 @@ class TestCreateEventTool:
             start_date="2026-03-15T12:00:00",
             end_date="2026-03-15T13:00:00",
             location="Room A",
-            description="Notes here",
+            notes="Notes here",
             url="https://example.com",
             allday_event=True,
         )
@@ -204,7 +204,7 @@ class TestCreateEventTool:
             start_date="2026-03-15T12:00:00",
             end_date="2026-03-15T13:00:00",
             location="Room A",
-            description="Notes here",
+            notes="Notes here",
             url="https://example.com",
             allday_event=True,
             recurrence_rule=None,
@@ -258,7 +258,7 @@ class TestGetEventsTool:
         mock_client.get_events.return_value = [
             {"uid": "ABC-123", "summary": "Team Meeting", "start_date": "2026-03-15T14:00:00",
              "end_date": "2026-03-15T15:00:00", "allday_event": False, "location": "Room 4",
-             "description": "Weekly sync", "url": "", "status": "confirmed", "calendar_name": "Work"},
+             "notes": "Weekly sync", "url": "", "status": "confirmed", "calendar_name": "Work"},
         ]
         mock_get_client.return_value = mock_client
 
@@ -274,7 +274,7 @@ class TestGetEventsTool:
         mock_client.get_events.return_value = [
             {"uid": "REC-123", "summary": "Weekly Standup", "start_date": "2026-07-01T09:00:00",
              "end_date": "2026-07-01T09:30:00", "allday_event": False, "location": "",
-             "description": "", "url": "", "status": "confirmed", "calendar_name": "Work",
+             "notes": "", "url": "", "status": "confirmed", "calendar_name": "Work",
              "is_recurring": True, "recurrence_rule": "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE,FR",
              "is_detached": False, "occurrence_date": "2026-07-01T09:00:00"},
         ]
@@ -291,7 +291,7 @@ class TestGetEventsTool:
         mock_client.get_events.return_value = [
             {"uid": "ATT-123", "summary": "Team Meeting", "start_date": "2026-07-01T14:00:00",
              "end_date": "2026-07-01T15:00:00", "allday_event": False, "location": "",
-             "description": "", "url": "", "status": "confirmed", "calendar_name": "Work",
+             "notes": "", "url": "", "status": "confirmed", "calendar_name": "Work",
              "attendees": [
                  {"name": "Alice", "email": "alice@example.com", "role": "required", "status": "accepted"},
                  {"name": "", "email": "bob@example.com", "role": "optional", "status": "pending"},
@@ -514,7 +514,7 @@ class TestUpdateEventTool:
         update_event(calendar_name="Work", event_uid="ABC-123", summary="New")
         call_kwargs = mock_client.update_event.call_args[1]
         assert call_kwargs["location"] is None
-        assert call_kwargs["description"] is None
+        assert call_kwargs["notes"] is None
         assert call_kwargs["url"] is None
         assert call_kwargs["allday_event"] is None
 

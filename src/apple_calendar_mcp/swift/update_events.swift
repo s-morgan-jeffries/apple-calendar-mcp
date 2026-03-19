@@ -173,10 +173,10 @@ for (index, updateData) in updatesJson.enumerated() {
     } else if updateData["clear_location"] as? Bool == true {
         event.location = nil; updatedFields.append("location")
     }
-    if let description = updateData["description"] as? String {
-        event.notes = description; updatedFields.append("description")
-    } else if updateData["clear_description"] as? Bool == true {
-        event.notes = nil; updatedFields.append("description")
+    if let notes = updateData["notes"] as? String {
+        event.notes = notes; updatedFields.append("notes")
+    } else if updateData["clear_notes"] as? Bool == true {
+        event.notes = nil; updatedFields.append("notes")
     }
     if let urlStr = updateData["url"] as? String, let url = URL(string: urlStr) {
         event.url = url; updatedFields.append("url")
