@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-03-20
+
+### Added
+
+- `update_events` batch tool for updating multiple events in one operation (#100, #105)
+- Smart availability filtering: `min_duration_minutes` and `working_hours_start`/`working_hours_end` on `get_availability` (#101, #107)
+- Returns sections in all 11 tool docstrings for agent workflow chaining (#73, #116)
+- 9 integration tests from real-world usage patterns: special characters, alerts, search, year-boundary queries, reschedule (#93, #115)
+- Automated agent eval framework with 38 scenarios and OpenRouter runner (#114, #117)
+- CONTRIBUTING.md (#64, #119)
+
+### Changed
+
+- Renamed `description` to `notes` across the API surface (#108, #109)
+- Refactored `create_event` and `_format_event` to reduce cyclomatic complexity (#77, #113)
+
+### Fixed
+
+- `update_event` now returns the correct UID when rescheduling a recurring event occurrence (#63, #120)
+- Swift helpers now exit with code 1 on errors, enabling proper subprocess error detection (#63, #120)
+- `_parse_alert_minutes` raises descriptive error on invalid input (#63, #120)
+- Batch `update_events` now rejects `occurrence_date` with clear error instead of silently ignoring it (#63, #120)
+- `timezone` now tracked in `updated_fields` when passed to `update_event` (#63, #120)
+- Fragile test calendar cleanup with `fresh_calendar` fixture (#106, #112)
+- Documentation accuracy: updated test counts, removed stale "Planned" note (#65, #121)
+
+### Removed
+
+- Dead `_iso_to_applescript_date` method and its unit tests (#63, #120)
+
 ## [0.6.0] - 2026-03-18
 
 ### Added
