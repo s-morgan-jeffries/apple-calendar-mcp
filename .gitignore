@@ -26,5 +26,8 @@ htmlcov/
 # Git worktrees
 .worktrees/
 
+# Environment
+.env
+
 # OS
 .DS_Store
