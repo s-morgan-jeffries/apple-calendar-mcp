@@ -8,6 +8,8 @@ Run with: make test-integration
 """
 import os
 import re
+import uuid
+
 import pytest
 
 from apple_calendar_mcp.calendar_connector import CalendarConnector, run_applescript
@@ -278,6 +280,33 @@ class TestGetEventsIntegration:
         )
         assert events == []
 
+    def test_get_events_year_boundary(self, connector):
+        """Query spanning Dec 29 – Jan 3 should return events on both sides of year boundary."""
+        uid_dec = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Year Boundary Dec 31",
+            start_date="2029-12-31T10:00:00",
+            end_date="2029-12-31T11:00:00",
+        )
+        uid_jan = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Year Boundary Jan 2",
+            start_date="2030-01-02T10:00:00",
+            end_date="2030-01-02T11:00:00",
+        )
+        try:
+            events = connector.get_events(
+                calendar_name=TEST_CALENDAR,
+                start_date="2029-12-29",
+                end_date="2030-01-04",
+            )
+            uids = [e["uid"] for e in events]
+            assert uid_dec in uids, "Dec 31 event not found in year-boundary query"
+            assert uid_jan in uids, "Jan 2 event not found in year-boundary query"
+        finally:
+            _delete_event_by_uid(uid_dec)
+            _delete_event_by_uid(uid_jan)
+
 
 class TestUpdateEventIntegration:
     """Integration tests for update_event against real Calendar.app."""
@@ -385,6 +414,80 @@ class TestUpdateEventIntegration:
         finally:
             _delete_event_by_uid(uid)
 
+    def test_update_title_only(self, connector):
+        """Updating only summary should leave location and notes unchanged."""
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Original Title",
+            start_date="2027-09-10T10:00:00",
+            end_date="2027-09-10T11:00:00",
+            location="Keep This Location",
+            notes="Keep these notes",
+        )
+        try:
+            connector.update_event(TEST_CALENDAR, uid, summary="New Title")
+            events = connector.get_events(TEST_CALENDAR, "2027-09-10", "2027-09-11")
+            matches = [e for e in events if e["uid"] == uid]
+            assert len(matches) == 1
+            assert matches[0]["summary"] == "New Title"
+            assert matches[0]["location"] == "Keep This Location"
+            assert matches[0]["notes"] == "Keep these notes"
+        finally:
+            _delete_event_by_uid(uid)
+
+    def test_update_allday_event_notes_preserves_fields(self, connector):
+        """Updating notes on an all-day event should preserve location and all-day status."""
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="All Day Update Test",
+            start_date="2027-09-15",
+            end_date="2027-09-16",
+            allday_event=True,
+            location="Conference Room",
+            notes="Original notes",
+        )
+        try:
+            connector.update_event(TEST_CALENDAR, uid, notes="Updated notes")
+            events = connector.get_events(TEST_CALENDAR, "2027-09-15", "2027-09-17")
+            matches = [e for e in events if e["uid"] == uid]
+            assert len(matches) == 1
+            assert matches[0]["notes"] == "Updated notes"
+            assert matches[0]["location"] == "Conference Room"
+            assert matches[0]["allday_event"] is True
+        finally:
+            _delete_event_by_uid(uid)
+
+    def test_reschedule_event_to_different_day(self, connector):
+        """Moving an event to a different day should update dates and preserve other fields."""
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Reschedule Day Test",
+            start_date="2027-09-20T10:00:00",
+            end_date="2027-09-20T11:00:00",
+            location="Room B",
+            notes="Important meeting",
+        )
+        try:
+            connector.update_event(
+                TEST_CALENDAR, uid,
+                start_date="2027-09-25T14:00:00",
+                end_date="2027-09-25T15:00:00",
+            )
+            # Query the new date range
+            events = connector.get_events(TEST_CALENDAR, "2027-09-25", "2027-09-26")
+            matches = [e for e in events if e["uid"] == uid]
+            assert len(matches) == 1
+            assert "2027-09-25" in matches[0]["start_date"]
+            assert "14:00" in matches[0]["start_date"]
+            assert matches[0]["location"] == "Room B"
+            assert matches[0]["notes"] == "Important meeting"
+
+            # Verify not at original date
+            old_events = connector.get_events(TEST_CALENDAR, "2027-09-20", "2027-09-21")
+            assert not any(e["uid"] == uid for e in old_events)
+        finally:
+            _delete_event_by_uid(uid)
+
 
 class TestDeleteEventsIntegration:
     """Integration tests for delete_events against real Calendar.app."""
@@ -488,6 +591,26 @@ class TestDeleteEventsIntegration:
         assert len(remaining) == 2, f"Expected 2 occurrences after deleting one, got {len(remaining)}"
         dates = sorted([e["start_date"][:10] for e in remaining])
         assert "2028-08-14" not in dates, "Deleted occurrence should be gone"
+
+    def test_delete_non_recurring_event_then_verify_absent(self, connector):
+        """Delete a non-recurring event and verify it's absent via re-query (round-trip)."""
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Delete Verify Test",
+            start_date="2027-10-10T10:00:00",
+            end_date="2027-10-10T11:00:00",
+        )
+        # Verify it exists
+        events = connector.get_events(TEST_CALENDAR, "2027-10-10", "2027-10-11")
+        assert any(e["uid"] == uid for e in events), "Event should exist before deletion"
+
+        # Delete it
+        result = connector.delete_events(TEST_CALENDAR, uid)
+        assert uid in result["deleted_uids"]
+
+        # Verify absent via re-query
+        events = connector.get_events(TEST_CALENDAR, "2027-10-10", "2027-10-11")
+        assert not any(e["uid"] == uid for e in events), "Event should be absent after deletion"
 
     def test_delete_recurring_series_with_future_events(self, connector, fresh_calendar):
         """Delete a recurring series using span=future_events (#84)."""
@@ -985,3 +1108,93 @@ class TestErrorHandlingIntegration:
         result = connector.delete_events(TEST_CALENDAR, "DOES-NOT-EXIST-UID-12345")
         assert result["deleted_uids"] == []
         assert "DOES-NOT-EXIST-UID-12345" in result["not_found_uids"]
+
+
+class TestSpecialCharactersIntegration:
+    """Integration tests for special characters in event fields."""
+
+    def test_create_event_with_special_characters(self, connector):
+        """Event titles with colons, slashes, apostrophes, and parentheses should round-trip."""
+        title = "Lunch w/ John O'Brien: Planning (Q2/Q3)"
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary=title,
+            start_date="2027-11-01T12:00:00",
+            end_date="2027-11-01T13:00:00",
+        )
+        try:
+            events = connector.get_events(TEST_CALENDAR, "2027-11-01", "2027-11-02")
+            matches = [e for e in events if e["uid"] == uid]
+            assert len(matches) == 1
+            assert matches[0]["summary"] == title
+        finally:
+            _delete_event_by_uid(uid)
+
+
+class TestAlertsIntegration:
+    """Integration tests for event alerts/reminders."""
+
+    def test_create_event_with_multiple_alerts(self, connector):
+        """Creating an event with multiple alerts should preserve all of them."""
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Multi Alert Test",
+            start_date="2027-11-05T10:00:00",
+            end_date="2027-11-05T11:00:00",
+            alert_minutes=[0, 15, 30, 60],
+        )
+        try:
+            events = connector.get_events(TEST_CALENDAR, "2027-11-05", "2027-11-06")
+            matches = [e for e in events if e["uid"] == uid]
+            assert len(matches) == 1
+            alerts = matches[0].get("alerts", [])
+            alert_values = sorted([a["minutes_before"] for a in alerts])
+            assert alert_values == [0, 15, 30, 60], (
+                f"Expected alerts [0, 15, 30, 60], got {alert_values}"
+            )
+        finally:
+            _delete_event_by_uid(uid)
+
+    def test_alert_at_zero_minutes(self, connector):
+        """Alert at 0 minutes (at time of event) should not be dropped as falsy."""
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary="Zero Alert Test",
+            start_date="2027-11-06T10:00:00",
+            end_date="2027-11-06T11:00:00",
+            alert_minutes=[0],
+        )
+        try:
+            events = connector.get_events(TEST_CALENDAR, "2027-11-06", "2027-11-07")
+            matches = [e for e in events if e["uid"] == uid]
+            assert len(matches) == 1
+            alerts = matches[0].get("alerts", [])
+            assert len(alerts) == 1, f"Expected 1 alert, got {len(alerts)}"
+            assert alerts[0]["minutes_before"] == 0
+        finally:
+            _delete_event_by_uid(uid)
+
+
+class TestSearchEventsIntegration:
+    """Integration tests for search_events."""
+
+    def test_search_events_multi_month(self, connector):
+        """Keyword search across a multi-month range should find a matching event."""
+        keyword = f"UniqueSearch{uuid.uuid4().hex[:8]}"
+        uid = connector.create_event(
+            calendar_name=TEST_CALENDAR,
+            summary=f"Meeting about {keyword}",
+            start_date="2027-12-15T10:00:00",
+            end_date="2027-12-15T11:00:00",
+        )
+        try:
+            results = connector.search_events(
+                query=keyword,
+                calendar_name=TEST_CALENDAR,
+                start_date="2027-10-01",
+                end_date="2028-04-01",
+            )
+            assert len(results) >= 1, f"Expected to find event with keyword '{keyword}'"
+            assert any(keyword in e["summary"] for e in results)
+        finally:
+            _delete_event_by_uid(uid)
