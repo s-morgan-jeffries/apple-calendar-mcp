@@ -12,19 +12,21 @@ Merge the current PR, pull main, and show open milestone issues.
    gh pr merge <number> --squash --delete-branch
    ```
 
-3. **Switch to main and pull:**
+3. **Clean up worktree** (if the branch was developed in a worktree): remove the worktree before deleting the local branch, otherwise the branch delete will fail.
+
+4. **Switch to main and pull:**
    ```bash
    git checkout main && git pull
    ```
 
-4. **Determine the current milestone.** Find the earliest open milestone:
+5. **Determine the current milestone.** Find the earliest open milestone:
    ```bash
    gh api repos/:owner/:repo/milestones --jq 'sort_by(.due_on // .title) | map(select(.state == "open")) | .[0].title'
    ```
 
-5. **List open issues** on that milestone:
+6. **List open issues** on that milestone:
    ```bash
    gh issue list --milestone "<milestone>" --state open
    ```
 
-6. **Display results** as a formatted table with issue number, title, and labels.
+7. **Display results** as a formatted table with issue number, title, and labels.
