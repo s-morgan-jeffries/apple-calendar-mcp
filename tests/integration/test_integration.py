@@ -460,7 +460,7 @@ class TestDeleteEventsIntegration:
         finally:
             _delete_event_by_uid(uid)
 
-    def test_delete_single_occurrence_of_recurring(self, connector):
+    def test_delete_single_occurrence_of_recurring(self, connector, fresh_calendar):
         """Delete one occurrence of a recurring event, verify others preserved (#84)."""
         uid = connector.create_event(
             calendar_name=TEST_CALENDAR,
@@ -469,32 +469,27 @@ class TestDeleteEventsIntegration:
             end_date="2028-08-07T11:00:00",
             recurrence_rule="FREQ=WEEKLY;COUNT=3",
         )
-        try:
-            # Verify 3 occurrences: Aug 7, 14, 21
-            events = connector.get_events(TEST_CALENDAR, "2028-08-01", "2028-08-31")
-            series = [e for e in events if e["uid"] == uid]
-            assert len(series) == 3
+        # Verify 3 occurrences: Aug 7, 14, 21
+        events = connector.get_events(TEST_CALENDAR, "2028-08-01", "2028-08-31")
+        series = [e for e in events if e["uid"] == uid]
+        assert len(series) == 3
 
-            # Delete the middle occurrence (Aug 14)
-            result = connector.delete_events(
-                TEST_CALENDAR, uid,
-                span="this_event",
-                occurrence_date="2028-08-14T10:00:00",
-            )
-            assert uid in result["deleted_uids"]
+        # Delete the middle occurrence (Aug 14)
+        result = connector.delete_events(
+            TEST_CALENDAR, uid,
+            span="this_event",
+            occurrence_date="2028-08-14T10:00:00",
+        )
+        assert uid in result["deleted_uids"]
 
-            # Verify 2 remaining occurrences (Aug 7 and 21)
-            events = connector.get_events(TEST_CALENDAR, "2028-08-01", "2028-08-31")
-            remaining = [e for e in events if e["uid"] == uid]
-            assert len(remaining) == 2, f"Expected 2 occurrences after deleting one, got {len(remaining)}"
-            dates = sorted([e["start_date"][:10] for e in remaining])
-            assert "2028-08-14" not in dates, "Deleted occurrence should be gone"
-        finally:
-            from tests.helpers.calendar_setup import delete_test_calendar, create_test_calendar
-            delete_test_calendar(TEST_CALENDAR)
-            create_test_calendar(TEST_CALENDAR)
+        # Verify 2 remaining occurrences (Aug 7 and 21)
+        events = connector.get_events(TEST_CALENDAR, "2028-08-01", "2028-08-31")
+        remaining = [e for e in events if e["uid"] == uid]
+        assert len(remaining) == 2, f"Expected 2 occurrences after deleting one, got {len(remaining)}"
+        dates = sorted([e["start_date"][:10] for e in remaining])
+        assert "2028-08-14" not in dates, "Deleted occurrence should be gone"
 
-    def test_delete_recurring_series_with_future_events(self, connector):
+    def test_delete_recurring_series_with_future_events(self, connector, fresh_calendar):
         """Delete a recurring series using span=future_events (#84)."""
         uid = connector.create_event(
             calendar_name=TEST_CALENDAR,
@@ -503,23 +498,18 @@ class TestDeleteEventsIntegration:
             end_date="2028-09-02T11:00:00",
             recurrence_rule="FREQ=WEEKLY;COUNT=4",
         )
-        try:
-            events = connector.get_events(TEST_CALENDAR, "2028-09-01", "2028-09-30")
-            series = [e for e in events if e["uid"] == uid]
-            assert len(series) == 4
+        events = connector.get_events(TEST_CALENDAR, "2028-09-01", "2028-09-30")
+        series = [e for e in events if e["uid"] == uid]
+        assert len(series) == 4
 
-            # Delete entire series
-            result = connector.delete_events(TEST_CALENDAR, uid, span="future_events")
-            assert uid in result["deleted_uids"]
+        # Delete entire series
+        result = connector.delete_events(TEST_CALENDAR, uid, span="future_events")
+        assert uid in result["deleted_uids"]
 
-            # Verify all gone
-            events = connector.get_events(TEST_CALENDAR, "2028-09-01", "2028-09-30")
-            remaining = [e for e in events if e["uid"] == uid]
-            assert len(remaining) == 0, f"Expected 0 occurrences after deleting series, got {len(remaining)}"
-        finally:
-            from tests.helpers.calendar_setup import delete_test_calendar, create_test_calendar
-            delete_test_calendar(TEST_CALENDAR)
-            create_test_calendar(TEST_CALENDAR)
+        # Verify all gone
+        events = connector.get_events(TEST_CALENDAR, "2028-09-01", "2028-09-30")
+        remaining = [e for e in events if e["uid"] == uid]
+        assert len(remaining) == 0, f"Expected 0 occurrences after deleting series, got {len(remaining)}"
 
 
 class TestGetAvailabilityIntegration:
@@ -603,7 +593,7 @@ class TestGetAvailabilityIntegration:
 class TestRecurringEventsIntegration:
     """Integration tests for recurring event handling."""
 
-    def test_create_recurring_event_and_read_occurrences(self, connector):
+    def test_create_recurring_event_and_read_occurrences(self, connector, fresh_calendar):
         """Create a recurring event, verify multiple occurrences returned with recurrence fields."""
         uid = connector.create_event(
             calendar_name=TEST_CALENDAR,
@@ -612,35 +602,28 @@ class TestRecurringEventsIntegration:
             end_date="2027-01-05T11:00:00",
             recurrence_rule="FREQ=WEEKLY;COUNT=3",
         )
-        try:
-            events = connector.get_events(
-                calendar_name=TEST_CALENDAR,
-                start_date="2027-01-01",
-                end_date="2027-01-31",
-            )
-            recurring = [e for e in events if e["uid"] == uid]
-            assert len(recurring) == 3
+        events = connector.get_events(
+            calendar_name=TEST_CALENDAR,
+            start_date="2027-01-01",
+            end_date="2027-01-31",
+        )
+        recurring = [e for e in events if e["uid"] == uid]
+        assert len(recurring) == 3
 
-            # All share the same UID
-            assert all(e["uid"] == uid for e in recurring)
+        # All share the same UID
+        assert all(e["uid"] == uid for e in recurring)
 
-            # All have recurrence fields
-            for evt in recurring:
-                assert evt["is_recurring"] is True
-                assert "FREQ=WEEKLY" in evt["recurrence_rule"]
-                assert evt["is_detached"] is False
+        # All have recurrence fields
+        for evt in recurring:
+            assert evt["is_recurring"] is True
+            assert "FREQ=WEEKLY" in evt["recurrence_rule"]
+            assert evt["is_detached"] is False
 
-            # Each has a different occurrence_date
-            occ_dates = [e["occurrence_date"] for e in recurring]
-            assert len(set(occ_dates)) == 3
-        finally:
-            # Recurring events can't be fully deleted via AppleScript,
-            # so we recreate the calendar to clean up
-            from tests.helpers.calendar_setup import delete_test_calendar, create_test_calendar
-            delete_test_calendar(TEST_CALENDAR)
-            create_test_calendar(TEST_CALENDAR)
+        # Each has a different occurrence_date
+        occ_dates = [e["occurrence_date"] for e in recurring]
+        assert len(set(occ_dates)) == 3
 
-    def test_monthly_nth_weekday_recurrence(self, connector):
+    def test_monthly_nth_weekday_recurrence(self, connector, fresh_calendar):
         """Create monthly event on 4th Monday — verify correct dates (#79)."""
         # Jan 26 2028 is a 4th Monday
         uid = connector.create_event(
@@ -650,26 +633,21 @@ class TestRecurringEventsIntegration:
             end_date="2028-01-26T11:00:00",
             recurrence_rule="FREQ=MONTHLY;BYDAY=4MO;COUNT=3",
         )
-        try:
-            events = connector.get_events(
-                calendar_name=TEST_CALENDAR,
-                start_date="2028-01-01",
-                end_date="2028-04-30",
-            )
-            recurring = [e for e in events if e["uid"] == uid]
-            assert len(recurring) == 3, f"Expected 3 occurrences, got {len(recurring)}"
+        events = connector.get_events(
+            calendar_name=TEST_CALENDAR,
+            start_date="2028-01-01",
+            end_date="2028-04-30",
+        )
+        recurring = [e for e in events if e["uid"] == uid]
+        assert len(recurring) == 3, f"Expected 3 occurrences, got {len(recurring)}"
 
-            # Verify dates are all 4th Mondays
-            dates = sorted([e["start_date"][:10] for e in recurring])
-            assert dates[0] == "2028-01-26"  # 4th Monday of Jan
-            assert dates[1] == "2028-02-28"  # 4th Monday of Feb
-            assert dates[2] == "2028-03-27"  # 4th Monday of Mar
-        finally:
-            from tests.helpers.calendar_setup import delete_test_calendar, create_test_calendar
-            delete_test_calendar(TEST_CALENDAR)
-            create_test_calendar(TEST_CALENDAR)
+        # Verify dates are all 4th Mondays
+        dates = sorted([e["start_date"][:10] for e in recurring])
+        assert dates[0] == "2028-01-26"  # 4th Monday of Jan
+        assert dates[1] == "2028-02-28"  # 4th Monday of Feb
+        assert dates[2] == "2028-03-27"  # 4th Monday of Mar
 
-    def test_recurrence_with_until_end_date(self, connector):
+    def test_recurrence_with_until_end_date(self, connector, fresh_calendar):
         """Create weekly event with UNTIL — verify recurrence stops (#81)."""
         uid = connector.create_event(
             calendar_name=TEST_CALENDAR,
@@ -678,28 +656,23 @@ class TestRecurringEventsIntegration:
             end_date="2028-03-01T11:00:00",
             recurrence_rule="FREQ=WEEKLY;UNTIL=20280322T000000",
         )
-        try:
-            events = connector.get_events(
-                calendar_name=TEST_CALENDAR,
-                start_date="2028-03-01",
-                end_date="2028-04-30",
+        events = connector.get_events(
+            calendar_name=TEST_CALENDAR,
+            start_date="2028-03-01",
+            end_date="2028-04-30",
+        )
+        recurring = [e for e in events if e["uid"] == uid]
+        # Should have ~3 occurrences (Mar 1, 8, 15) — Mar 22 is the UNTIL date
+        assert len(recurring) <= 4, f"Should stop by March 22, got {len(recurring)} occurrences"
+        assert len(recurring) >= 3, f"Should have at least 3 occurrences, got {len(recurring)}"
+
+        # No occurrence should be on or after March 22
+        for e in recurring:
+            assert e["start_date"][:10] < "2028-03-22", (
+                f"Occurrence {e['start_date']} should be before UNTIL date 2028-03-22"
             )
-            recurring = [e for e in events if e["uid"] == uid]
-            # Should have ~3 occurrences (Mar 1, 8, 15) — Mar 22 is the UNTIL date
-            assert len(recurring) <= 4, f"Should stop by March 22, got {len(recurring)} occurrences"
-            assert len(recurring) >= 3, f"Should have at least 3 occurrences, got {len(recurring)}"
 
-            # No occurrence should be on or after March 22
-            for e in recurring:
-                assert e["start_date"][:10] < "2028-03-22", (
-                    f"Occurrence {e['start_date']} should be before UNTIL date 2028-03-22"
-                )
-        finally:
-            from tests.helpers.calendar_setup import delete_test_calendar, create_test_calendar
-            delete_test_calendar(TEST_CALENDAR)
-            create_test_calendar(TEST_CALENDAR)
-
-    def test_last_friday_recurrence(self, connector):
+    def test_last_friday_recurrence(self, connector, fresh_calendar):
         """Create monthly event on last Friday (BYDAY=-1FR) — verify correct dates (#79)."""
         # Jan 27 2028 is the last Friday of January
         uid = connector.create_event(
@@ -709,25 +682,20 @@ class TestRecurringEventsIntegration:
             end_date="2028-01-28T11:00:00",
             recurrence_rule="FREQ=MONTHLY;BYDAY=-1FR;COUNT=3",
         )
-        try:
-            events = connector.get_events(
-                calendar_name=TEST_CALENDAR,
-                start_date="2028-01-01",
-                end_date="2028-04-30",
-            )
-            recurring = [e for e in events if e["uid"] == uid]
-            assert len(recurring) == 3, f"Expected 3 occurrences, got {len(recurring)}"
+        events = connector.get_events(
+            calendar_name=TEST_CALENDAR,
+            start_date="2028-01-01",
+            end_date="2028-04-30",
+        )
+        recurring = [e for e in events if e["uid"] == uid]
+        assert len(recurring) == 3, f"Expected 3 occurrences, got {len(recurring)}"
 
-            dates = sorted([e["start_date"][:10] for e in recurring])
-            assert dates[0] == "2028-01-28"  # Last Friday of Jan
-            assert dates[1] == "2028-02-25"  # Last Friday of Feb
-            assert dates[2] == "2028-03-31"  # Last Friday of Mar
-        finally:
-            from tests.helpers.calendar_setup import delete_test_calendar, create_test_calendar
-            delete_test_calendar(TEST_CALENDAR)
-            create_test_calendar(TEST_CALENDAR)
+        dates = sorted([e["start_date"][:10] for e in recurring])
+        assert dates[0] == "2028-01-28"  # Last Friday of Jan
+        assert dates[1] == "2028-02-25"  # Last Friday of Feb
+        assert dates[2] == "2028-03-31"  # Last Friday of Mar
 
-    def test_add_recurrence_to_existing_event(self, connector):
+    def test_add_recurrence_to_existing_event(self, connector, fresh_calendar):
         """Create non-recurring event, add recurrence via update (#80)."""
         uid = connector.create_event(
             calendar_name=TEST_CALENDAR,
@@ -735,27 +703,22 @@ class TestRecurringEventsIntegration:
             start_date="2028-04-03T10:00:00",
             end_date="2028-04-03T11:00:00",
         )
-        try:
-            # Verify starts as non-recurring
-            events = connector.get_events(TEST_CALENDAR, "2028-04-01", "2028-04-30")
-            matches = [e for e in events if e["uid"] == uid]
-            assert len(matches) == 1
-            assert matches[0]["is_recurring"] is False
+        # Verify starts as non-recurring
+        events = connector.get_events(TEST_CALENDAR, "2028-04-01", "2028-04-30")
+        matches = [e for e in events if e["uid"] == uid]
+        assert len(matches) == 1
+        assert matches[0]["is_recurring"] is False
 
-            # Add weekly recurrence
-            connector.update_event(TEST_CALENDAR, uid, recurrence_rule="FREQ=WEEKLY;COUNT=3")
+        # Add weekly recurrence
+        connector.update_event(TEST_CALENDAR, uid, recurrence_rule="FREQ=WEEKLY;COUNT=3")
 
-            # Verify now has 3 occurrences
-            events = connector.get_events(TEST_CALENDAR, "2028-04-01", "2028-04-30")
-            matches = [e for e in events if e["uid"] == uid]
-            assert len(matches) == 3, f"Expected 3 occurrences, got {len(matches)}"
-            assert all(e["is_recurring"] for e in matches)
-        finally:
-            from tests.helpers.calendar_setup import delete_test_calendar, create_test_calendar
-            delete_test_calendar(TEST_CALENDAR)
-            create_test_calendar(TEST_CALENDAR)
+        # Verify now has 3 occurrences
+        events = connector.get_events(TEST_CALENDAR, "2028-04-01", "2028-04-30")
+        matches = [e for e in events if e["uid"] == uid]
+        assert len(matches) == 3, f"Expected 3 occurrences, got {len(matches)}"
+        assert all(e["is_recurring"] for e in matches)
 
-    def test_remove_recurrence_from_event(self, connector):
+    def test_remove_recurrence_from_event(self, connector, fresh_calendar):
         """Create recurring event, remove recurrence via update (#80)."""
         uid = connector.create_event(
             calendar_name=TEST_CALENDAR,
@@ -764,26 +727,21 @@ class TestRecurringEventsIntegration:
             end_date="2028-05-01T11:00:00",
             recurrence_rule="FREQ=WEEKLY;COUNT=4",
         )
-        try:
-            # Verify starts with 4 occurrences
-            events = connector.get_events(TEST_CALENDAR, "2028-05-01", "2028-05-31")
-            matches = [e for e in events if e["uid"] == uid]
-            assert len(matches) == 4
+        # Verify starts with 4 occurrences
+        events = connector.get_events(TEST_CALENDAR, "2028-05-01", "2028-05-31")
+        matches = [e for e in events if e["uid"] == uid]
+        assert len(matches) == 4
 
-            # Remove recurrence
-            connector.update_event(TEST_CALENDAR, uid, recurrence_rule="")
+        # Remove recurrence
+        connector.update_event(TEST_CALENDAR, uid, recurrence_rule="")
 
-            # Verify now has 1 occurrence
-            events = connector.get_events(TEST_CALENDAR, "2028-05-01", "2028-05-31")
-            matches = [e for e in events if e["uid"] == uid]
-            assert len(matches) == 1, f"Expected 1 occurrence after removing recurrence, got {len(matches)}"
-            assert matches[0]["is_recurring"] is False
-        finally:
-            from tests.helpers.calendar_setup import delete_test_calendar, create_test_calendar
-            delete_test_calendar(TEST_CALENDAR)
-            create_test_calendar(TEST_CALENDAR)
+        # Verify now has 1 occurrence
+        events = connector.get_events(TEST_CALENDAR, "2028-05-01", "2028-05-31")
+        matches = [e for e in events if e["uid"] == uid]
+        assert len(matches) == 1, f"Expected 1 occurrence after removing recurrence, got {len(matches)}"
+        assert matches[0]["is_recurring"] is False
 
-    def test_reschedule_single_occurrence(self, connector):
+    def test_reschedule_single_occurrence(self, connector, fresh_calendar):
         """Reschedule one occurrence of a recurring event — should create standalone event (#82)."""
         uid = connector.create_event(
             calendar_name=TEST_CALENDAR,
@@ -793,41 +751,36 @@ class TestRecurringEventsIntegration:
             recurrence_rule="FREQ=WEEKLY;COUNT=3",
             location="Room A",
         )
-        try:
-            # Verify 3 occurrences: Jun 5, 12, 19
-            events = connector.get_events(TEST_CALENDAR, "2028-06-01", "2028-06-30")
-            series = [e for e in events if e["uid"] == uid]
-            assert len(series) == 3
+        # Verify 3 occurrences: Jun 5, 12, 19
+        events = connector.get_events(TEST_CALENDAR, "2028-06-01", "2028-06-30")
+        series = [e for e in events if e["uid"] == uid]
+        assert len(series) == 3
 
-            # Reschedule the Jun 12 occurrence to 2pm
-            result = connector.update_event(
-                TEST_CALENDAR, uid,
-                start_date="2028-06-12T14:00:00",
-                end_date="2028-06-12T15:00:00",
-                occurrence_date="2028-06-12T10:00:00",
-                span="this_event",
-            )
+        # Reschedule the Jun 12 occurrence to 2pm
+        connector.update_event(
+            TEST_CALENDAR, uid,
+            start_date="2028-06-12T14:00:00",
+            end_date="2028-06-12T15:00:00",
+            occurrence_date="2028-06-12T10:00:00",
+            span="this_event",
+        )
 
-            # Check results
-            events = connector.get_events(TEST_CALENDAR, "2028-06-01", "2028-06-30")
+        # Check results
+        events = connector.get_events(TEST_CALENDAR, "2028-06-01", "2028-06-30")
 
-            # Series should still have occurrences (Jun 5 and Jun 19 at 10am)
-            remaining_series = [e for e in events if e["uid"] == uid]
-            assert len(remaining_series) >= 2, (
-                f"Series should still have at least 2 occurrences, got {len(remaining_series)}"
-            )
+        # Series should still have occurrences (Jun 5 and Jun 19 at 10am)
+        remaining_series = [e for e in events if e["uid"] == uid]
+        assert len(remaining_series) >= 2, (
+            f"Series should still have at least 2 occurrences, got {len(remaining_series)}"
+        )
 
-            # A standalone event should exist at 2pm on Jun 12 with same summary and location
-            jun12_events = [e for e in events if "2028-06-12" in e["start_date"]]
-            assert len(jun12_events) >= 1, "Should have an event on Jun 12 at the new time"
-            rescheduled = [e for e in jun12_events if "14:00" in e["start_date"]]
-            assert len(rescheduled) == 1, f"Should have one event at 2pm on Jun 12, got {len(rescheduled)}"
-            assert rescheduled[0]["summary"] == "Reschedule Test"
-            assert rescheduled[0]["location"] == "Room A"
-        finally:
-            from tests.helpers.calendar_setup import delete_test_calendar, create_test_calendar
-            delete_test_calendar(TEST_CALENDAR)
-            create_test_calendar(TEST_CALENDAR)
+        # A standalone event should exist at 2pm on Jun 12 with same summary and location
+        jun12_events = [e for e in events if "2028-06-12" in e["start_date"]]
+        assert len(jun12_events) >= 1, "Should have an event on Jun 12 at the new time"
+        rescheduled = [e for e in jun12_events if "14:00" in e["start_date"]]
+        assert len(rescheduled) == 1, f"Should have one event at 2pm on Jun 12, got {len(rescheduled)}"
+        assert rescheduled[0]["summary"] == "Reschedule Test"
+        assert rescheduled[0]["location"] == "Room A"
 
 
 class TestRoundTripIntegration:
