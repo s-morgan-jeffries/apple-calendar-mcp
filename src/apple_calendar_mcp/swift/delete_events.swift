@@ -63,7 +63,7 @@ func outputError(_ error: String, _ message: String) {
 
 guard let parsed = parseArgs() else {
     outputError("invalid_args", "Required: --calendar <name> --uid <uid> [--uid <uid> ...]")
-    exit(0)
+    exit(1)
 }
 
 let store = EKEventStore()
@@ -82,7 +82,7 @@ semaphore.wait()
 if !accessGranted {
     let msg = accessError?.localizedDescription ?? "Calendar access denied."
     outputError("calendar_access_denied", msg)
-    exit(0)
+    exit(1)
 }
 
 store.refreshSourcesIfNecessary()
@@ -92,7 +92,7 @@ let allCalendars = store.calendars(for: .event)
 guard let calendar = allCalendars.first(where: { $0.title == parsed.calendar }) else {
     let available = allCalendars.map { $0.title }.joined(separator: ", ")
     outputError("calendar_not_found", "Calendar '\(parsed.calendar)' not found. Available: \(available)")
-    exit(0)
+    exit(1)
 }
 
 // Delete events by UID
@@ -140,7 +140,7 @@ if !deletedUids.isEmpty {
         try store.commit()
     } catch {
         outputError("delete_failed", "Failed to commit deletions: \(error.localizedDescription)")
-        exit(0)
+        exit(1)
     }
 }
 

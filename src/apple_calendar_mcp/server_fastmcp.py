@@ -119,7 +119,12 @@ def _parse_alert_minutes(alert_minutes: str) -> list[int] | None:
     """Parse comma-separated alert minutes string into a list of ints."""
     if not alert_minutes:
         return None
-    return [int(m.strip()) for m in alert_minutes.split(",") if m.strip()]
+    try:
+        return [int(m.strip()) for m in alert_minutes.split(",") if m.strip()]
+    except ValueError:
+        raise ValueError(
+            f"alert_minutes must be comma-separated integers (e.g., '15,60'), got: {alert_minutes!r}"
+        )
 
 
 def _build_create_response(

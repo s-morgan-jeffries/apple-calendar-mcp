@@ -41,7 +41,7 @@ semaphore.wait()
 if !accessGranted {
     let msg = accessError?.localizedDescription ?? "Calendar access denied. Grant permission in System Settings > Privacy & Security > Calendars."
     outputError("calendar_access_denied", msg)
-    exit(0)
+    exit(1)
 }
 
 store.refreshSourcesIfNecessary()

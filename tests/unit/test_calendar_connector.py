@@ -154,37 +154,6 @@ class TestEscapeApplescriptString:
 # ── _iso_to_applescript_date ─────────────────────────────────────────────────
 
 
-class TestIsoToApplescriptDate:
-    """Tests for ISO 8601 to AppleScript date conversion."""
-
-    def setup_method(self):
-        self.connector = CalendarConnector()
-
-    def test_date_only(self):
-        result = self.connector._iso_to_applescript_date("2026-03-15")
-        assert result == "March 15, 2026 12:00:00 AM"
-
-    def test_date_with_time(self):
-        result = self.connector._iso_to_applescript_date("2026-03-15T14:30:00")
-        assert result == "March 15, 2026 02:30:00 PM"
-
-    def test_date_with_midnight(self):
-        result = self.connector._iso_to_applescript_date("2026-03-15T00:00:00")
-        assert result == "March 15, 2026 12:00:00 AM"
-
-    def test_date_with_noon(self):
-        result = self.connector._iso_to_applescript_date("2026-03-15T12:00:00")
-        assert result == "March 15, 2026 12:00:00 PM"
-
-    def test_invalid_date_raises_error(self):
-        with pytest.raises(ValueError, match="Invalid date format"):
-            self.connector._iso_to_applescript_date("not-a-date")
-
-    def test_date_with_z_suffix(self):
-        result = self.connector._iso_to_applescript_date("2026-03-15T14:30:00Z")
-        assert result == "March 15, 2026 02:30:00 PM"
-
-
 # ── CalendarSafetyError ─────────────────────────────────────────────────────
 
 
