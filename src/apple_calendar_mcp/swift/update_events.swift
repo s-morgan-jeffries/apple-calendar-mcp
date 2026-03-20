@@ -109,13 +109,13 @@ func outputError(_ error: String, _ message: String) {
 
 guard let calendarName = parseArgs() else {
     outputError("invalid_args", "Required: --calendar <name>. Update data is read from stdin as JSON array.")
-    exit(0)
+    exit(1)
 }
 
 let stdinData = FileHandle.standardInput.readDataToEndOfFile()
 guard let updatesJson = try? JSONSerialization.jsonObject(with: stdinData) as? [[String: Any]] else {
     outputError("invalid_input", "Expected JSON array of update objects on stdin")
-    exit(0)
+    exit(1)
 }
 
 let store = EKEventStore()
@@ -129,7 +129,7 @@ semaphore.wait()
 
 if !accessGranted {
     outputError("calendar_access_denied", "Calendar access denied.")
-    exit(0)
+    exit(1)
 }
 
 store.refreshSourcesIfNecessary()
@@ -137,7 +137,7 @@ store.refreshSourcesIfNecessary()
 guard let calendar = store.calendars(for: .event).first(where: { $0.title == calendarName }) else {
     let available = store.calendars(for: .event).map { $0.title }.joined(separator: ", ")
     outputError("calendar_not_found", "Calendar '\(calendarName)' not found. Available: \(available)")
-    exit(0)
+    exit(1)
 }
 
 var updated: [[String: Any]] = []
@@ -227,7 +227,7 @@ if !updated.isEmpty {
         try store.commit()
     } catch {
         outputError("commit_failed", "Failed to commit batch: \(error.localizedDescription)")
-        exit(0)
+        exit(1)
     }
 }
 

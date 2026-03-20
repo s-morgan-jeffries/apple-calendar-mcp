@@ -114,34 +114,17 @@ class CalendarConnector:
         text = text.replace('"', '\\"')
         return text
 
-    def _iso_to_applescript_date(self, iso_date: str) -> str:
-        """Convert ISO 8601 date to AppleScript date format.
-
-        Args:
-            iso_date: Date in ISO 8601 format (e.g., "2026-03-15" or "2026-03-15T14:30:00")
-
-        Returns:
-            str: Date in AppleScript format (e.g., "March 15, 2026 02:30:00 PM")
-        """
-        try:
-            if "T" in iso_date:
-                dt = datetime.fromisoformat(iso_date.replace("Z", "+00:00"))
-            else:
-                dt = datetime.fromisoformat(iso_date + "T00:00:00")
-        except ValueError as e:
-            raise ValueError(
-                f"Invalid date format '{iso_date}'. "
-                "Expected ISO 8601 format like '2026-03-15' or '2026-03-15T14:30:00'"
-            ) from e
-
-        # Format for AppleScript: "March 15, 2026 02:30:00 PM"
-        return dt.strftime("%B %d, %Y %I:%M:%S %p")
-
     def _run_swift_helper_json(
         self, script_name: str, args: list[str], stdin_data: Optional[str] = None
     ) -> dict:
         """Run a Swift helper and parse JSON response, raising on errors."""
-        result = run_swift_helper(script_name, args, stdin_data=stdin_data)
+        try:
+            result = run_swift_helper(script_name, args, stdin_data=stdin_data)
+        except subprocess.CalledProcessError as e:
+            # Swift helpers exit(1) on error but still write JSON to stdout
+            result = (e.stdout or "").strip()
+            if not result:
+                raise RuntimeError(f"Swift helper '{script_name}' failed with no output") from e
         parsed = json.loads(result)
         if isinstance(parsed, dict) and "error" in parsed:
             error_map = {
@@ -264,6 +247,13 @@ class CalendarConnector:
 
         if not updates:
             raise ValueError("At least one update must be provided")
+
+        for i, update in enumerate(updates):
+            if "occurrence_date" in update:
+                raise ValueError(
+                    f"update_events does not support occurrence_date (update index {i}). "
+                    "Use update_event (singular) to target specific recurring event occurrences."
+                )
 
         stdin_data = json.dumps(updates)
         return self._run_swift_helper_json(
@@ -442,12 +432,14 @@ class CalendarConnector:
 
         if timezone:
             args += ["--timezone", timezone]
+            updated_fields.append("timezone")
 
         if not updated_fields:
             raise ValueError("At least one field must be provided to update")
 
-        self._run_swift_helper_json("update_event", args)
-        return {"uid": event_uid, "updated_fields": updated_fields}
+        result = self._run_swift_helper_json("update_event", args)
+        returned_uid = result.get("uid", event_uid) if isinstance(result, dict) else event_uid
+        return {"uid": returned_uid, "updated_fields": updated_fields}
 
     def _build_update_args(
         self,

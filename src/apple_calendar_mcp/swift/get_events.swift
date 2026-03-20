@@ -185,17 +185,17 @@ func participantStatusString(_ status: EKParticipantStatus) -> String {
 
 guard let parsed = parseArgs() else {
     outputError("invalid_args", "Required: --calendar <name> --start <ISO8601> --end <ISO8601>")
-    exit(0)
+    exit(1)
 }
 
 guard let startDate = parseISO8601(parsed.start) else {
     outputError("invalid_date", "Cannot parse start date: \(parsed.start)")
-    exit(0)
+    exit(1)
 }
 
 guard let endDate = parseISO8601(parsed.end) else {
     outputError("invalid_date", "Cannot parse end date: \(parsed.end)")
-    exit(0)
+    exit(1)
 }
 
 let store = EKEventStore()
@@ -214,7 +214,7 @@ semaphore.wait()
 if !accessGranted {
     let msg = accessError?.localizedDescription ?? "Calendar access denied. Grant permission in System Settings > Privacy & Security > Calendars."
     outputError("calendar_access_denied", msg)
-    exit(0)
+    exit(1)
 }
 
 // Refresh sources to pick up recently-created events
@@ -225,7 +225,7 @@ let allCalendars = store.calendars(for: .event)
 guard let calendar = allCalendars.first(where: { $0.title == parsed.calendar }) else {
     let available = allCalendars.map { $0.title }.joined(separator: ", ")
     outputError("calendar_not_found", "Calendar '\(parsed.calendar)' not found. Available: \(available)")
-    exit(0)
+    exit(1)
 }
 
 // Query events

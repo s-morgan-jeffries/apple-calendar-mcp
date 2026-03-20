@@ -225,12 +225,12 @@ func outputError(_ error: String, _ message: String) {
 
 guard let parsed = parseArgs() else {
     outputError("invalid_args", "Required: --calendar <name> --uid <uid> and at least one field to update")
-    exit(0)
+    exit(1)
 }
 
 if parsed.updatedFields.isEmpty {
     outputError("no_fields", "At least one field must be provided to update")
-    exit(0)
+    exit(1)
 }
 
 let store = EKEventStore()
@@ -249,7 +249,7 @@ semaphore.wait()
 if !accessGranted {
     let msg = accessError?.localizedDescription ?? "Calendar access denied."
     outputError("calendar_access_denied", msg)
-    exit(0)
+    exit(1)
 }
 
 store.refreshSourcesIfNecessary()
@@ -277,7 +277,7 @@ if let occDateStr = parsed.occurrenceDate, let occDate = parseISO8601(occDateStr
 
 guard let event = event else {
     outputError("event_not_found", "Event not found: \(parsed.uid)")
-    exit(0)
+    exit(1)
 }
 
 // Resolve timezone for date parsing
@@ -291,13 +291,13 @@ if let startStr = parsed.start, let startDate = parseISO8601(startStr, timeZone:
     event.startDate = startDate
 } else if parsed.start != nil {
     outputError("invalid_date", "Cannot parse start date: \(parsed.start!)")
-    exit(0)
+    exit(1)
 }
 if let endStr = parsed.end, let endDate = parseISO8601(endStr, timeZone: eventTimeZone) {
     event.endDate = endDate
 } else if parsed.end != nil {
     outputError("invalid_date", "Cannot parse end date: \(parsed.end!)")
-    exit(0)
+    exit(1)
 }
 if let location = parsed.location {
     event.location = location
@@ -358,7 +358,7 @@ if isDateChange && isRecurringThisEvent {
         try store.remove(event, span: .thisEvent)
     } catch {
         outputError("remove_failed", "Failed to remove occurrence: \(error.localizedDescription)")
-        exit(0)
+        exit(1)
     }
 
     // Create standalone event with same properties at new time
@@ -379,7 +379,7 @@ if isDateChange && isRecurringThisEvent {
         try store.save(newEvent, span: .thisEvent)
     } catch {
         outputError("save_failed", "Failed to create rescheduled event: \(error.localizedDescription)")
-        exit(0)
+        exit(1)
     }
 
     let result: [String: Any] = [
@@ -400,7 +400,7 @@ do {
     try store.save(event, span: saveSpan)
 } catch {
     outputError("save_failed", "Failed to save event: \(error.localizedDescription)")
-    exit(0)
+    exit(1)
 }
 
 // Output result
