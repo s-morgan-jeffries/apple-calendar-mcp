@@ -30,3 +30,17 @@ def ensure_test_calendar():
 
     if created and calendar_exists(TEST_CALENDAR):
         delete_test_calendar(TEST_CALENDAR)
+
+
+@pytest.fixture
+def fresh_calendar():
+    """Provide a clean test calendar for tests that need full calendar reset.
+
+    Used by recurring event tests where events can't be fully deleted
+    via the API — the calendar must be recreated to ensure clean state.
+    """
+    delete_test_calendar(TEST_CALENDAR)
+    create_test_calendar(TEST_CALENDAR)
+    yield
+    delete_test_calendar(TEST_CALENDAR)
+    create_test_calendar(TEST_CALENDAR)
