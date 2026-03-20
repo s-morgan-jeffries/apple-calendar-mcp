@@ -105,6 +105,28 @@ def delete_calendar(name: str) -> str:
     return f"Deleted calendar '{result['name']}'"
 
 
+def _parse_alert_minutes(alert_minutes: str) -> list[int] | None:
+    """Parse comma-separated alert minutes string into a list of ints."""
+    if not alert_minutes:
+        return None
+    return [int(m.strip()) for m in alert_minutes.split(",") if m.strip()]
+
+
+def _build_create_response(
+    summary: str, calendar_name: str, event_uid: str,
+    location: str, allday_event: bool, recurrence_rule: str,
+) -> str:
+    """Build the success response for create_event."""
+    lines = [f"Created event '{summary}' in calendar '{calendar_name}'", f"Event UID: {event_uid}"]
+    if location:
+        lines.append(f"Location: {location}")
+    if allday_event:
+        lines.append("All-day event")
+    if recurrence_rule:
+        lines.append(f"Recurrence: {recurrence_rule}")
+    return "\n".join(lines)
+
+
 @mcp.tool()
 def create_event(
     calendar_name: str,
@@ -136,7 +158,6 @@ def create_event(
         availability: Event availability status: "free", "busy", or "tentative" (optional, default: busy)
         timezone: IANA timezone for interpreting start/end times (optional, e.g., "America/Los_Angeles", "US/Eastern"). When provided, times are interpreted in that timezone instead of the system's local timezone.
     """
-    parsed_alerts = [int(m.strip()) for m in alert_minutes.split(",") if m.strip()] if alert_minutes else None
     client = get_client()
     try:
         event_uid = client.create_event(
@@ -149,21 +170,14 @@ def create_event(
             url=url or None,
             allday_event=allday_event,
             recurrence_rule=recurrence_rule or None,
-            alert_minutes=parsed_alerts,
+            alert_minutes=_parse_alert_minutes(alert_minutes),
             availability=availability or None,
             timezone=timezone or None,
         )
     except Exception as e:
         return f"Error creating event: {e}"
 
-    result = f"Created event '{summary}' in calendar '{calendar_name}'\nEvent UID: {event_uid}"
-    if location:
-        result += f"\nLocation: {location}"
-    if allday_event:
-        result += "\nAll-day event"
-    if recurrence_rule:
-        result += f"\nRecurrence: {recurrence_rule}"
-    return result
+    return _build_create_response(summary, calendar_name, event_uid, location, allday_event, recurrence_rule)
 
 
 @mcp.tool()
@@ -264,37 +278,60 @@ def update_events(
     return "\n".join(parts)
 
 
-def _format_event(event: dict) -> str:
-    """Format an event dict as human-readable text."""
-    result = f"Title: {event['summary']}\n"
-    result += f"Start: {event['start_date']}\n"
-    result += f"End: {event['end_date']}\n"
+def _format_event_details(event: dict) -> list[str]:
+    """Format optional event fields as a list of display lines."""
+    lines: list[str] = []
     if event.get("allday_event"):
-        result += "All-day event\n"
-    if event.get("location"):
-        result += f"Location: {event['location']}\n"
-    if event.get("notes"):
-        result += f"Notes: {event['notes']}\n"
-    if event.get("url"):
-        result += f"URL: {event['url']}\n"
-    if event.get("is_recurring"):
-        result += f"Recurring: {event.get('recurrence_rule', 'yes')}\n"
-        if event.get("is_detached"):
-            result += "Modified occurrence (detached from series)\n"
-    alerts = event.get("alerts", [])
-    if alerts:
-        alert_strs = [f"{a['minutes_before']}m before" for a in alerts]
-        result += f"Alerts: {', '.join(alert_strs)}\n"
-    attendees = event.get("attendees", [])
-    if attendees:
-        names = [a.get("name") or a.get("email", "unknown") for a in attendees]
-        result += f"Attendees ({len(attendees)}): {', '.join(names)}\n"
+        lines.append("All-day event")
+    for key, label in [("location", "Location"), ("notes", "Notes"), ("url", "URL")]:
+        if event.get(key):
+            lines.append(f"{label}: {event[key]}")
+    lines += _format_recurrence(event)
+    lines += _format_alerts(event.get("alerts", []))
+    lines += _format_attendees(event.get("attendees", []))
     avail = event.get("availability", "busy")
     if avail and avail != "busy":
-        result += f"Availability: {avail}\n"
-    result += f"Status: {event.get('status', 'none')}\n"
-    result += f"UID: {event['uid']}\n"
-    return result
+        lines.append(f"Availability: {avail}")
+    return lines
+
+
+def _format_recurrence(event: dict) -> list[str]:
+    """Format recurrence info for an event."""
+    if not event.get("is_recurring"):
+        return []
+    lines = [f"Recurring: {event.get('recurrence_rule', 'yes')}"]
+    if event.get("is_detached"):
+        lines.append("Modified occurrence (detached from series)")
+    return lines
+
+
+def _format_alerts(alerts: list[dict]) -> list[str]:
+    """Format alert list for display."""
+    if not alerts:
+        return []
+    alert_strs = [f"{a['minutes_before']}m before" for a in alerts]
+    return [f"Alerts: {', '.join(alert_strs)}"]
+
+
+def _format_attendees(attendees: list[dict]) -> list[str]:
+    """Format attendee list for display."""
+    if not attendees:
+        return []
+    names = [a.get("name") or a.get("email", "unknown") for a in attendees]
+    return [f"Attendees ({len(attendees)}): {', '.join(names)}"]
+
+
+def _format_event(event: dict) -> str:
+    """Format an event dict as human-readable text."""
+    lines = [
+        f"Title: {event['summary']}",
+        f"Start: {event['start_date']}",
+        f"End: {event['end_date']}",
+        *_format_event_details(event),
+        f"Status: {event.get('status', 'none')}",
+        f"UID: {event['uid']}",
+    ]
+    return "\n".join(lines) + "\n"
 
 
 @mcp.tool()
@@ -485,7 +522,7 @@ def update_event(
     if alert_minutes == "none":
         parsed_alerts = []
     elif alert_minutes:
-        parsed_alerts = [int(m.strip()) for m in alert_minutes.split(",") if m.strip()]
+        parsed_alerts = _parse_alert_minutes(alert_minutes)
     # recurrence_rule: None = not provided, "" = clear, "RRULE..." = set
     parsed_recurrence = None
     if recurrence_rule is not None:
