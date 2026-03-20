@@ -74,7 +74,7 @@ Calendar names are not guaranteed unique — the same name can appear across dif
 
 ```bash
 make install           # Create venv and install dependencies
-make test              # Run all tests (102 unit, 24 integration skipped)
+make test              # Run all tests (147 unit, 57 integration)
 make test-unit         # Unit tests only
 make test-integration  # Integration tests (requires test calendar)
 make test-verbose      # Tests with verbose output
