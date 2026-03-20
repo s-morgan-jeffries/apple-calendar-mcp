@@ -59,6 +59,10 @@ def get_calendars() -> str:
 
     Note: Calendar names may not be unique across accounts. Check the description
     field to distinguish calendars with the same name from different accounts.
+
+    Returns:
+        Each calendar includes: name, access level (read-write or read-only), description, color.
+        Use calendar names exactly as shown when calling other tools.
     """
     client = get_client()
     calendars = client.get_calendars()
@@ -79,6 +83,9 @@ def create_calendar(name: str) -> str:
 
     Args:
         name: Name for the new calendar
+
+    Returns:
+        Confirmation with the calendar name.
     """
     client = get_client()
     try:
@@ -96,6 +103,9 @@ def delete_calendar(name: str) -> str:
 
     Args:
         name: Exact name of the calendar to delete (use get_calendars to find available names)
+
+    Returns:
+        Confirmation with the deleted calendar name.
     """
     client = get_client()
     try:
@@ -157,6 +167,11 @@ def create_event(
         alert_minutes: Comma-separated minutes before event to alert (optional, e.g., "15" or "15,60")
         availability: Event availability status: "free", "busy", or "tentative" (optional, default: busy)
         timezone: IANA timezone for interpreting start/end times (optional, e.g., "America/Los_Angeles", "US/Eastern"). When provided, times are interpreted in that timezone instead of the system's local timezone.
+
+    Returns:
+        Confirmation with the event UID. Use this UID with update_event or delete_events.
+        If recurrence_rule was set, includes the recurrence details.
+        If alert_minutes was set, includes the alert times.
     """
     client = get_client()
     try:
@@ -197,6 +212,10 @@ def create_events(
                 location, notes, url, allday (bool), recurrence (RRULE string),
                 alerts (list of minutes, e.g. [15, 60]), availability ("free"/"busy"/"tentative"),
                 timezone (IANA identifier, e.g. "America/Los_Angeles")
+
+    Returns:
+        Summary of created events, each with title and UID. Any per-event errors are listed
+        separately. Partial success is possible — some events may be created while others fail.
     """
     try:
         event_list = json.loads(events)
@@ -246,6 +265,10 @@ def update_events(
                  availability ("free"/"busy"/"tentative"), timezone (IANA identifier),
                  recurrence (RRULE string), clear_location (bool), clear_notes (bool),
                  clear_url (bool), clear_alerts (bool), clear_recurrence (bool)
+
+    Returns:
+        Summary of updated events, each with title and list of changed fields. Any per-event
+        errors are listed separately. Partial success is possible.
     """
     try:
         update_list = json.loads(updates)
@@ -349,6 +372,15 @@ def get_events(
         calendar_name: Exact name of the calendar to query (use get_calendars to find available names)
         start_date: Start of date range in ISO 8601 format (e.g., "2026-03-15" or "2026-03-15T00:00:00")
         end_date: End of date range in ISO 8601 format (must be after start_date)
+
+    Returns:
+        Each event includes: uid, summary, start_date, end_date, allday_event, location, notes,
+        url, status, calendar_name, availability.
+        For recurring events: is_recurring, recurrence_rule, occurrence_date, is_detached.
+        If alerts are set: alerts (list with minutes_before for each).
+        If attendees exist: attendees (list with name, email, role, status for each).
+        `uid` and `calendar_name` identify the event for update_event and delete_events.
+        For recurring events, also use `occurrence_date` to target a specific occurrence.
     """
     client = get_client()
     try:
@@ -388,6 +420,10 @@ def search_events(
         calendar_name: Calendar to search (optional — searches all calendars if empty)
         start_date: Start of date range in ISO 8601 format (optional)
         end_date: End of date range in ISO 8601 format (optional)
+
+    Returns:
+        Matching events with the same fields as get_events. Returns events whose summary,
+        notes, or location contain the query text (case-insensitive).
     """
     client = get_client()
     try:
@@ -445,6 +481,11 @@ def get_availability(
         min_duration_minutes: Only return slots of at least this many minutes (e.g., 45)
         working_hours_start: Start of working hours as HH:MM (e.g., "09:00")
         working_hours_end: End of working hours as HH:MM (e.g., "17:00")
+
+    Returns:
+        Each free slot includes: start_date, end_date, duration (formatted as hours and minutes).
+        Slots are gaps between busy periods across all specified calendars. Overlapping events
+        are merged. Returns "No free time" if the entire range is busy.
     """
     client = get_client()
     try:
@@ -517,6 +558,12 @@ def update_event(
         recurrence_rule: iCalendar RRULE string to set/change recurrence (e.g., "FREQ=WEEKLY;BYDAY=MO,WE,FR"), or "" to remove recurrence (optional)
         occurrence_date: For recurring events, the occurrence_date from get_events to target a specific occurrence (optional)
         span: "this_event" to update one occurrence, "future_events" to update this and all future occurrences (default: "this_event")
+
+    Returns:
+        Confirmation with the event UID and list of updated fields.
+        Note: when rescheduling a single occurrence of a recurring event (changing dates with
+        span="this_event"), a new standalone event is created — the returned UID may differ
+        from the original.
     """
     parsed_alerts = None
     if alert_minutes == "none":
@@ -576,6 +623,10 @@ def delete_events(
         event_uid: UID of a single event (str) or list of UIDs to delete
         span: "this_event" to delete one occurrence, "future_events" to delete the series from this point onward (default: "this_event")
         occurrence_date: For recurring events, the occurrence_date from get_events to target a specific occurrence (optional)
+
+    Returns:
+        Count of deleted events. Any UIDs not found are listed separately — these don't cause
+        the operation to fail.
     """
     client = get_client()
     try:
