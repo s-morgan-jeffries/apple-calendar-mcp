@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-03-21
+
+### Added
+
+- `get_conflicts` tool for detecting double-bookings across calendars (#103, #125)
+- Calendar `source` field in `get_calendars` for account disambiguation (#141, #150)
+- Blind agent eval results: Claude Sonnet 4 achieves 100% (76/76) on 38 scenarios (#146, #157)
+- Release automation workflows: `release.yml` and `release-hygiene.yml` (#128, #137)
+- Git hooks: pre-commit, pre-push, pre-tag with installer (#131, #136)
+- SECURITY.md, dependabot, and dependency audit script (#130, #139)
+- README badges, PR template, LICENSE file, blank issue config (#132, #135)
+- `__version__` in `__init__.py` and complete pyproject.toml metadata (#133, #134)
+- README rewrite with competitive analysis, benchmarks, and eval scores (#118, #147)
+- 98% code coverage with parity check and coverage enforcement in CI (#129, #138)
+
+### Changed
+
+- **API consolidation:** `create_event` → `create_events`, `update_event` → `update_events` (10 tools, down from 12). Single events use 1-element arrays. (#143, #152, #144, #155)
+- All-day event `end_date` is now inclusive — a single March 15 event has end_date="2026-03-15" (#142, #151)
+- `get_availability` respects event availability status — "free" events no longer block time (#124, #126)
+- Calendar create/delete migrated from AppleScript to Swift/EventKit with explicit source assignment (#153, #154)
+- Tool descriptions improved based on blind eval failures: date range semantics, timezone guidance (#145, #156)
+- Architecture fully migrated to Swift/EventKit — no more AppleScript for any operation
+
+### Fixed
+
+- Test calendar infrastructure: calendars now persist reliably via EventKit source assignment (#153, #154)
+- Scenario 37: corrected COUNT=6 for biweekly over 12 weeks (was COUNT=12)
+
+### Removed
+
+- `create_event` tool (use `create_events` with 1-element array) (#143, #152)
+- `update_event` tool (use `update_events` with 1-element array) (#144, #155)
+- `create_event.swift` and `update_event.swift` (logic ported to batch helpers)
+- `_escape_applescript_string` (no longer needed — all operations use EventKit)
+
 ## [0.6.1] - 2026-03-20
 
 ### Added
