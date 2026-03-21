@@ -188,7 +188,7 @@ end tell'''
             calendar_name=TEST_CALENDAR,
             summary="All Day Test",
             start_date="2026-06-15",
-            end_date="2026-06-16",
+            end_date="2026-06-15",
             allday_event=True,
         )
         try:
@@ -442,7 +442,7 @@ class TestUpdateEventIntegration:
             calendar_name=TEST_CALENDAR,
             summary="All Day Update Test",
             start_date="2027-09-15",
-            end_date="2027-09-16",
+            end_date="2027-09-15",
             allday_event=True,
             location="Conference Room",
             notes="Original notes",
@@ -1079,12 +1079,12 @@ class TestTimezoneIntegration:
             _delete_event_by_uid(uid)
 
     def test_allday_event_fields(self, connector):
-        """All-day event should return allday_event=True with correct date boundaries."""
+        """All-day event should return allday_event=True with inclusive end_date."""
         uid = connector.create_event(
             calendar_name=TEST_CALENDAR,
             summary="All Day Test",
             start_date="2027-08-01",
-            end_date="2027-08-02",
+            end_date="2027-08-01",
             allday_event=True,
         )
         try:
@@ -1092,6 +1092,7 @@ class TestTimezoneIntegration:
             matches = [e for e in events if e["uid"] == uid]
             assert len(matches) == 1
             assert matches[0]["allday_event"] is True
+            assert "2027-08-01" in matches[0]["end_date"]
         finally:
             _delete_event_by_uid(uid)
 

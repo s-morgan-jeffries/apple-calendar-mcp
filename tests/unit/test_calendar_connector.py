@@ -377,11 +377,14 @@ class TestCreateEvent:
             calendar_name="MCP-Test-Calendar",
             summary="Holiday",
             start_date="2026-03-15",
-            end_date="2026-03-16",
+            end_date="2026-03-15",
             allday_event=True,
         )
         args = mock_swift.call_args[0][1]
         assert "--allday" in args
+        # end_date passed through as-is — EventKit handles all-day boundaries internally
+        end_idx = args.index("--end") + 1
+        assert args[end_idx] == "2026-03-15"
 
     def test_invalid_start_date_raises_error(self):
         with pytest.raises(ValueError, match="Invalid date format"):
@@ -662,6 +665,7 @@ class TestGetAvailability:
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_allday_event_blocks_full_day(self, mock_swift):
+        # Swift returns exclusive end_date; get_events converts to inclusive
         mock_swift.return_value = json.dumps([
             self._make_event("2026-03-15", "2026-03-16", allday=True),
         ])
@@ -1381,3 +1385,41 @@ class TestSearchEvents:
         mock_swift.side_effect = side_effect
         results = self.connector.search_events("found", start_date="2026-03-01", end_date="2026-04-01")
         assert len(results) == 1
+
+
+# ── all-day inclusive end_date helpers ─────────────────────────────────────
+
+
+class TestAlldayEndDateConversion:
+    """Tests for all-day event inclusive end_date conversion."""
+
+    def setup_method(self):
+        self.connector = CalendarConnector(enable_safety_checks=False)
+
+    def test_allday_end_from_eventkit_extracts_date(self):
+        """EventKit all-day end_date (with time) should be stripped to date-only."""
+        assert self.connector._allday_end_from_eventkit("2026-03-15T23:59:59") == "2026-03-15"
+        assert self.connector._allday_end_from_eventkit("2026-12-31T23:59:59") == "2026-12-31"
+
+    def test_allday_end_from_eventkit_date_only(self):
+        """Date-only input should pass through unchanged."""
+        assert self.connector._allday_end_from_eventkit("2026-03-15") == "2026-03-15"
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_get_events_adjusts_allday_end_date(self, mock_swift):
+        """get_events should extract date portion of all-day end_date from EventKit."""
+        mock_swift.return_value = json.dumps([
+            {"uid": "AD-1", "summary": "Holiday", "start_date": "2026-03-15T00:00:00",
+             "end_date": "2026-03-15T23:59:59", "allday_event": True, "location": "",
+             "notes": "", "url": "", "status": "confirmed", "calendar_name": "Work"},
+            {"uid": "TM-1", "summary": "Meeting", "start_date": "2026-03-15T10:00:00",
+             "end_date": "2026-03-15T11:00:00", "allday_event": False, "location": "",
+             "notes": "", "url": "", "status": "confirmed", "calendar_name": "Work"},
+        ])
+        result = self.connector.get_events("Work", "2026-03-15", "2026-03-17")
+        # All-day event end_date should be date-only (inclusive)
+        assert result[0]["end_date"] == "2026-03-15"
+        # Timed event end_date should be unchanged
+        assert result[1]["end_date"] == "2026-03-15T11:00:00"
+        # Timed event end_date should not be changed
+        assert result[1]["end_date"] == "2026-03-15T11:00:00"

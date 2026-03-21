@@ -304,7 +304,11 @@ class CalendarConnector:
         self._validate_date(end_date)
 
         args = ["--calendar", calendar_name, "--start", start_date, "--end", end_date]
-        return self._run_swift_helper_json("get_events", args)
+        events = self._run_swift_helper_json("get_events", args)
+        for event in events:
+            if event.get("allday_event"):
+                event["end_date"] = self._allday_end_from_eventkit(event["end_date"])
+        return events
 
     def search_events(
         self,
@@ -347,6 +351,9 @@ class CalendarConnector:
             try:
                 events = self._run_swift_helper_json("get_events", args)
                 if isinstance(events, list):
+                    for event in events:
+                        if event.get("allday_event"):
+                            event["end_date"] = self._allday_end_from_eventkit(event["end_date"])
                     all_results.extend(events)
             except ValueError:
                 continue  # skip calendars that error (e.g., not found)
@@ -523,6 +530,16 @@ class CalendarConnector:
         parsed = self._run_swift_helper_json("delete_events", args)
         return {"deleted_uids": parsed["deleted_uids"], "not_found_uids": parsed["not_found_uids"]}
 
+    def _allday_end_from_eventkit(self, end_date: str) -> str:
+        """Extract date portion from EventKit all-day end_date.
+
+        EventKit returns all-day end dates as the last day at 23:59:59
+        (e.g., "2027-08-01T23:59:59" for a single-day event on Aug 1).
+        This extracts just the date portion for a clean inclusive end date.
+        """
+        dt = self._parse_iso_datetime(end_date)
+        return dt.strftime("%Y-%m-%d")
+
     def _parse_iso_datetime(self, date_str: str) -> datetime:
         """Parse an ISO 8601 date string to a naive local-time datetime.
 
@@ -557,8 +574,7 @@ class CalendarConnector:
             if event.get("allday_event"):
                 evt_start = evt_start.replace(hour=0, minute=0, second=0)
                 evt_end = evt_end.replace(hour=0, minute=0, second=0)
-                if evt_end == evt_start:
-                    evt_end += timedelta(days=1)
+                evt_end += timedelta(days=1)  # Convert inclusive to exclusive for calculations
 
             blocks.append((evt_start, evt_end))
 
@@ -774,8 +790,7 @@ class CalendarConnector:
             if event.get("allday_event"):
                 evt_start = evt_start.replace(hour=0, minute=0, second=0)
                 evt_end = evt_end.replace(hour=0, minute=0, second=0)
-                if evt_end == evt_start:
-                    evt_end += timedelta(days=1)
+                evt_end += timedelta(days=1)  # Convert inclusive to exclusive for calculations
             parsed.append((evt_start, evt_end, event))
         parsed.sort(key=lambda x: x[0])
 

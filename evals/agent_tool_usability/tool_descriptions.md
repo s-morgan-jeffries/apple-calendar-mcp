@@ -70,7 +70,7 @@ Create a new event in a specified calendar.
 - `location` (str, optional, default: ""): Event location
 - `notes` (str, optional, default: ""): Event notes
 - `url` (str, optional, default: ""): URL associated with the event
-- `allday_event` (bool, optional, default: false): Whether this is an all-day event. When true, use date-only format for start_date/end_date.
+- `allday_event` (bool, optional, default: false): Whether this is an all-day event. When true, use date-only format for start_date/end_date. For a single-day event, end_date equals start_date. For multi-day events, end_date is the last day (inclusive).
 - `recurrence_rule` (str, optional, default: ""): iCalendar RRULE string for recurring events (e.g., "FREQ=WEEKLY;BYDAY=MO,WE,FR" or "FREQ=DAILY;COUNT=10")
 - `alert_minutes` (str, optional, default: ""): Comma-separated minutes before event to alert (e.g., "15" or "15,60")
 - `availability` (str, optional, default: ""): Event availability status: "free", "busy", or "tentative" (default: busy)
@@ -88,7 +88,7 @@ More efficient than calling create_event multiple times — all events are creat
 
 **Parameters:**
 - `calendar_name` (str, required): Exact name of the target calendar
-- `events` (str, required): JSON array of event objects. Each object has keys: summary (required), start (required, ISO 8601), end (required, ISO 8601), and optional: location, notes, url, allday (bool), recurrence (RRULE string), alerts (list of minutes, e.g. [15, 60]), availability ("free"/"busy"/"tentative"), timezone (IANA identifier, e.g. "America/Los_Angeles")
+- `events` (str, required): JSON array of event objects. Each object has keys: summary (required), start (required, ISO 8601), end (required, ISO 8601), and optional: location, notes, url, allday (bool — when true, end is the last day inclusive), recurrence (RRULE string), alerts (list of minutes, e.g. [15, 60]), availability ("free"/"busy"/"tentative"), timezone (IANA identifier, e.g. "America/Los_Angeles")
 
 **Returns:** Summary of created events, each with title and UID. Any per-event errors are listed separately. Partial success is possible — some events may be created while others fail.
 
@@ -113,7 +113,7 @@ For recurring events: use occurrence_date to target a specific occurrence, and s
 - `location` (str | None, optional, default: None): New location, or "" to clear
 - `notes` (str | None, optional, default: None): New notes, or "" to clear
 - `url` (str | None, optional, default: None): New URL, or "" to clear
-- `allday_event` (bool | None, optional, default: None): New all-day status
+- `allday_event` (bool | None, optional, default: None): New all-day status. When true, end_date is the last day (inclusive).
 - `alert_minutes` (str, optional, default: ""): Comma-separated minutes before event to alert (e.g., "15,60"), or "none" to clear all alerts
 - `availability` (str | None, optional, default: None): Event availability: "free", "busy", or "tentative"
 - `timezone` (str, optional, default: ""): IANA timezone for interpreting start/end times (e.g., "America/Los_Angeles", "US/Eastern"). When provided, times are interpreted in that timezone instead of the system's local timezone.
@@ -133,7 +133,7 @@ More efficient than calling update_event multiple times. All events must be on t
 
 **Parameters:**
 - `calendar_name` (str, required): Exact name of the calendar containing the events
-- `updates` (str, required): JSON array of update objects. Each object must have "uid" (required) and at least one field to update: summary, start (ISO 8601), end (ISO 8601), location, notes, url, allday (bool), alerts (list of minutes), availability ("free"/"busy"/"tentative"), timezone (IANA identifier), recurrence (RRULE string), clear_location (bool), clear_notes (bool), clear_url (bool), clear_alerts (bool), clear_recurrence (bool)
+- `updates` (str, required): JSON array of update objects. Each object must have "uid" (required) and at least one field to update: summary, start (ISO 8601), end (ISO 8601), location, notes, url, allday (bool — when true, end is the last day inclusive), alerts (list of minutes), availability ("free"/"busy"/"tentative"), timezone (IANA identifier), recurrence (RRULE string), clear_location (bool), clear_notes (bool), clear_url (bool), clear_alerts (bool), clear_recurrence (bool)
 
 **Returns:** Summary of updated events, each with title and list of changed fields. Any per-event errors are listed separately. Partial success is possible.
 
@@ -150,7 +150,7 @@ Returns all events in the specified calendar that overlap with the given date ra
 - `start_date` (str, required): Start of date range in ISO 8601 format (e.g., "2026-03-15" or "2026-03-15T00:00:00")
 - `end_date` (str, required): End of date range in ISO 8601 format (must be after start_date)
 
-**Returns:** Each event includes: uid, summary, start_date, end_date, allday_event, location, notes, url, status, calendar_name, availability. For recurring events: is_recurring, recurrence_rule, occurrence_date, is_detached. If alerts are set: alerts (list with minutes_before for each). If attendees exist: attendees (list with name, email, role, status for each). `uid` and `calendar_name` identify the event for update_event and delete_events. For recurring events, also use `occurrence_date` to target a specific occurrence.
+**Returns:** Each event includes: uid, summary, start_date, end_date, allday_event, location, notes, url, status, calendar_name, availability. For all-day events, end_date is the last day of the event (inclusive). For recurring events: is_recurring, recurrence_rule, occurrence_date, is_detached. If alerts are set: alerts (list with minutes_before for each). If attendees exist: attendees (list with name, email, role, status for each). `uid` and `calendar_name` identify the event for update_event and delete_events. For recurring events, also use `occurrence_date` to target a specific occurrence.
 
 ---
 
