@@ -1,0 +1,40 @@
+#!/bin/bash
+# Git pre-commit hook
+# Checks: branch protection, version sync
+
+# Check 1: Block commits to main/master (unless hotfix/emergency)
+BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null)
+
+if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ]; then
+    COMMIT_MSG_FILE=".git/COMMIT_EDITMSG"
+    if [ -f "$COMMIT_MSG_FILE" ] && grep -qi "hotfix\|emergency" "$COMMIT_MSG_FILE"; then
+        exit 0
+    fi
+
+    LAST_MSG=$(git log -1 --pretty=%B 2>/dev/null || echo "")
+    if echo "$LAST_MSG" | grep -qi "hotfix\|emergency"; then
+        exit 0
+    fi
+
+    echo ""
+    echo "Direct commits to $BRANCH are not allowed."
+    echo "Create a feature branch: git checkout -b feature/description"
+    echo "For hotfixes, include 'hotfix' in commit message."
+    exit 1
+fi
+
+# Check 2: Version sync — if pyproject.toml version changed, warn if CHANGELOG not staged
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
+
+if echo "$STAGED_FILES" | grep -q "pyproject.toml"; then
+    VERSION_CHANGED=$(git diff --cached pyproject.toml | grep "^+version = ")
+    if [ -n "$VERSION_CHANGED" ]; then
+        if ! echo "$STAGED_FILES" | grep -q "CHANGELOG.md"; then
+            echo ""
+            echo "Warning: Version bump detected but CHANGELOG.md not staged."
+            echo ""
+        fi
+    fi
+fi
+
+exit 0

@@ -1,0 +1,38 @@
+#!/bin/bash
+# Git pre-tag hook — validates tag format and branch requirements
+
+TAG_NAME="$1"
+
+# Only check version tags
+if [[ ! "$TAG_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+)?$ ]]; then
+    exit 0
+fi
+
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# RC tags must be on release/* branches
+if [[ "$TAG_NAME" =~ -rc[0-9]+$ ]]; then
+    if [[ ! "$CURRENT_BRANCH" =~ ^release/ ]]; then
+        echo "RC tags must be created on release/* branches."
+        echo "Current branch: $CURRENT_BRANCH"
+        echo "Create a release branch: git checkout -b release/${TAG_NAME%-rc*}"
+        exit 1
+    fi
+else
+    # Final release tags must be on main or release/* branches
+    if [ "$CURRENT_BRANCH" != "main" ] && [[ ! "$CURRENT_BRANCH" =~ ^release/ ]]; then
+        echo "Final release tags must be created on main or release/* branches."
+        echo "Current branch: $CURRENT_BRANCH"
+        exit 1
+    fi
+
+    # Check CHANGELOG.md date is set
+    if [ -f "./scripts/check_changelog_date.sh" ]; then
+        if ! ./scripts/check_changelog_date.sh "$TAG_NAME" 2>&1; then
+            echo "Fix CHANGELOG date before creating final release tag."
+            exit 1
+        fi
+    fi
+fi
+
+exit 0
