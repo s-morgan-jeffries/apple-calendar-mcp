@@ -520,6 +520,62 @@ def get_availability(
     return f"Found {len(slots)} free slot(s) across {cal_list}{filter_desc}:\n\n" + "\n".join(lines)
 
 
+def _format_conflict(conflict: dict) -> str:
+    """Format a conflict pair as human-readable text."""
+    a = conflict["event_a"]
+    b = conflict["event_b"]
+    overlap = f"{conflict['overlap_start']} to {conflict['overlap_end']}"
+    lines = [
+        f"{conflict['overlap_minutes']} min overlap ({overlap}):",
+        f"  \"{a['summary']}\" on {a['calendar_name']} ({a['start_date']} to {a['end_date']})",
+        f"  \"{b['summary']}\" on {b['calendar_name']} ({b['start_date']} to {b['end_date']})",
+    ]
+    return "\n".join(lines)
+
+
+@mcp.tool()
+def get_conflicts(
+    calendar_names: list[str],
+    start_date: str,
+    end_date: str,
+) -> str:
+    """Detect double-bookings and overlapping events across calendars.
+
+    Finds all pairs of events that overlap in time within the date range.
+    Useful for checking if you have scheduling conflicts before adding new events.
+
+    Use get_calendars first to find available calendar names.
+
+    Args:
+        calendar_names: List of calendar names to check for conflicts
+        start_date: Start of range in ISO 8601 format (e.g., "2026-03-15T00:00:00")
+        end_date: End of range in ISO 8601 format (e.g., "2026-03-22T00:00:00")
+
+    Returns:
+        Each conflict includes two overlapping events with their UIDs, summaries,
+        times, and calendar names, plus the overlap window and duration in minutes.
+        Events marked as "free" availability are excluded. Returns "No conflicts"
+        if no overlapping events found.
+    """
+    client = get_client()
+    try:
+        conflicts = client.get_conflicts(
+            calendar_names=calendar_names,
+            start_date=start_date,
+            end_date=end_date,
+        )
+    except Exception as e:
+        return f"Error checking conflicts: {e}"
+
+    cal_list = ", ".join(f"'{c}'" for c in calendar_names)
+
+    if not conflicts:
+        return f"No conflicts found in {cal_list} between {start_date} and {end_date}."
+
+    lines = [_format_conflict(c) for c in conflicts]
+    return f"Found {len(conflicts)} conflict(s) across {cal_list}:\n\n" + "\n\n".join(lines)
+
+
 @mcp.tool()
 def update_event(
     calendar_name: str,

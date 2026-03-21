@@ -190,6 +190,23 @@ Use get_calendars first to find available calendar names.
 
 ---
 
+### get_conflicts
+
+Detect double-bookings and overlapping events across calendars.
+
+Finds all pairs of events that overlap in time within the date range. Useful for checking if you have scheduling conflicts before adding new events.
+
+Use get_calendars first to find available calendar names.
+
+**Parameters:**
+- `calendar_names` (list[str], required): List of calendar names to check for conflicts
+- `start_date` (str, required): Start of range in ISO 8601 format (e.g., "2026-03-15T00:00:00")
+- `end_date` (str, required): End of range in ISO 8601 format (e.g., "2026-03-22T00:00:00")
+
+**Returns:** Each conflict includes two overlapping events with their UIDs, summaries, times, and calendar names, plus the overlap window and duration in minutes. Events marked as "free" availability are excluded. Returns "No conflicts" if no overlapping events found.
+
+---
+
 ### delete_events
 
 Delete one or more events from a calendar by UID.
