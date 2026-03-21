@@ -24,11 +24,11 @@ DATES: All dates use ISO 8601 format in local time, without timezone suffix (e.g
 
 List all calendars in Apple Calendar.
 
-Returns all calendars with their names, access level (read-write or read-only), descriptions, and colors. Use this to discover available calendars before creating or querying events.
+Returns all calendars with their names, access level (read-write or read-only), source (account name), descriptions, and colors. Use this to discover available calendars before creating or querying events.
 
-Note: Calendar names may not be unique across accounts. Check the description field to distinguish calendars with the same name from different accounts.
+Note: Calendar names may not be unique across accounts. Use the source field (e.g., "iCloud", "Google") to distinguish calendars with the same name from different accounts.
 
-**Returns:** Each calendar includes: name, access level (read-write or read-only), description, color. Use calendar names exactly as shown when calling other tools.
+**Returns:** Each calendar includes: name, access level (read-write or read-only), source (account name like "iCloud" or "Google"), description, color. Use calendar names exactly as shown when calling other tools.
 
 **Parameters:** None
 

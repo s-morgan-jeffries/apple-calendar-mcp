@@ -819,8 +819,9 @@ class CalendarConnector:
         Uses EventKit via Swift helper for fast native access.
 
         Returns:
-            List of calendar dicts with keys: name, writable, description, color.
+            List of calendar dicts with keys: name, writable, description, color, type, source.
             Calendars are identified by name. Duplicate names may exist across accounts.
+            Use source (account name) to disambiguate.
 
         Raises:
             PermissionError: If EventKit calendar access is denied

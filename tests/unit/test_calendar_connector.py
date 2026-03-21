@@ -210,8 +210,8 @@ class TestGetCalendars:
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_returns_list_of_calendar_dicts(self, mock_swift):
         mock_swift.return_value = json.dumps([
-            {"name": "Personal", "writable": True, "description": "", "color": "#0072FF"},
-            {"name": "Work", "writable": True, "description": "", "color": "#FF0023"},
+            {"name": "Personal", "writable": True, "description": "", "color": "#0072FF", "source": "iCloud"},
+            {"name": "Work", "writable": True, "description": "", "color": "#FF0023", "source": "Google"},
         ])
         result = self.connector.get_calendars()
         assert isinstance(result, list)
@@ -222,7 +222,7 @@ class TestGetCalendars:
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_calendar_has_expected_keys(self, mock_swift):
         mock_swift.return_value = json.dumps([
-            {"name": "Personal", "writable": True, "description": "my cal", "color": "#0072FF"},
+            {"name": "Personal", "writable": True, "description": "my cal", "color": "#0072FF", "source": "iCloud"},
         ])
         result = self.connector.get_calendars()
         cal = result[0]
@@ -240,7 +240,7 @@ class TestGetCalendars:
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_read_only_calendar(self, mock_swift):
         mock_swift.return_value = json.dumps([
-            {"name": "Holidays", "writable": False, "description": "US Holidays", "color": "#8882FE"},
+            {"name": "Holidays", "writable": False, "description": "US Holidays", "color": "#8882FE", "source": "Other"},
         ])
         result = self.connector.get_calendars()
         assert result[0]["writable"] is False
@@ -248,7 +248,7 @@ class TestGetCalendars:
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_calendar_with_empty_description(self, mock_swift):
         mock_swift.return_value = json.dumps([
-            {"name": "Work", "writable": True, "description": "", "color": "#FF0000"},
+            {"name": "Work", "writable": True, "description": "", "color": "#FF0000", "source": "iCloud"},
         ])
         result = self.connector.get_calendars()
         assert result[0]["description"] == ""
@@ -1342,7 +1342,7 @@ class TestSearchEvents:
         def side_effect(script, args, **kwargs):
             if script == "get_calendars":
                 return json.dumps([
-                    {"name": "Work", "writable": True, "description": "", "color": "#FF0000"},
+                    {"name": "Work", "writable": True, "description": "", "color": "#FF0000", "source": "iCloud"},
                     {"name": "Personal", "writable": True, "description": "", "color": "#0000FF"},
                 ])
             # get_events returns for each calendar
@@ -1369,7 +1369,7 @@ class TestSearchEvents:
         def side_effect(script, args, **kwargs):
             if script == "get_calendars":
                 return json.dumps([
-                    {"name": "Work", "writable": True, "description": "", "color": "#FF0000"},
+                    {"name": "Work", "writable": True, "description": "", "color": "#FF0000", "source": "iCloud"},
                     {"name": "Missing", "writable": True, "description": "", "color": "#00FF00"},
                 ])
             # Work returns events, Missing raises ValueError

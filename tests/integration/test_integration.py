@@ -86,13 +86,14 @@ class TestGetCalendarsIntegration:
         assert "MCP-Test-Calendar" in names
 
     def test_calendar_has_required_keys(self, connector):
-        """Each calendar should have name, writable, description, color."""
+        """Each calendar should have name, writable, description, color, source."""
         calendars = connector.get_calendars()
         for cal in calendars:
             assert "name" in cal, f"Missing 'name' in calendar: {cal}"
             assert "writable" in cal, f"Missing 'writable' in calendar: {cal}"
             assert "description" in cal, f"Missing 'description' in calendar: {cal}"
             assert "color" in cal, f"Missing 'color' in calendar: {cal}"
+            assert "source" in cal, f"Missing 'source' in calendar: {cal}"
 
     def test_writable_is_boolean(self, connector):
         """Writable should be a proper boolean."""
