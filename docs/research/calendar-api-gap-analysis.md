@@ -350,4 +350,60 @@ EventKit exposes additional calendar metadata:
 3. ~~**Attendee properties:**~~ Answered — see Attendees section.
 4. ~~**Calendar creation:**~~ Answered — `make new calendar with properties {name:"X"}` works.
 5. ~~**Alert/reminder access:**~~ Answered — see Alerts section.
-6. ~~**EventKit alternative:**~~ Partially answered — EventKit via Swift helper is used for reads. Write migration depends on usability testing.
+6. ~~**EventKit alternative:**~~ Answered — all operations now use EventKit via Swift helpers (v0.7.0).
+
+---
+
+## Unimplemented Capabilities Audit (2026-03-21)
+
+Comprehensive audit of EventKit and AppleScript capabilities not exposed by the current 10-tool API. Organized by priority.
+
+### P1 — High value, worth implementing
+
+| Capability | API | What it enables | Effort |
+|-----------|-----|----------------|--------|
+| **Structured Location** (EKStructuredLocation) | EventKit | Geo coordinates (lat/long), radius for geofencing, structured address. Enables location-aware scheduling, map integration, "where's my next meeting?" | High |
+
+Structured location is the most significant unexposed capability. No competitor exposes it. Would add `structured_location: {title, latitude, longitude, radius}` to create_events/update_events and get_events.
+
+### P2 — Medium value, low effort
+
+| Capability | API | What it enables | Effort |
+|-----------|-----|----------------|--------|
+| **Organizer details** | EventKit (EKEvent.organizer) | Full organizer name/email/status instead of just `is_organizer` boolean | Low |
+| **Creation/modified timestamps** | EventKit (EKEvent.creationDate, lastModifiedDate) | Audit trails, sync conflict detection | Low |
+| **Default calendar** | EventKit (EKEventStore.defaultCalendarForNewEvents) | Smart defaults when user doesn't specify calendar | Low |
+
+### P3 — Low value, skip
+
+| Capability | API | Why skip |
+|-----------|-----|---------|
+| Fine-grained recurrence parsing | EventKit | RRULE string is standard and sufficient |
+| Calendar isImmutable/isSubscribed | EventKit | Type field (subscription/birthday) mostly covers this |
+| Event timezone read-back | EventKit | Events created with timezone param; returned in local time |
+| Absolute/proximity alarms | EventKit | Advanced; relative offset covers 99% of use cases |
+| All sources list | EventKit | Source field on calendars sufficient |
+| UI operations (reveal, openLocation) | AppleScript | Automation, not scheduling |
+
+### Out of scope
+
+| Capability | API | Why excluded |
+|-----------|-----|-------------|
+| Reminders (EKReminder) | EventKit | Separate entity type; Reminders.app is primary consumer. Would bloat tool surface. |
+| Travel time | EventKit (private) | Not in public API docs; sync risk (#102) |
+| Calendar visibility | EventKit (private) | Not in public API docs; UI preference only (#104) |
+| Attendee write | EventKit (read-only) | EventKit limitation; must use email invitations |
+| Event attachments | Neither | Not exposed by EventKit or AppleScript |
+
+### Already complete (no gap)
+
+| Capability | Status |
+|-----------|--------|
+| Availability states (busy/free/tentative/unavailable/not_supported) | All 5 exposed |
+| Attendees (name, email, role, status) | Full read-only access |
+| Recurrence (RRULE create/update/delete, occurrence targeting, reschedule) | Complete |
+| Calendar source/account | Exposed in v0.7.0 |
+| All-day event handling | Inclusive end_date in v0.7.0 |
+| Batch operations | create_events + update_events |
+| Conflict detection | get_conflicts tool |
+| Smart availability | Working hours + min duration filters |
