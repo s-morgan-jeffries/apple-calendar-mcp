@@ -165,7 +165,7 @@ All write operations implemented and tested via AppleScript:
 | Recurring events | ✅ | ✅ Read + create with RRULE. See Recurring Events section. | Tested 2026-03-16 |
 | Attendees | ✅ | ✅ Read (email, status). ✅ Create via AppleScript. See Attendees section. | Tested 2026-03-16 |
 | Alerts/reminders | ✅ | ✅ Read + create display alarms. See Alerts section. | Tested 2026-03-16 |
-| Travel time | ✅ | EventKit only (structuredLocation with geo coords). | Tested 2026-03-16 |
+| Travel time | ⚠️ | Private API only. Properties exist in runtime headers but not public docs. Not implementing. | Updated 2026-03-20 |
 | Text search | ✅ | AppleScript works on small calendars, likely slow on large. EventKit: fast client-side filter. | Tested 2026-03-16 |
 | Attachments | ✅ | ❌ Not exposed via EventKit or AppleScript | Tested 2026-03-16 |
 | Calendar sharing | ✅ | Read-only: type, isSubscribed, isImmutable via EventKit | Tested 2026-03-16 |
@@ -282,14 +282,23 @@ Each occurrence exposes:
 
 ---
 
-## Travel Time & Structured Location (tested 2026-03-16)
+## Travel Time & Structured Location (updated 2026-03-20)
 
 - **AppleScript:** No `travel time` property found
-- **EventKit:** `EKEvent.structuredLocation` provides:
+- **EventKit (public):** `EKEvent.structuredLocation` provides:
   - `title` (string) — location name/address
   - `geoLocation` (CLLocation) — latitude/longitude coordinates
   - `radius` (Double) — geofence radius in meters
-- Travel time is set via Calendar.app UI but no direct API property found in EventKit for the travel duration itself
+- **EventKit (private/undocumented):** Travel time properties exist in runtime headers but are NOT in Apple's public API documentation:
+  - `travelTime` (Double, seconds) — read/write travel duration
+  - `travelStartLocation` (EKStructuredLocation) — read/write travel origin
+  - `durationIncludingTravel` (Double, read-only) — computed total duration including travel
+  - `startDateIncludingTravel` (Date, read-only) — adjusted start time accounting for travel
+  - `allowsTravelTimeModifications` (Bool, read-only) — whether calendar permits travel time changes
+  - `travelRoutingMode` — read-only, routing mode set by Calendar.app (road/transit/walking)
+- **Source:** iOS Runtime Headers (github.com/nst/iOS-Runtime-Headers, EKEvent.h)
+- **Risk:** Writing to undocumented properties may cause data corruption or iCloud/Exchange sync issues. Read-only use has similar risk profile to the calendar description KVC key (safe fallback to nil).
+- **Decision:** Not implementing. Revisit if Apple documents these properties publicly (#102).
 
 ---
 
