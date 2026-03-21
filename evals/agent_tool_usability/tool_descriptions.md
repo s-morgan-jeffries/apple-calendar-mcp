@@ -14,7 +14,7 @@ EVENTS: Events have summary (title), start/end dates, location, notes, URL, stat
 
 RECURRING EVENTS: Recurring events share the same UID across all occurrences. Each occurrence has a unique occurrence_date. The is_recurring field indicates if an event is part of a series. The recurrence_rule field contains the iCalendar RRULE (e.g., "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE,FR"). To modify or delete a specific occurrence, pass occurrence_date and span="this_event". To modify or delete the series from a point onward, use span="future_events".
 
-DATES: All dates use ISO 8601 format in local time, without timezone suffix (e.g., "2026-03-15" or "2026-03-15T14:30:00"). Returned event timestamps are also in local time. Do NOT append "Z" to dates — they are not UTC.
+DATES: All dates use ISO 8601 format in local time, without timezone suffix (e.g., "2026-03-15" or "2026-03-15T14:30:00"). Returned event timestamps are also in local time. Do NOT append "Z" to dates — they are not UTC. Date ranges in get_events are inclusive on start, exclusive on end — to include all events on March 29, use end_date="2026-03-30". When scheduling in another timezone, use the timezone field per event rather than converting times manually.
 
 ---
 
@@ -66,7 +66,7 @@ For a single event, pass an array with one element. All events go to the same ca
 
 **Parameters:**
 - `calendar_name` (str, required): Exact name of the target calendar
-- `events` (str, required): JSON array of event objects. Each object has keys: summary (required), start (required, ISO 8601), end (required, ISO 8601), and optional: location, notes, url, allday (bool), recurrence (RRULE string), alerts (list of minutes, e.g. [15, 60]), availability ("free"/"busy"/"tentative"), timezone (IANA identifier, e.g. "America/Los_Angeles"). For all-day events, set allday=true and use date-only format. end is inclusive for all-day events.
+- `events` (str, required): JSON array of event objects. Each object has keys: summary (required), start (required, ISO 8601), end (required, ISO 8601), and optional: location, notes, url, allday (bool), recurrence (RRULE string), alerts (list of minutes, e.g. [15, 60]), availability ("free"/"busy"/"tentative"), timezone (IANA identifier, e.g. "America/Los_Angeles" — use to schedule in a remote timezone rather than converting times manually). For all-day events, set allday=true and use date-only format. end is inclusive for all-day events.
 
 **Returns:** Each created event with title and UID. Use these UIDs with update_events or delete_events. Any per-event errors are listed separately. Partial success is possible — some events may be created while others fail.
 
@@ -99,7 +99,7 @@ Returns all events in the specified calendar that overlap with the given date ra
 **Parameters:**
 - `calendar_name` (str, required): Exact name of the calendar to query (use get_calendars to find available names)
 - `start_date` (str, required): Start of date range in ISO 8601 format (e.g., "2026-03-15" or "2026-03-15T00:00:00")
-- `end_date` (str, required): End of date range in ISO 8601 format (must be after start_date)
+- `end_date` (str, required): End of date range in ISO 8601 format (exclusive — to include March 29, use "2026-03-30")
 
 **Returns:** Each event includes: uid, summary, start_date, end_date, allday_event, location, notes, url, status, calendar_name, availability. For all-day events, end_date is the last day of the event (inclusive). For recurring events: is_recurring, recurrence_rule, occurrence_date, is_detached. If alerts are set: alerts (list with minutes_before for each). If attendees exist: attendees (list with name, email, role, status for each). `uid` and `calendar_name` identify the event for update_events and delete_events. For recurring events, also use `occurrence_date` to target a specific occurrence.
 

@@ -18,7 +18,7 @@ EVENTS: Events have summary (title), start/end dates, location, notes, URL, stat
 
 RECURRING EVENTS: Recurring events share the same UID across all occurrences. Each occurrence has a unique occurrence_date. The is_recurring field indicates if an event is part of a series. The recurrence_rule field contains the iCalendar RRULE (e.g., "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE,FR"). To modify or delete a specific occurrence, pass occurrence_date and span="this_event". To modify or delete the series from a point onward, use span="future_events".
 
-DATES: All dates use ISO 8601 format in local time, without timezone suffix (e.g., "2026-03-15" or "2026-03-15T14:30:00"). Returned event timestamps are also in local time. Do NOT append "Z" to dates — they are not UTC.
+DATES: All dates use ISO 8601 format in local time, without timezone suffix (e.g., "2026-03-15" or "2026-03-15T14:30:00"). Returned event timestamps are also in local time. Do NOT append "Z" to dates — they are not UTC. Date ranges in get_events are inclusive on start, exclusive on end — to include all events on March 29, use end_date="2026-03-30". When scheduling in another timezone, use the timezone field per event rather than converting times manually.
 """)
 
 # Initialize Calendar client (lazy)
@@ -135,7 +135,8 @@ def create_events(
                 start (required, ISO 8601), end (required, ISO 8601), and optional:
                 location, notes, url, allday (bool), recurrence (RRULE string),
                 alerts (list of minutes, e.g. [15, 60]), availability ("free"/"busy"/"tentative"),
-                timezone (IANA identifier, e.g. "America/Los_Angeles").
+                timezone (IANA identifier, e.g. "America/Los_Angeles" — use this to schedule
+                in a remote timezone rather than converting times manually).
                 For all-day events, set allday=true and use date-only format.
                 end is inclusive for all-day events.
 
@@ -190,7 +191,8 @@ def update_events(
         updates: JSON array of update objects. Each object must have "uid" (required)
                  and at least one field to update: summary, start (ISO 8601), end (ISO 8601),
                  location, notes, url, allday (bool), alerts (list of minutes),
-                 availability ("free"/"busy"/"tentative"), timezone (IANA identifier),
+                 availability ("free"/"busy"/"tentative"), timezone (IANA identifier —
+                 use to schedule in a remote timezone rather than converting manually),
                  recurrence (RRULE string), clear_location (bool), clear_notes (bool),
                  clear_url (bool), clear_alerts (bool), clear_recurrence (bool).
                  For recurring events: occurrence_date (ISO 8601) to target specific occurrence,
@@ -303,7 +305,7 @@ def get_events(
     Args:
         calendar_name: Exact name of the calendar to query (use get_calendars to find available names)
         start_date: Start of date range in ISO 8601 format (e.g., "2026-03-15" or "2026-03-15T00:00:00")
-        end_date: End of date range in ISO 8601 format (must be after start_date)
+        end_date: End of date range in ISO 8601 format (exclusive — to include March 29, use "2026-03-30")
 
     Returns:
         Each event includes: uid, summary, start_date, end_date, allday_event, location, notes,
