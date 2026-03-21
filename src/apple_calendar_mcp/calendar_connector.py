@@ -106,14 +106,6 @@ class CalendarConnector:
                 f"Allowed: {self.ALLOWED_TEST_CALENDARS}"
             )
 
-    def _escape_applescript_string(self, text: Optional[str]) -> str:
-        """Escape quotes and backslashes for AppleScript strings."""
-        if not text:
-            return ""
-        text = text.replace("\\", "\\\\")
-        text = text.replace('"', '\\"')
-        return text
-
     def _run_swift_helper_json(
         self, script_name: str, args: list[str], stdin_data: Optional[str] = None
     ) -> dict:
@@ -782,23 +774,24 @@ class CalendarConnector:
     def create_calendar(self, name: str) -> dict[str, str]:
         """Create a new calendar in Apple Calendar.
 
+        Uses EventKit via Swift helper for native calendar creation.
+
         Args:
             name: Name for the new calendar
 
         Returns:
-            Dict with 'name' key of the created calendar
+            Dict with 'name' and optionally 'source' keys of the created calendar
 
         Raises:
-            subprocess.CalledProcessError: If AppleScript execution fails
+            RuntimeError: If Swift helper execution fails
+            PermissionError: If EventKit calendar access is denied
         """
-        escaped = self._escape_applescript_string(name)
-        run_applescript(
-            f'tell application "Calendar" to make new calendar with properties {{name:"{escaped}"}}'
-        )
-        return {"name": name}
+        return self._run_swift_helper_json("create_calendar", ["--name", name])
 
     def delete_calendar(self, name: str) -> dict[str, str]:
         """Delete a calendar from Apple Calendar.
+
+        Uses EventKit via Swift helper for native calendar deletion.
 
         Args:
             name: Name of the calendar to delete
@@ -809,12 +802,7 @@ class CalendarConnector:
         Raises:
             CalendarSafetyError: If safety checks block the target calendar
             ValueError: If the calendar doesn't exist
-            subprocess.CalledProcessError: If AppleScript execution fails
+            PermissionError: If EventKit calendar access is denied
         """
         self._verify_calendar_safety(name)
-        escaped = self._escape_applescript_string(name)
-        try:
-            run_applescript(f'tell application "Calendar" to delete calendar "{escaped}"')
-        except subprocess.CalledProcessError as e:
-            raise ValueError(f"Calendar '{name}' not found or could not be deleted") from e
-        return {"name": name}
+        return self._run_swift_helper_json("delete_calendar", ["--name", name])
