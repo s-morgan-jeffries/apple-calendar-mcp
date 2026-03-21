@@ -1,5 +1,9 @@
 # Apple Calendar MCP Server
 
+[![CI](https://github.com/s-morgan-jeffries/apple-calendar-mcp/actions/workflows/test.yml/badge.svg)](https://github.com/s-morgan-jeffries/apple-calendar-mcp/actions/workflows/test.yml)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 An [MCP](https://modelcontextprotocol.io/) server that connects Claude to Apple Calendar on macOS via AppleScript and EventKit.
 
 ## Features
