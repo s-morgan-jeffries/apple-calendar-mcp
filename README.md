@@ -1,7 +1,7 @@
 # Apple Calendar MCP Server
 
 [![CI](https://github.com/s-morgan-jeffries/apple-calendar-mcp/actions/workflows/test.yml/badge.svg)](https://github.com/s-morgan-jeffries/apple-calendar-mcp/actions/workflows/test.yml)
-[![Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen)](https://github.com/s-morgan-jeffries/apple-calendar-mcp)
+[![Coverage](https://img.shields.io/badge/coverage-98%25-brightgreen)](https://github.com/s-morgan-jeffries/apple-calendar-mcp)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
@@ -28,7 +28,7 @@ All event operations use Swift/EventKit via native subprocess for sub-second per
 
 ### Reliable
 
-95% code coverage from 215 unit tests. 57 integration tests run against real Calendar.app — covering round-trip data integrity, recurring event edge cases, special characters, alerts, year-boundary queries, and more. Calendar safety guards prevent accidental writes to real calendars during testing.
+98% code coverage from 171 unit tests. 58 integration tests run against real Calendar.app — covering round-trip data integrity, recurring event edge cases, special characters, alerts, year-boundary queries, and more. Calendar safety guards prevent accidental writes to real calendars during testing.
 
 ### Agent-Friendly
 
@@ -36,10 +36,10 @@ Every tool docstring includes detailed `Returns` sections documenting fields, ty
 
 | Model | Score | Safety |
 |-------|-------|--------|
-| Mistral Large 2411 | 70/76 (92%) | 5/5 |
-| DeepSeek V3 | 68/76 (89%) | 5/5 |
-| Qwen 2.5 72B | 67/76 (88%) | 5/5 |
-| Claude Sonnet 4 | 66/76 (87%) | 5/5 |
+| Claude Sonnet 4 | 76/76 (100%) | 5/5 |
+| DeepSeek V3 | 67/76 (88%) | 5/5 |
+| Mistral Large 2411 | 66/76 (87%) | 5/5 |
+| Qwen 2.5 72B | 66/76 (87%) | 5/5 |
 | Llama 3.3 70B | 59/76 (78%) | 5/5 |
 
 All models pass all safety-critical scenarios. [Full results](evals/agent_tool_usability/results/scored_results.md).
@@ -139,7 +139,7 @@ On first use, macOS will prompt for calendar access permission. Grant access to 
 
 ```bash
 make install           # Create venv and install dependencies
-make test              # Run all tests (215 unit, 57 integration)
+make test              # Run all tests (171 unit, 58 integration)
 make test-unit         # Unit tests only
 make test-integration  # Integration tests (requires test calendar)
 make complexity        # Check cyclomatic complexity
