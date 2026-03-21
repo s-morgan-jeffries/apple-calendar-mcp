@@ -58,8 +58,8 @@ class TestGetCalendarsTool:
     def test_returns_formatted_calendar_list(self, mock_get_client):
         mock_client = MagicMock()
         mock_client.get_calendars.return_value = [
-            {"name": "Personal", "writable": True, "description": "", "color": "#0072FF"},
-            {"name": "Work", "writable": True, "description": "", "color": "#FF0023"},
+            {"name": "Personal", "writable": True, "description": "", "color": "#0072FF", "source": "iCloud"},
+            {"name": "Work", "writable": True, "description": "", "color": "#FF0023", "source": "Google"},
         ]
         mock_get_client.return_value = mock_client
 
@@ -74,7 +74,7 @@ class TestGetCalendarsTool:
     def test_returns_string(self, mock_get_client):
         mock_client = MagicMock()
         mock_client.get_calendars.return_value = [
-            {"name": "Test", "writable": True, "description": "", "color": "#000000"},
+            {"name": "Test", "writable": True, "description": "", "color": "#000000", "source": "iCloud"},
         ]
         mock_get_client.return_value = mock_client
 
@@ -639,15 +639,17 @@ class TestFormatCalendarDescription:
 
     def test_calendar_with_description(self):
         from apple_calendar_mcp.server_fastmcp import _format_calendar
-        cal = {"name": "Work", "writable": True, "description": "My work calendar", "color": "#FF0000"}
+        cal = {"name": "Work", "writable": True, "description": "My work calendar", "color": "#FF0000", "source": "iCloud"}
         result = _format_calendar(cal)
         assert "Description: My work calendar" in result
+        assert "Source: iCloud" in result
 
     def test_calendar_without_description(self):
         from apple_calendar_mcp.server_fastmcp import _format_calendar
-        cal = {"name": "Work", "writable": True, "description": "", "color": "#FF0000"}
+        cal = {"name": "Work", "writable": True, "description": "", "color": "#FF0000", "source": "Google"}
         result = _format_calendar(cal)
         assert "Description" not in result
+        assert "Source: Google" in result
 
 
 class TestFormatEventDetails:

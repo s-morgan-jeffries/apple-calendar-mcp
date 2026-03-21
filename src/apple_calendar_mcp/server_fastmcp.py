@@ -10,7 +10,7 @@ from .calendar_connector import CalendarConnector
 # Create FastMCP server
 mcp = FastMCP("apple-calendar-mcp", instructions="""Apple Calendar is the built-in macOS calendar application. This MCP server provides tools to interact with it.
 
-CALENDARS: Each calendar has a name, writable status, type (caldav, subscription, birthday, local), description, and color. Calendar names are NOT guaranteed unique — the same name can appear across different accounts (e.g., two "Family" calendars from iCloud and Google). Use description to disambiguate when needed.
+CALENDARS: Each calendar has a name, writable status, type (caldav, subscription, birthday, local), source (account name like "iCloud" or "Google"), description, and color. Calendar names are NOT guaranteed unique — the same name can appear across different accounts (e.g., two "Family" calendars from iCloud and Google). Use the source field to disambiguate when needed.
 
 CALENDAR IDENTIFICATION: Calendars are identified by name (not UID — UIDs are not accessible via AppleScript). When specifying a calendar, use the exact name as returned by get_calendars.
 
@@ -43,6 +43,8 @@ def _format_calendar(cal: dict) -> str:
     writable = "read-write" if cal["writable"] else "read-only"
     result = f"Name: {cal['name']}\n"
     result += f"Access: {writable}\n"
+    if cal.get("source"):
+        result += f"Source: {cal['source']}\n"
     if cal.get("description"):
         result += f"Description: {cal['description']}\n"
     result += f"Color: {cal['color']}\n"
@@ -57,11 +59,13 @@ def get_calendars() -> str:
     descriptions, and colors. Use this to discover available calendars before
     creating or querying events.
 
-    Note: Calendar names may not be unique across accounts. Check the description
-    field to distinguish calendars with the same name from different accounts.
+    Note: Calendar names may not be unique across accounts. Use the source field
+    (e.g., "iCloud", "Google") to distinguish calendars with the same name from
+    different accounts.
 
     Returns:
-        Each calendar includes: name, access level (read-write or read-only), description, color.
+        Each calendar includes: name, access level (read-write or read-only), source
+        (account name like "iCloud" or "Google"), description, color.
         Use calendar names exactly as shown when calling other tools.
     """
     client = get_client()

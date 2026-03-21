@@ -66,6 +66,7 @@ let calendarDicts: [[String: Any]] = calendars.map { cal in
         "description": (cal as EKCalendar).value(forKey: "notes") as? String ?? "",
         "color": cgColorToHex(cal.cgColor),
         "type": calendarTypeString(cal.type),
+        "source": cal.source.title,
     ]
 }
 
