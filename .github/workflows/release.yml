@@ -1,0 +1,131 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on any v* tag
+      - '!v*-rc*'  # But NOT on RC tags
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "version=${TAG_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          TAG_NAME=${{ steps.version.outputs.tag }}
+
+          # Extract section from CHANGELOG.md for this version
+          awk "/^## \[$TAG_NAME\]/,/^## \[/ {print}" CHANGELOG.md | \
+            sed '$d' | \
+            tail -n +2 > /tmp/release-notes.md
+
+          # If empty, create generic release notes
+          if [ ! -s /tmp/release-notes.md ]; then
+            echo "Release $TAG_NAME" > /tmp/release-notes.md
+            echo "" >> /tmp/release-notes.md
+            echo "See [CHANGELOG.md](CHANGELOG.md) for details." >> /tmp/release-notes.md
+          fi
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME=${{ steps.version.outputs.tag }}
+
+          gh release create "$TAG_NAME" \
+            --title "Release $TAG_NAME" \
+            --notes-file /tmp/release-notes.md
+
+      - name: Close milestone
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME=${{ steps.version.outputs.tag }}
+
+          MILESTONE_NUM=$(gh api repos/${{ github.repository }}/milestones \
+            --jq ".[] | select(.title == \"${TAG_NAME}\") | .number")
+
+          if [ -n "$MILESTONE_NUM" ]; then
+            echo "Closing milestone: $TAG_NAME (#$MILESTONE_NUM)"
+
+            gh api --method PATCH "repos/${{ github.repository }}/milestones/$MILESTONE_NUM" \
+              -f state=closed
+
+            echo "Milestone $TAG_NAME closed"
+          else
+            echo "No milestone found for $TAG_NAME"
+          fi
+
+      - name: Verify next milestone exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME=${{ steps.version.outputs.tag }}
+
+          VERSION=$(echo "$TAG_NAME" | sed 's/^v//')
+          MAJOR=$(echo "$VERSION" | cut -d. -f1)
+          MINOR=$(echo "$VERSION" | cut -d. -f2)
+          PATCH=$(echo "$VERSION" | cut -d. -f3)
+
+          NEXT_PATCH="v${MAJOR}.${MINOR}.$((PATCH + 1))"
+          NEXT_MINOR="v${MAJOR}.$((MINOR + 1)).0"
+          NEXT_MAJOR="v$((MAJOR + 1)).0.0"
+
+          echo "Current version: $TAG_NAME"
+          echo "Checking for next milestone (priority: minor > major > patch)..."
+
+          NEXT_VERSION=""
+          for CANDIDATE in "$NEXT_MINOR" "$NEXT_MAJOR" "$NEXT_PATCH"; do
+            echo "  Checking: $CANDIDATE"
+            EXISTS=$(gh api repos/${{ github.repository }}/milestones \
+              --jq ".[] | select(.title == \"${CANDIDATE}\") | .number")
+
+            if [ -n "$EXISTS" ]; then
+              echo "  Found existing milestone: $CANDIDATE"
+              NEXT_VERSION="$CANDIDATE"
+              break
+            fi
+          done
+
+          if [ -z "$NEXT_VERSION" ]; then
+            NEXT_VERSION="$NEXT_PATCH"
+            echo "No existing milestone found. Creating: $NEXT_VERSION"
+
+            gh api --method POST "repos/${{ github.repository }}/milestones" \
+              -f title="$NEXT_VERSION" \
+              -f description="Planned work for $NEXT_VERSION"
+
+            echo "Milestone $NEXT_VERSION created"
+          else
+            echo "Using existing milestone: $NEXT_VERSION"
+          fi
+
+      - name: Post release summary
+        if: always()
+        run: |
+          TAG_NAME=${{ steps.version.outputs.tag }}
+
+          echo "## Release $TAG_NAME Created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- GitHub Release created" >> $GITHUB_STEP_SUMMARY
+          echo "- Milestone closed" >> $GITHUB_STEP_SUMMARY
+          echo "- Next milestone verified/created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Release URL:** https://github.com/${{ github.repository }}/releases/tag/$TAG_NAME" >> $GITHUB_STEP_SUMMARY
