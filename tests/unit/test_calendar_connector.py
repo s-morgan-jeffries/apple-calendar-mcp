@@ -125,32 +125,6 @@ class TestRunSwiftHelper:
 # ── _escape_applescript_string ───────────────────────────────────────────────
 
 
-class TestEscapeApplescriptString:
-    """Tests for string escaping before embedding in AppleScript."""
-
-    def setup_method(self):
-        self.connector = CalendarConnector()
-
-    def test_escapes_double_quotes(self):
-        assert self.connector._escape_applescript_string('say "hello"') == 'say \\"hello\\"'
-
-    def test_escapes_backslashes(self):
-        assert self.connector._escape_applescript_string("path\\to\\file") == "path\\\\to\\\\file"
-
-    def test_escapes_both(self):
-        result = self.connector._escape_applescript_string('a\\b"c')
-        assert result == 'a\\\\b\\"c'
-
-    def test_empty_string(self):
-        assert self.connector._escape_applescript_string("") == ""
-
-    def test_none_returns_empty(self):
-        assert self.connector._escape_applescript_string(None) == ""
-
-    def test_no_special_chars(self):
-        assert self.connector._escape_applescript_string("plain text") == "plain text"
-
-
 # ── _iso_to_applescript_date ─────────────────────────────────────────────────
 
 
@@ -278,21 +252,20 @@ class TestCreateCalendar:
     def setup_method(self):
         self.connector = CalendarConnector(enable_safety_checks=False)
 
-    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
-    def test_creates_calendar(self, mock_run):
-        mock_run.return_value = "calendar id ABC-123"
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_creates_calendar(self, mock_swift):
+        mock_swift.return_value = json.dumps({"name": "New Calendar"})
         result = self.connector.create_calendar("New Calendar")
         assert result == {"name": "New Calendar"}
-        script = mock_run.call_args[0][0]
-        assert 'make new calendar' in script
-        assert 'name:"New Calendar"' in script
+        mock_swift.assert_called_once_with(
+            "create_calendar", ["--name", "New Calendar"], stdin_data=None
+        )
 
-    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
-    def test_escapes_special_characters(self, mock_run):
-        mock_run.return_value = "calendar id ABC-123"
-        self.connector.create_calendar('Cal with "quotes"')
-        script = mock_run.call_args[0][0]
-        assert 'Cal with \\"quotes\\"' in script
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_returns_source_when_present(self, mock_swift):
+        mock_swift.return_value = json.dumps({"name": "New Calendar", "source": "iCloud"})
+        result = self.connector.create_calendar("New Calendar")
+        assert result == {"name": "New Calendar", "source": "iCloud"}
 
 
 # ── delete_calendar ─────────────────────────────────────────────────────────
@@ -304,18 +277,21 @@ class TestDeleteCalendar:
     def setup_method(self):
         self.connector = CalendarConnector(enable_safety_checks=False)
 
-    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
-    def test_deletes_calendar(self, mock_run):
-        mock_run.return_value = ""
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_deletes_calendar(self, mock_swift):
+        mock_swift.return_value = json.dumps({"name": "Old Calendar"})
         result = self.connector.delete_calendar("Old Calendar")
         assert result == {"name": "Old Calendar"}
-        script = mock_run.call_args[0][0]
-        assert 'delete calendar "Old Calendar"' in script
+        mock_swift.assert_called_once_with(
+            "delete_calendar", ["--name", "Old Calendar"], stdin_data=None
+        )
 
-    @patch("apple_calendar_mcp.calendar_connector.run_applescript")
-    def test_not_found_raises_error(self, mock_run):
-        mock_run.side_effect = subprocess.CalledProcessError(
-            returncode=1, cmd="osascript", stderr="Calendar not found"
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_not_found_raises_error(self, mock_swift):
+        mock_swift.side_effect = subprocess.CalledProcessError(
+            returncode=1, cmd="swift",
+            output='{"error": "calendar_not_found", "message": "Calendar \'Nonexistent\' not found"}',
+            stderr=""
         )
         with pytest.raises(ValueError, match="not found"):
             self.connector.delete_calendar("Nonexistent")

@@ -62,7 +62,7 @@ All event operations use Swift/EventKit via `swift` subprocess for native perfor
 
 - **Reads** (get_events, get_calendars, get_availability): EventKit predicate queries, sub-second
 - **Writes** (create_event, update_event, delete_events): EventKit save/remove with batch commit
-- **Calendar management** (create_calendar, delete_calendar): AppleScript (simple, fast enough)
+- **Calendar management** (create_calendar, delete_calendar): EventKit via Swift helper
 
 Swift helpers at `src/apple_calendar_mcp/swift/` use `EKEventStore`. First run triggers a macOS calendar access permission dialog. Scripts are interpreted by `swift` (cached after first compilation).
 
