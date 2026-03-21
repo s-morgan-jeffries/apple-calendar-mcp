@@ -46,6 +46,29 @@ end tell'''
         pass  # Best-effort cleanup
 
 
+def _create_single_event(connector, calendar_name, summary, start_date, end_date, **kwargs):
+    """Create a single event via create_events and return the UID."""
+    event = {"summary": summary, "start": start_date, "end": end_date}
+    if kwargs.get("location"):
+        event["location"] = kwargs["location"]
+    if kwargs.get("notes"):
+        event["notes"] = kwargs["notes"]
+    if kwargs.get("url"):
+        event["url"] = kwargs["url"]
+    if kwargs.get("allday_event"):
+        event["allday"] = True
+    if kwargs.get("recurrence_rule"):
+        event["recurrence"] = kwargs["recurrence_rule"]
+    if kwargs.get("alert_minutes"):
+        event["alerts"] = kwargs["alert_minutes"]
+    if kwargs.get("availability"):
+        event["availability"] = kwargs["availability"]
+    if kwargs.get("timezone"):
+        event["timezone"] = kwargs["timezone"]
+    result = connector.create_events(calendar_name, [event])
+    return result["created"][0]["uid"]
+
+
 class TestCalendarManagementIntegration:
     """Integration tests for create_calendar and delete_calendar."""
 
@@ -119,12 +142,12 @@ class TestGetCalendarsIntegration:
             assert len(color) == 7, f"color should be #RRGGBB format for {cal['name']}"
 
 
-class TestCreateEventIntegration:
-    """Integration tests for create_event against real Calendar.app."""
+class TestCreateEventsIntegration:
+    """Integration tests for create_events against real Calendar.app."""
 
     def test_creates_event_and_returns_uid(self, connector):
         """Creating an event should return a valid UID string."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Integration Test Event",
             start_date="2026-06-15T10:00:00",
@@ -139,7 +162,7 @@ class TestCreateEventIntegration:
 
     def test_created_event_has_correct_summary(self, connector):
         """Verify the created event has the right summary via AppleScript query."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Verify Summary Test",
             start_date="2026-06-15T14:00:00",
@@ -159,7 +182,7 @@ end tell'''
 
     def test_creates_event_with_optional_fields(self, connector):
         """Creating an event with location, notes, and URL should succeed."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Full Event Test",
             start_date="2026-06-15T09:00:00",
@@ -184,7 +207,7 @@ end tell'''
 
     def test_creates_allday_event(self, connector):
         """Creating an all-day event should set the allday flag."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="All Day Test",
             start_date="2026-06-15",
@@ -204,13 +227,30 @@ end tell'''
         finally:
             _delete_event_by_uid(uid)
 
+    def test_batch_creates_multiple_events(self, connector):
+        """Batch create should handle multiple events in one call."""
+        events = [
+            {"summary": "Batch Event 1", "start": "2026-06-20T10:00:00", "end": "2026-06-20T11:00:00"},
+            {"summary": "Batch Event 2", "start": "2026-06-20T14:00:00", "end": "2026-06-20T15:00:00"},
+        ]
+        result = connector.create_events(TEST_CALENDAR, events)
+        uids = [c["uid"] for c in result["created"]]
+        try:
+            assert len(result["created"]) == 2
+            assert result["errors"] == []
+            assert result["created"][0]["summary"] == "Batch Event 1"
+            assert result["created"][1]["summary"] == "Batch Event 2"
+        finally:
+            for uid in uids:
+                _delete_event_by_uid(uid)
+
 
 class TestGetEventsIntegration:
     """Integration tests for get_events against real Calendar.app via EventKit."""
 
     def test_get_events_returns_created_event(self, connector):
         """Create an event, then verify get_events returns it."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="GetEvents Test",
             start_date="2026-07-01T10:00:00",
@@ -229,7 +269,7 @@ class TestGetEventsIntegration:
 
     def test_date_range_filtering(self, connector):
         """Event outside date range should not be returned."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Outside Range Test",
             start_date="2026-08-01T10:00:00",
@@ -248,7 +288,7 @@ class TestGetEventsIntegration:
 
     def test_event_has_expected_keys(self, connector):
         """Returned event dicts should have all expected keys."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Keys Test Event",
             start_date="2026-07-02T10:00:00",
@@ -283,13 +323,13 @@ class TestGetEventsIntegration:
 
     def test_get_events_year_boundary(self, connector):
         """Query spanning Dec 29 – Jan 3 should return events on both sides of year boundary."""
-        uid_dec = connector.create_event(
+        uid_dec = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Year Boundary Dec 31",
             start_date="2029-12-31T10:00:00",
             end_date="2029-12-31T11:00:00",
         )
-        uid_jan = connector.create_event(
+        uid_jan = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Year Boundary Jan 2",
             start_date="2030-01-02T10:00:00",
@@ -314,7 +354,7 @@ class TestUpdateEventIntegration:
 
     def test_update_summary(self, connector):
         """Update summary and verify via get_events."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Original Summary",
             start_date="2026-09-01T10:00:00",
@@ -331,7 +371,7 @@ class TestUpdateEventIntegration:
 
     def test_update_location(self, connector):
         """Update location from A to B and verify."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Location Update Test",
             start_date="2026-09-02T10:00:00",
@@ -349,7 +389,7 @@ class TestUpdateEventIntegration:
 
     def test_update_dates(self, connector):
         """Update start/end dates and verify."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Date Update Test",
             start_date="2026-09-03T10:00:00",
@@ -370,7 +410,7 @@ class TestUpdateEventIntegration:
 
     def test_update_multiple_fields(self, connector):
         """Update summary and location in one call."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Multi Update Test",
             start_date="2026-09-04T10:00:00",
@@ -399,7 +439,7 @@ class TestUpdateEventIntegration:
 
     def test_clear_location(self, connector):
         """Passing location="" should clear the location field."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Clear Location Test",
             start_date="2026-09-05T10:00:00",
@@ -417,7 +457,7 @@ class TestUpdateEventIntegration:
 
     def test_update_title_only(self, connector):
         """Updating only summary should leave location and notes unchanged."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Original Title",
             start_date="2027-09-10T10:00:00",
@@ -438,7 +478,7 @@ class TestUpdateEventIntegration:
 
     def test_update_allday_event_notes_preserves_fields(self, connector):
         """Updating notes on an all-day event should preserve location and all-day status."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="All Day Update Test",
             start_date="2027-09-15",
@@ -460,7 +500,7 @@ class TestUpdateEventIntegration:
 
     def test_reschedule_event_to_different_day(self, connector):
         """Moving an event to a different day should update dates and preserve other fields."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Reschedule Day Test",
             start_date="2027-09-20T10:00:00",
@@ -495,7 +535,7 @@ class TestDeleteEventsIntegration:
 
     def test_delete_single_event(self, connector):
         """Create event, delete it, verify it's gone via get_events."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Delete Single Test",
             start_date="2026-10-01T10:00:00",
@@ -521,7 +561,7 @@ class TestDeleteEventsIntegration:
         """Create 3 events, delete all, verify gone."""
         uids = []
         for i in range(3):
-            uid = connector.create_event(
+            uid = _create_single_event(connector,
                 calendar_name=TEST_CALENDAR,
                 summary=f"Batch Delete Test {i}",
                 start_date="2026-10-02T10:00:00",
@@ -548,7 +588,7 @@ class TestDeleteEventsIntegration:
 
     def test_delete_already_deleted(self, connector):
         """Deleting an event twice — second attempt reports not found."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Double Delete Test",
             start_date="2026-10-03T10:00:00",
@@ -566,7 +606,7 @@ class TestDeleteEventsIntegration:
 
     def test_delete_single_occurrence_of_recurring(self, connector, fresh_calendar):
         """Delete one occurrence of a recurring event, verify others preserved (#84)."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Delete Occurrence Test",
             start_date="2028-08-07T10:00:00",
@@ -595,7 +635,7 @@ class TestDeleteEventsIntegration:
 
     def test_delete_non_recurring_event_then_verify_absent(self, connector):
         """Delete a non-recurring event and verify it's absent via re-query (round-trip)."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Delete Verify Test",
             start_date="2027-10-10T10:00:00",
@@ -615,7 +655,7 @@ class TestDeleteEventsIntegration:
 
     def test_delete_recurring_series_with_future_events(self, connector, fresh_calendar):
         """Delete a recurring series using span=future_events (#84)."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Delete Series Test",
             start_date="2028-09-02T10:00:00",
@@ -641,7 +681,7 @@ class TestGetAvailabilityIntegration:
 
     def test_free_slots_around_event(self, connector):
         """Create an event and verify free slots before and after it."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Availability Test",
             start_date="2026-11-01T10:00:00",
@@ -671,7 +711,7 @@ class TestGetAvailabilityIntegration:
 
     def test_min_duration_filters_short_slots(self, connector):
         """Create event leaving short gaps, verify min_duration filters them."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Availability Filter Test",
             start_date="2099-07-01T09:20:00",
@@ -719,7 +759,7 @@ class TestRecurringEventsIntegration:
 
     def test_create_recurring_event_and_read_occurrences(self, connector, fresh_calendar):
         """Create a recurring event, verify multiple occurrences returned with recurrence fields."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Recurring Test",
             start_date="2027-01-05T10:00:00",
@@ -750,7 +790,7 @@ class TestRecurringEventsIntegration:
     def test_monthly_nth_weekday_recurrence(self, connector, fresh_calendar):
         """Create monthly event on 4th Monday — verify correct dates (#79)."""
         # Jan 26 2028 is a 4th Monday
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="4th Monday Test",
             start_date="2028-01-26T10:00:00",
@@ -773,7 +813,7 @@ class TestRecurringEventsIntegration:
 
     def test_recurrence_with_until_end_date(self, connector, fresh_calendar):
         """Create weekly event with UNTIL — verify recurrence stops (#81)."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Until Test",
             start_date="2028-03-01T10:00:00",
@@ -799,7 +839,7 @@ class TestRecurringEventsIntegration:
     def test_last_friday_recurrence(self, connector, fresh_calendar):
         """Create monthly event on last Friday (BYDAY=-1FR) — verify correct dates (#79)."""
         # Jan 27 2028 is the last Friday of January
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Last Friday Test",
             start_date="2028-01-28T10:00:00",
@@ -821,7 +861,7 @@ class TestRecurringEventsIntegration:
 
     def test_add_recurrence_to_existing_event(self, connector, fresh_calendar):
         """Create non-recurring event, add recurrence via update (#80)."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Add Recurrence Test",
             start_date="2028-04-03T10:00:00",
@@ -844,7 +884,7 @@ class TestRecurringEventsIntegration:
 
     def test_remove_recurrence_from_event(self, connector, fresh_calendar):
         """Create recurring event, remove recurrence via update (#80)."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Remove Recurrence Test",
             start_date="2028-05-01T10:00:00",
@@ -867,7 +907,7 @@ class TestRecurringEventsIntegration:
 
     def test_reschedule_single_occurrence(self, connector, fresh_calendar):
         """Reschedule one occurrence of a recurring event — should create standalone event (#82)."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Reschedule Test",
             start_date="2028-06-05T10:00:00",
@@ -912,7 +952,7 @@ class TestRoundTripIntegration:
 
     def test_created_event_fields_match_input(self, connector):
         """Create event with all fields, read back, verify every field matches."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Round Trip Test",
             start_date="2027-03-01T14:00:00",
@@ -936,7 +976,7 @@ class TestRoundTripIntegration:
 
     def test_returned_timestamps_usable_for_requery(self, connector):
         """Create event, read timestamps, use them to query again — timezone round-trip."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Timestamp Round Trip",
             start_date="2027-03-15T10:00:00",
@@ -961,7 +1001,7 @@ class TestRoundTripIntegration:
 
     def test_returned_timestamps_without_z_suffix(self, connector):
         """Simulate Claude stripping Z from timestamps — should still find the event."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Stripped Z Test",
             start_date="2027-03-20T14:00:00",
@@ -987,7 +1027,7 @@ class TestRoundTripIntegration:
 
     def test_update_then_read_back(self, connector):
         """Create → update → read back → verify only updated fields changed."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Before Update",
             start_date="2027-04-01T09:00:00",
@@ -1010,7 +1050,7 @@ class TestWorkflowIntegration:
 
     def test_full_event_lifecycle(self, connector):
         """Create → update → verify → delete → verify gone."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Lifecycle Test",
             start_date="2027-05-01T10:00:00",
@@ -1042,7 +1082,7 @@ class TestWorkflowIntegration:
         )
         assert len(slots_before) == 1  # entirely free
 
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Block This Slot",
             start_date="2027-06-01T10:00:00",
@@ -1065,7 +1105,7 @@ class TestTimezoneIntegration:
 
     def test_event_near_midnight(self, connector):
         """Event at 23:30 should be found when querying across midnight."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Late Night Event",
             start_date="2027-07-01T23:30:00",
@@ -1080,7 +1120,7 @@ class TestTimezoneIntegration:
 
     def test_allday_event_fields(self, connector):
         """All-day event should return allday_event=True with inclusive end_date."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="All Day Test",
             start_date="2027-08-01",
@@ -1115,10 +1155,10 @@ class TestErrorHandlingIntegration:
 class TestSpecialCharactersIntegration:
     """Integration tests for special characters in event fields."""
 
-    def test_create_event_with_special_characters(self, connector):
+    def test_create_events_with_special_characters(self, connector):
         """Event titles with colons, slashes, apostrophes, and parentheses should round-trip."""
         title = "Lunch w/ John O'Brien: Planning (Q2/Q3)"
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary=title,
             start_date="2027-11-01T12:00:00",
@@ -1136,9 +1176,9 @@ class TestSpecialCharactersIntegration:
 class TestAlertsIntegration:
     """Integration tests for event alerts/reminders."""
 
-    def test_create_event_with_multiple_alerts(self, connector):
+    def test_create_events_with_multiple_alerts(self, connector):
         """Creating an event with multiple alerts should preserve all of them."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Multi Alert Test",
             start_date="2027-11-05T10:00:00",
@@ -1159,7 +1199,7 @@ class TestAlertsIntegration:
 
     def test_alert_at_zero_minutes(self, connector):
         """Alert at 0 minutes (at time of event) should not be dropped as falsy."""
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Zero Alert Test",
             start_date="2027-11-06T10:00:00",
@@ -1183,7 +1223,7 @@ class TestSearchEventsIntegration:
     def test_search_events_multi_month(self, connector):
         """Keyword search across a multi-month range should find a matching event."""
         keyword = f"UniqueSearch{uuid.uuid4().hex[:8]}"
-        uid = connector.create_event(
+        uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary=f"Meeting about {keyword}",
             start_date="2027-12-15T10:00:00",

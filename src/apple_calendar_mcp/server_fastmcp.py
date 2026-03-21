@@ -131,101 +131,30 @@ def _parse_alert_minutes(alert_minutes: str) -> list[int] | None:
         )
 
 
-def _build_create_response(
-    summary: str, calendar_name: str, event_uid: str,
-    location: str, allday_event: bool, recurrence_rule: str,
-) -> str:
-    """Build the success response for create_event."""
-    lines = [f"Created event '{summary}' in calendar '{calendar_name}'", f"Event UID: {event_uid}"]
-    if location:
-        lines.append(f"Location: {location}")
-    if allday_event:
-        lines.append("All-day event")
-    if recurrence_rule:
-        lines.append(f"Recurrence: {recurrence_rule}")
-    return "\n".join(lines)
-
-
-@mcp.tool()
-def create_event(
-    calendar_name: str,
-    summary: str,
-    start_date: str,
-    end_date: str,
-    location: str = "",
-    notes: str = "",
-    url: str = "",
-    allday_event: bool = False,
-    recurrence_rule: str = "",
-    alert_minutes: str = "",
-    availability: str = "",
-    timezone: str = "",
-) -> str:
-    """Create a new event in a specified calendar.
-
-    Args:
-        calendar_name: Exact name of the target calendar (use get_calendars to find available names)
-        summary: Event title
-        start_date: Start date/time in ISO 8601 format (e.g., "2026-03-15" for all-day, "2026-03-15T14:30:00" for timed)
-        end_date: End date/time in ISO 8601 format (must be after start_date)
-        location: Event location (optional)
-        notes: Event notes (optional)
-        url: URL associated with the event (optional)
-        allday_event: Whether this is an all-day event (default: false). When true, use date-only format for start_date/end_date. For a single-day event, end_date equals start_date. For multi-day events, end_date is the last day (inclusive).
-        recurrence_rule: iCalendar RRULE string for recurring events (optional, e.g., "FREQ=WEEKLY;BYDAY=MO,WE,FR" or "FREQ=DAILY;COUNT=10")
-        alert_minutes: Comma-separated minutes before event to alert (optional, e.g., "15" or "15,60")
-        availability: Event availability status: "free", "busy", or "tentative" (optional, default: busy)
-        timezone: IANA timezone for interpreting start/end times (optional, e.g., "America/Los_Angeles", "US/Eastern"). When provided, times are interpreted in that timezone instead of the system's local timezone.
-
-    Returns:
-        Confirmation with the event UID. Use this UID with update_event or delete_events.
-        If recurrence_rule was set, includes the recurrence details.
-        If alert_minutes was set, includes the alert times.
-    """
-    client = get_client()
-    try:
-        event_uid = client.create_event(
-            calendar_name=calendar_name,
-            summary=summary,
-            start_date=start_date,
-            end_date=end_date,
-            location=location or None,
-            notes=notes or None,
-            url=url or None,
-            allday_event=allday_event,
-            recurrence_rule=recurrence_rule or None,
-            alert_minutes=_parse_alert_minutes(alert_minutes),
-            availability=availability or None,
-            timezone=timezone or None,
-        )
-    except Exception as e:
-        return f"Error creating event: {e}"
-
-    return _build_create_response(summary, calendar_name, event_uid, location, allday_event, recurrence_rule)
-
-
 @mcp.tool()
 def create_events(
     calendar_name: str,
     events: str,
 ) -> str:
-    """Create multiple events in a single batch operation.
+    """Create one or more events in a calendar.
 
-    More efficient than calling create_event multiple times — all events are
-    created in one operation. All events go to the same calendar.
+    For a single event, pass an array with one element. All events go to
+    the same calendar.
 
     Args:
         calendar_name: Exact name of the target calendar
         events: JSON array of event objects. Each object has keys: summary (required),
                 start (required, ISO 8601), end (required, ISO 8601), and optional:
-                location, notes, url, allday (bool — when true, end is the last day inclusive),
-                recurrence (RRULE string), alerts (list of minutes, e.g. [15, 60]),
-                availability ("free"/"busy"/"tentative"),
-                timezone (IANA identifier, e.g. "America/Los_Angeles")
+                location, notes, url, allday (bool), recurrence (RRULE string),
+                alerts (list of minutes, e.g. [15, 60]), availability ("free"/"busy"/"tentative"),
+                timezone (IANA identifier, e.g. "America/Los_Angeles").
+                For all-day events, set allday=true and use date-only format.
+                end is inclusive for all-day events.
 
     Returns:
-        Summary of created events, each with title and UID. Any per-event errors are listed
-        separately. Partial success is possible — some events may be created while others fail.
+        Each created event with title and UID. Use these UIDs with update_events or
+        delete_events. Any per-event errors are listed separately. Partial success
+        is possible — some events may be created while others fail.
     """
     try:
         event_list = json.loads(events)

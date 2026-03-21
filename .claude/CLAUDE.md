@@ -19,10 +19,10 @@ make test-verbose          # Tests with verbose output
 
 **Running the server:** `uv run python -m apple_calendar_mcp.server_fastmcp` or via Claude Desktop config.
 
-## API Surface (12 functions)
+## API Surface (11 functions)
 
 - **Calendars:** `get_calendars`, `create_calendar`, `delete_calendar`
-- **Events:** `get_events`, `search_events`, `create_event`, `create_events`, `update_event`, `update_events`, `delete_events`
+- **Events:** `get_events`, `search_events`, `create_events`, `update_event`, `update_events`, `delete_events`
 - **Availability:** `get_availability`, `get_conflicts`
 
 ## Core API Principles

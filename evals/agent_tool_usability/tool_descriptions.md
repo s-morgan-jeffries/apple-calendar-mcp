@@ -58,39 +58,17 @@ This permanently removes the calendar and all its events. Use with caution.
 
 ---
 
-### create_event
-
-Create a new event in a specified calendar.
-
-**Parameters:**
-- `calendar_name` (str, required): Exact name of the target calendar (use get_calendars to find available names)
-- `summary` (str, required): Event title
-- `start_date` (str, required): Start date/time in ISO 8601 format (e.g., "2026-03-15" for all-day, "2026-03-15T14:30:00" for timed)
-- `end_date` (str, required): End date/time in ISO 8601 format (must be after start_date)
-- `location` (str, optional, default: ""): Event location
-- `notes` (str, optional, default: ""): Event notes
-- `url` (str, optional, default: ""): URL associated with the event
-- `allday_event` (bool, optional, default: false): Whether this is an all-day event. When true, use date-only format for start_date/end_date. For a single-day event, end_date equals start_date. For multi-day events, end_date is the last day (inclusive).
-- `recurrence_rule` (str, optional, default: ""): iCalendar RRULE string for recurring events (e.g., "FREQ=WEEKLY;BYDAY=MO,WE,FR" or "FREQ=DAILY;COUNT=10")
-- `alert_minutes` (str, optional, default: ""): Comma-separated minutes before event to alert (e.g., "15" or "15,60")
-- `availability` (str, optional, default: ""): Event availability status: "free", "busy", or "tentative" (default: busy)
-- `timezone` (str, optional, default: ""): IANA timezone for interpreting start/end times (e.g., "America/Los_Angeles", "US/Eastern"). When provided, times are interpreted in that timezone instead of the system's local timezone.
-
-**Returns:** Confirmation with the event UID. Use this UID with update_event or delete_events. If recurrence_rule was set, includes the recurrence details. If alert_minutes was set, includes the alert times.
-
----
-
 ### create_events
 
-Create multiple events in a single batch operation.
+Create one or more events in a calendar.
 
-More efficient than calling create_event multiple times — all events are created in one operation. All events go to the same calendar.
+For a single event, pass an array with one element. All events go to the same calendar.
 
 **Parameters:**
 - `calendar_name` (str, required): Exact name of the target calendar
-- `events` (str, required): JSON array of event objects. Each object has keys: summary (required), start (required, ISO 8601), end (required, ISO 8601), and optional: location, notes, url, allday (bool — when true, end is the last day inclusive), recurrence (RRULE string), alerts (list of minutes, e.g. [15, 60]), availability ("free"/"busy"/"tentative"), timezone (IANA identifier, e.g. "America/Los_Angeles")
+- `events` (str, required): JSON array of event objects. Each object has keys: summary (required), start (required, ISO 8601), end (required, ISO 8601), and optional: location, notes, url, allday (bool), recurrence (RRULE string), alerts (list of minutes, e.g. [15, 60]), availability ("free"/"busy"/"tentative"), timezone (IANA identifier, e.g. "America/Los_Angeles"). For all-day events, set allday=true and use date-only format. end is inclusive for all-day events.
 
-**Returns:** Summary of created events, each with title and UID. Any per-event errors are listed separately. Partial success is possible — some events may be created while others fail.
+**Returns:** Each created event with title and UID. Use these UIDs with update_events or delete_events. Any per-event errors are listed separately. Partial success is possible — some events may be created while others fail.
 
 ---
 
