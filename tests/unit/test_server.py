@@ -374,58 +374,6 @@ class TestGetAvailabilityTool:
         assert "09:00-17:00" not in result
 
 
-class TestUpdateEventTool:
-    """Tests for the update_event MCP tool."""
-
-    @patch("apple_calendar_mcp.server_fastmcp.get_client")
-    def test_returns_success_message(self, mock_get_client):
-        mock_client = MagicMock()
-        mock_client.update_event.return_value = {"uid": "ABC-123", "updated_fields": ["summary"]}
-        mock_get_client.return_value = mock_client
-
-        from apple_calendar_mcp.server_fastmcp import update_event
-        result = update_event(calendar_name="Work", event_uid="ABC-123", summary="New Title")
-        assert "ABC-123" in result
-        assert "summary" in result
-        assert isinstance(result, str)
-
-    @patch("apple_calendar_mcp.server_fastmcp.get_client")
-    def test_returns_error_on_failure(self, mock_get_client):
-        mock_client = MagicMock()
-        mock_client.update_event.side_effect = Exception("Event not found")
-        mock_get_client.return_value = mock_client
-
-        from apple_calendar_mcp.server_fastmcp import update_event
-        result = update_event(calendar_name="Work", event_uid="BAD-UID", summary="X")
-        assert "Error" in result
-        assert isinstance(result, str)
-
-    @patch("apple_calendar_mcp.server_fastmcp.get_client")
-    def test_passes_none_for_omitted_fields(self, mock_get_client):
-        mock_client = MagicMock()
-        mock_client.update_event.return_value = {"uid": "ABC-123", "updated_fields": ["summary"]}
-        mock_get_client.return_value = mock_client
-
-        from apple_calendar_mcp.server_fastmcp import update_event
-        update_event(calendar_name="Work", event_uid="ABC-123", summary="New")
-        call_kwargs = mock_client.update_event.call_args[1]
-        assert call_kwargs["location"] is None
-        assert call_kwargs["notes"] is None
-        assert call_kwargs["url"] is None
-        assert call_kwargs["allday_event"] is None
-
-    @patch("apple_calendar_mcp.server_fastmcp.get_client")
-    def test_passes_empty_string_through(self, mock_get_client):
-        mock_client = MagicMock()
-        mock_client.update_event.return_value = {"uid": "ABC-123", "updated_fields": ["location"]}
-        mock_get_client.return_value = mock_client
-
-        from apple_calendar_mcp.server_fastmcp import update_event
-        update_event(calendar_name="Work", event_uid="ABC-123", location="")
-        call_kwargs = mock_client.update_event.call_args[1]
-        assert call_kwargs["location"] == ""
-
-
 class TestDeleteEventsTool:
     """Tests for the delete_events MCP tool."""
 
@@ -498,36 +446,6 @@ class TestServerConfiguration:
 
     def test_server_name(self):
         assert mcp.name == "apple-calendar-mcp"
-
-
-class TestParseAlertMinutes:
-    """Tests for the _parse_alert_minutes helper."""
-
-    def test_valid_single_value(self):
-        from apple_calendar_mcp.server_fastmcp import _parse_alert_minutes
-        assert _parse_alert_minutes("15") == [15]
-
-    def test_valid_multiple_values(self):
-        from apple_calendar_mcp.server_fastmcp import _parse_alert_minutes
-        assert _parse_alert_minutes("15,60") == [15, 60]
-
-    def test_whitespace_handling(self):
-        from apple_calendar_mcp.server_fastmcp import _parse_alert_minutes
-        assert _parse_alert_minutes(" 15 , 60 ") == [15, 60]
-
-    def test_empty_string_returns_none(self):
-        from apple_calendar_mcp.server_fastmcp import _parse_alert_minutes
-        assert _parse_alert_minutes("") is None
-
-    def test_invalid_value_raises_error(self):
-        from apple_calendar_mcp.server_fastmcp import _parse_alert_minutes
-        with pytest.raises(ValueError, match="comma-separated integers"):
-            _parse_alert_minutes("15,abc")
-
-    def test_all_invalid_raises_error(self):
-        from apple_calendar_mcp.server_fastmcp import _parse_alert_minutes
-        with pytest.raises(ValueError, match="comma-separated integers"):
-            _parse_alert_minutes("not_a_number")
 
 
 class TestFormatCalendarDescription:
@@ -873,74 +791,6 @@ class TestGetConflictsTool:
         result = get_conflicts(calendar_names=["Bad"], start_date="2026-03-15T00:00:00", end_date="2026-03-16T00:00:00")
         assert "Error" in result
         assert isinstance(result, str)
-
-
-class TestUpdateEventToolBranches:
-    """Tests for uncovered branches in the update_event tool."""
-
-    @patch("apple_calendar_mcp.server_fastmcp.get_client")
-    def test_alert_minutes_none_clears_alerts(self, mock_get_client):
-        mock_client = MagicMock()
-        mock_client.update_event.return_value = {"uid": "ABC-123", "updated_fields": ["alert_minutes"]}
-        mock_get_client.return_value = mock_client
-
-        from apple_calendar_mcp.server_fastmcp import update_event
-        result = update_event(calendar_name="Work", event_uid="ABC-123", alert_minutes="none")
-        call_kwargs = mock_client.update_event.call_args[1]
-        assert call_kwargs["alert_minutes"] == []
-        assert "ABC-123" in result
-
-    @patch("apple_calendar_mcp.server_fastmcp.get_client")
-    def test_alert_minutes_parsed(self, mock_get_client):
-        mock_client = MagicMock()
-        mock_client.update_event.return_value = {"uid": "ABC-123", "updated_fields": ["alert_minutes"]}
-        mock_get_client.return_value = mock_client
-
-        from apple_calendar_mcp.server_fastmcp import update_event
-        update_event(calendar_name="Work", event_uid="ABC-123", alert_minutes="15,60")
-        call_kwargs = mock_client.update_event.call_args[1]
-        assert call_kwargs["alert_minutes"] == [15, 60]
-
-    @patch("apple_calendar_mcp.server_fastmcp.get_client")
-    def test_recurrence_rule_passed_through(self, mock_get_client):
-        mock_client = MagicMock()
-        mock_client.update_event.return_value = {"uid": "ABC-123", "updated_fields": ["recurrence_rule"]}
-        mock_get_client.return_value = mock_client
-
-        from apple_calendar_mcp.server_fastmcp import update_event
-        update_event(calendar_name="Work", event_uid="ABC-123", recurrence_rule="FREQ=DAILY")
-        call_kwargs = mock_client.update_event.call_args[1]
-        assert call_kwargs["recurrence_rule"] == "FREQ=DAILY"
-
-    @patch("apple_calendar_mcp.server_fastmcp.get_client")
-    def test_recurrence_rule_empty_string_clears(self, mock_get_client):
-        mock_client = MagicMock()
-        mock_client.update_event.return_value = {"uid": "ABC-123", "updated_fields": ["recurrence_rule"]}
-        mock_get_client.return_value = mock_client
-
-        from apple_calendar_mcp.server_fastmcp import update_event
-        update_event(calendar_name="Work", event_uid="ABC-123", recurrence_rule="")
-        call_kwargs = mock_client.update_event.call_args[1]
-        assert call_kwargs["recurrence_rule"] == ""
-
-    @patch("apple_calendar_mcp.server_fastmcp.get_client")
-    def test_timezone_and_occurrence_date_passed(self, mock_get_client):
-        mock_client = MagicMock()
-        mock_client.update_event.return_value = {"uid": "ABC-123", "updated_fields": ["start_date"]}
-        mock_get_client.return_value = mock_client
-
-        from apple_calendar_mcp.server_fastmcp import update_event
-        update_event(
-            calendar_name="Work", event_uid="ABC-123",
-            start_date="2026-03-15T10:00:00",
-            timezone="America/Los_Angeles",
-            occurrence_date="2026-03-15T09:00:00",
-            span="future_events",
-        )
-        call_kwargs = mock_client.update_event.call_args[1]
-        assert call_kwargs["timezone"] == "America/Los_Angeles"
-        assert call_kwargs["occurrence_date"] == "2026-03-15T09:00:00"
-        assert call_kwargs["span"] == "future_events"
 
 
 class TestDeleteEventsToolBranches:

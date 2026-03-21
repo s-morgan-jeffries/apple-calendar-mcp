@@ -19,17 +19,17 @@ make test-verbose          # Tests with verbose output
 
 **Running the server:** `uv run python -m apple_calendar_mcp.server_fastmcp` or via Claude Desktop config.
 
-## API Surface (11 functions)
+## API Surface (10 functions)
 
 - **Calendars:** `get_calendars`, `create_calendar`, `delete_calendar`
-- **Events:** `get_events`, `search_events`, `create_events`, `update_event`, `update_events`, `delete_events`
+- **Events:** `get_events`, `search_events`, `create_events`, `update_events`, `delete_events`
 - **Availability:** `get_availability`, `get_conflicts`
 
 ## Core API Principles
 
-1. **Comprehensive update functions over specialized operations** — no `set_event_title()`, use `update_event(event_id, title=X)`
-2. **No field-specific setters or getters** — `update_event` handles all fields, `get_events` handles all filters
-3. **Separate single/batch updates** — batch excludes title/notes (require unique values)
+1. **Comprehensive update functions over specialized operations** — no `set_event_title()`, use `update_events(calendar, [{uid, title=X}])`
+2. **No field-specific setters or getters** — `update_events` handles all fields, `get_events` handles all filters
+3. **Single update tool** — `update_events` handles both single and batch updates (pass array with one element for single)
 4. **Union types for deletes only** — `Union[str, list[str]]` for delete operations, NOT for updates
 5. **No upsert pattern** — create and update are always separate
 6. **Structured returns** — always `dict` or `list[dict]`, never formatted text strings
@@ -50,7 +50,7 @@ make test-verbose          # Tests with verbose output
 
 **Date format:** AppleScript returns dates as `"Monday, April 3, 2023 at 10:35:00 AM"` (locale-dependent, includes day name). The connector handles ISO 8601 conversion.
 
-**Date ordering on updates:** AppleScript rejects `set start date` if the new start is after the current end date (and vice versa). When updating both dates, `update_event` temporarily extends the end date to avoid this constraint.
+**Date ordering on updates:** AppleScript rejects `set start date` if the new start is after the current end date (and vice versa). When updating both dates, `update_events` temporarily extends the end date to avoid this constraint.
 
 **String escaping:** Always use `_escape_applescript_string()` for user-provided text. Unescaped quotes break AppleScript blocks silently.
 
@@ -61,7 +61,7 @@ make test-verbose          # Tests with verbose output
 All event operations use Swift/EventKit via `swift` subprocess for native performance:
 
 - **Reads** (get_events, get_calendars, get_availability): EventKit predicate queries, sub-second
-- **Writes** (create_event, update_event, delete_events): EventKit save/remove with batch commit
+- **Writes** (create_events, update_events, delete_events): EventKit save/remove with batch commit
 - **Calendar management** (create_calendar, delete_calendar): EventKit via Swift helper
 
 Swift helpers at `src/apple_calendar_mcp/swift/` use `EKEventStore`. First run triggers a macOS calendar access permission dialog. Scripts are interpreted by `swift` (cached after first compilation).

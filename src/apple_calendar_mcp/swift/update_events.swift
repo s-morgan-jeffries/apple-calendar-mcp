@@ -149,8 +149,30 @@ for (index, updateData) in updatesJson.enumerated() {
         continue
     }
 
-    let items = store.calendarItems(withExternalIdentifier: uid)
-    guard let event = items.compactMap({ $0 as? EKEvent }).first(where: { $0.calendar.title == calendarName }) else {
+    // Parse optional occurrence_date and span
+    let occDateStr = updateData["occurrence_date"] as? String
+    let occDate: Date? = occDateStr.flatMap { parseISO8601($0) }
+    let spanStr = updateData["span"] as? String ?? "this_event"
+    let span: EKSpan = spanStr == "future_events" ? .futureEvents : .thisEvent
+
+    // Dual-path event lookup
+    var event: EKEvent?
+    if let occDate = occDate {
+        // Predicate-based search: ±1 day around occurrence_date, filter by UID, 60s tolerance
+        let dayBefore = occDate.addingTimeInterval(-86400)
+        let dayAfter = occDate.addingTimeInterval(86400)
+        let pred = store.predicateForEvents(withStart: dayBefore, end: dayAfter, calendars: [calendar])
+        let tolerance: TimeInterval = 60
+        event = store.events(matching: pred)
+            .filter { $0.calendarItemIdentifier == uid }
+            .first { abs($0.occurrenceDate.timeIntervalSince(occDate)) < tolerance }
+    } else {
+        // Standard lookup
+        let items = store.calendarItems(withExternalIdentifier: uid)
+        event = items.compactMap { $0 as? EKEvent }.first { $0.calendar.title == calendarName }
+    }
+
+    guard let event = event else {
         errors.append(["index": index, "uid": uid, "error": "Event not found"])
         continue
     }
@@ -159,13 +181,92 @@ for (index, updateData) in updatesJson.enumerated() {
     let tz: TimeZone? = tzName.flatMap { TimeZone(identifier: $0) }
     var updatedFields: [String] = []
 
+    // Parse new start/end before applying
+    let newStartStr = updateData["start"] as? String
+    let newEndStr = updateData["end"] as? String
+    let newStart: Date? = newStartStr.flatMap { parseISO8601($0, timeZone: tz) }
+    let newEnd: Date? = newEndStr.flatMap { parseISO8601($0, timeZone: tz) }
+
+    // Check if this is a date change on a recurring event with .thisEvent
+    let isDateChange = newStart != nil || newEnd != nil
+    let isRecurringThisEvent = event.hasRecurrenceRules && span == .thisEvent && occDate != nil
+
+    if isDateChange && isRecurringThisEvent {
+        // Reschedule flow: remove occurrence from series, create standalone event at new time
+        let eventTitle = (updateData["summary"] as? String) ?? event.title ?? ""
+        let eventStart = newStart ?? event.startDate!
+        let eventEnd = newEnd ?? event.endDate!
+        let clearLocation = updateData["clear_location"] as? Bool == true
+        let clearNotes = updateData["clear_notes"] as? Bool == true
+        let clearUrl = updateData["clear_url"] as? Bool == true
+        let eventLocation = clearLocation ? nil : ((updateData["location"] as? String) ?? event.location)
+        let eventNotes = clearNotes ? nil : ((updateData["notes"] as? String) ?? event.notes)
+        let eventUrlStr = updateData["url"] as? String
+        let eventUrl = clearUrl ? nil : (eventUrlStr.flatMap { URL(string: $0) } ?? event.url)
+        let eventAllDay = (updateData["allday"] as? Bool) ?? event.isAllDay
+        let eventAlarms = event.alarms
+
+        // Build updatedFields for reschedule
+        if updateData["summary"] != nil { updatedFields.append("summary") }
+        if newStart != nil { updatedFields.append("start_date") }
+        if newEnd != nil { updatedFields.append("end_date") }
+        if updateData["location"] != nil || clearLocation { updatedFields.append("location") }
+        if updateData["notes"] != nil || clearNotes { updatedFields.append("notes") }
+        if updateData["url"] != nil || clearUrl { updatedFields.append("url") }
+        if updateData["allday"] != nil { updatedFields.append("allday_event") }
+        if updateData["availability"] != nil { updatedFields.append("availability") }
+        if updateData["clear_alerts"] as? Bool == true || updateData["alerts"] != nil { updatedFields.append("alerts") }
+
+        // Remove the occurrence from the series
+        do {
+            try store.remove(event, span: .thisEvent, commit: false)
+        } catch {
+            errors.append(["index": index, "uid": uid, "error": "Failed to remove occurrence: \(error.localizedDescription)"])
+            continue
+        }
+
+        // Create standalone event with same properties at new time
+        let newEvent = EKEvent(eventStore: store)
+        newEvent.calendar = calendar
+        newEvent.title = eventTitle
+        newEvent.startDate = eventStart
+        newEvent.endDate = eventEnd
+        newEvent.isAllDay = eventAllDay
+        newEvent.location = eventLocation
+        newEvent.notes = eventNotes
+        newEvent.url = eventUrl
+        if let alarms = eventAlarms {
+            for alarm in alarms { newEvent.addAlarm(EKAlarm(relativeOffset: alarm.relativeOffset)) }
+        }
+        // Apply new alerts if provided
+        if updateData["clear_alerts"] as? Bool == true || updateData["alerts"] != nil {
+            newEvent.alarms = nil
+            if let alerts = updateData["alerts"] as? [Int] {
+                for mins in alerts { newEvent.addAlarm(EKAlarm(relativeOffset: TimeInterval(-mins * 60))) }
+            }
+        }
+        if let avail = updateData["availability"] as? String {
+            newEvent.availability = parseAvailability(avail)
+        }
+
+        do {
+            try store.save(newEvent, span: .thisEvent, commit: false)
+            updated.append(["uid": newEvent.calendarItemIdentifier, "summary": newEvent.title ?? "",
+                            "updated_fields": updatedFields, "rescheduled": true])
+        } catch {
+            errors.append(["index": index, "uid": uid, "error": "Failed to create rescheduled event: \(error.localizedDescription)"])
+        }
+        continue
+    }
+
+    // Normal update path: apply field changes
     if let summary = updateData["summary"] as? String {
         event.title = summary; updatedFields.append("summary")
     }
-    if let startStr = updateData["start"] as? String, let startDate = parseISO8601(startStr, timeZone: tz) {
+    if let startDate = newStart {
         event.startDate = startDate; updatedFields.append("start_date")
     }
-    if let endStr = updateData["end"] as? String, let endDate = parseISO8601(endStr, timeZone: tz) {
+    if let endDate = newEnd {
         event.endDate = endDate; updatedFields.append("end_date")
     }
     if let location = updateData["location"] as? String {
@@ -214,15 +315,19 @@ for (index, updateData) in updatesJson.enumerated() {
         continue
     }
 
+    // Determine save span: force futureEvents for recurrence changes
+    let isRecurrenceChange = updateData["recurrence"] != nil || updateData["clear_recurrence"] as? Bool == true
+    let saveSpan: EKSpan = isRecurrenceChange ? .futureEvents : span
+
     do {
-        try store.save(event, span: .thisEvent, commit: false)
+        try store.save(event, span: saveSpan, commit: false)
         updated.append(["uid": uid, "summary": event.title ?? "", "updated_fields": updatedFields])
     } catch {
         errors.append(["index": index, "uid": uid, "error": error.localizedDescription])
     }
 }
 
-if !updated.isEmpty {
+if !updated.isEmpty || errors.isEmpty {
     do {
         try store.commit()
     } catch {

@@ -871,118 +871,6 @@ class TestParseTimeString:
             CalendarConnector._parse_time_string("09:60")
 
 
-# ── update_event ────────────────────────────────────────────────────────────
-
-
-class TestUpdateEvent:
-    """Tests for CalendarConnector.update_event()."""
-
-    def setup_method(self):
-        self.connector = CalendarConnector(enable_safety_checks=False)
-
-    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
-    def test_updates_summary(self, mock_swift):
-        mock_swift.return_value = json.dumps({"uid": "ABC-123", "updated_fields": ["summary"]})
-        self.connector.update_event("MCP-Test-Calendar", "ABC-123", summary="New Title")
-        args = mock_swift.call_args[0][1]
-        assert "--summary" in args
-        assert "New Title" in args
-
-    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
-    def test_updates_dates(self, mock_swift):
-        mock_swift.return_value = json.dumps({"uid": "ABC-123", "updated_fields": ["start_date", "end_date"]})
-        self.connector.update_event("MCP-Test-Calendar", "ABC-123",
-                                    start_date="2026-03-15T14:30:00", end_date="2026-03-15T15:30:00")
-        args = mock_swift.call_args[0][1]
-        assert "--start" in args
-        assert "2026-03-15T14:30:00" in args
-        assert "--end" in args
-        assert "2026-03-15T15:30:00" in args
-
-    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
-    def test_updates_allday(self, mock_swift):
-        mock_swift.return_value = json.dumps({"uid": "ABC-123", "updated_fields": ["allday_event"]})
-        self.connector.update_event("MCP-Test-Calendar", "ABC-123", allday_event=True)
-        args = mock_swift.call_args[0][1]
-        assert "--allday" in args
-        assert "true" in args
-
-    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
-    def test_updates_multiple_fields(self, mock_swift):
-        mock_swift.return_value = json.dumps({"uid": "ABC-123", "updated_fields": ["summary", "location"]})
-        result = self.connector.update_event("MCP-Test-Calendar", "ABC-123", summary="New", location="Room C")
-        args = mock_swift.call_args[0][1]
-        assert "--summary" in args
-        assert "--location" in args
-        assert result == {"uid": "ABC-123", "updated_fields": ["summary", "location"]}
-
-    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
-    def test_only_provided_fields_passed(self, mock_swift):
-        mock_swift.return_value = json.dumps({"uid": "ABC-123", "updated_fields": ["summary"]})
-        self.connector.update_event("MCP-Test-Calendar", "ABC-123", summary="New Title")
-        args = mock_swift.call_args[0][1]
-        assert "--summary" in args
-        assert "--location" not in args
-        assert "--description" not in args
-        assert "--url" not in args
-        assert "--start" not in args
-        assert "--end" not in args
-        assert "--allday" not in args
-
-    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
-    def test_clear_field_with_empty_string(self, mock_swift):
-        mock_swift.return_value = json.dumps({"uid": "ABC-123", "updated_fields": ["location"]})
-        self.connector.update_event("MCP-Test-Calendar", "ABC-123", location="")
-        args = mock_swift.call_args[0][1]
-        assert "--clear-location" in args
-        assert "--location" not in args
-
-    def test_invalid_date_raises(self):
-        with pytest.raises(ValueError, match="Invalid date format"):
-            self.connector.update_event("MCP-Test-Calendar", "ABC-123", start_date="not-a-date")
-
-    def test_safety_blocks_non_test_calendar(self):
-        connector = CalendarConnector(enable_safety_checks=True)
-        with pytest.raises(CalendarSafetyError, match="not an allowed test calendar"):
-            connector.update_event("Personal", "ABC-123", summary="Test")
-
-    def test_no_fields_raises(self):
-        with pytest.raises(ValueError, match="At least one field"):
-            self.connector.update_event("MCP-Test-Calendar", "ABC-123")
-
-    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
-    def test_event_not_found_raises(self, mock_swift):
-        mock_swift.return_value = json.dumps({"error": "event_not_found", "message": "Event not found: BAD-UID"})
-        with pytest.raises(ValueError, match="Event not found"):
-            self.connector.update_event("MCP-Test-Calendar", "BAD-UID", summary="X")
-
-    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
-    def test_passes_occurrence_date(self, mock_swift):
-        mock_swift.return_value = json.dumps({"uid": "REC-123", "updated_fields": ["summary"]})
-        self.connector.update_event("MCP-Test-Calendar", "REC-123",
-                                    summary="Modified", occurrence_date="2027-01-05T10:00:00")
-        args = mock_swift.call_args[0][1]
-        assert "--occurrence-date" in args
-        assert "2027-01-05T10:00:00" in args
-
-    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
-    def test_passes_span_future_events(self, mock_swift):
-        mock_swift.return_value = json.dumps({"uid": "REC-123", "updated_fields": ["summary"]})
-        self.connector.update_event("MCP-Test-Calendar", "REC-123",
-                                    summary="Series Update", span="future_events")
-        args = mock_swift.call_args[0][1]
-        assert "--span" in args
-        assert "future_events" in args
-
-    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
-    def test_default_span_not_passed(self, mock_swift):
-        mock_swift.return_value = json.dumps({"uid": "ABC-123", "updated_fields": ["summary"]})
-        self.connector.update_event("MCP-Test-Calendar", "ABC-123", summary="X")
-        args = mock_swift.call_args[0][1]
-        assert "--span" not in args
-        assert "--occurrence-date" not in args
-
-
 # ── delete_events ──────────────────────────────────────────────────────────
 
 
@@ -1159,9 +1047,25 @@ class TestUpdateEvents:
         with pytest.raises(ValueError, match="At least one update"):
             self.connector.update_events("MCP-Test-Calendar", [])
 
-    def test_occurrence_date_rejected(self):
-        with pytest.raises(ValueError, match="does not support occurrence_date"):
-            self.connector.update_events("MCP-Test-Calendar", [{"uid": "UID-1", "occurrence_date": "2026-03-15"}])
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_occurrence_date_passed_through(self, mock_swift):
+        """occurrence_date is now supported — verify it passes through to Swift."""
+        mock_swift.return_value = json.dumps({
+            "updated": [{"uid": "UID-1", "summary": "Test", "updated_fields": ["summary"]}],
+            "errors": [],
+        })
+        result = self.connector.update_events(
+            "MCP-Test-Calendar",
+            [{"uid": "UID-1", "summary": "Test", "occurrence_date": "2026-03-15T10:00:00"}],
+        )
+        assert len(result["updated"]) == 1
+        # Verify the occurrence_date was included in the JSON sent to stdin
+        import json as json_mod
+        stdin_data = mock_swift.call_args[1].get("stdin_data") or mock_swift.call_args[0][2] if len(mock_swift.call_args[0]) > 2 else None
+        if stdin_data is None:
+            stdin_data = mock_swift.call_args.kwargs.get("stdin_data", "")
+        parsed = json_mod.loads(stdin_data)
+        assert parsed[0]["occurrence_date"] == "2026-03-15T10:00:00"
 
     def test_safety_blocks_non_test_calendar(self):
         connector = CalendarConnector(enable_safety_checks=True)

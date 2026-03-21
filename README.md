@@ -11,7 +11,7 @@ A comprehensive, fast, reliable, and agent-friendly [MCP](https://modelcontextpr
 
 ### Comprehensive
 
-11 tools covering the full calendar lifecycle — more than any other dedicated Apple Calendar MCP server. Full CRUD for events and calendars, plus batch operations (`create_events`, `update_events`), text search, smart availability with working hours and minimum duration filters, and conflict detection. Complete recurring event support with iCalendar RRULE — create, update, and delete individual occurrences or entire series.
+10 tools covering the full calendar lifecycle — more than any other dedicated Apple Calendar MCP server. Full CRUD for events and calendars, plus batch operations (`create_events`, `update_events`), text search, smart availability with working hours and minimum duration filters, and conflict detection. Complete recurring event support with iCalendar RRULE — create, update, and delete individual occurrences or entire series.
 
 ### Fast
 
@@ -44,7 +44,7 @@ Every tool docstring includes detailed `Returns` sections documenting fields, ty
 
 All models pass all safety-critical scenarios. [Full results](evals/agent_tool_usability/results/scored_results.md).
 
-## Tools (11)
+## Tools (10)
 
 ### Calendars
 
@@ -61,8 +61,7 @@ All models pass all safety-critical scenarios. [Full results](evals/agent_tool_u
 | `get_events` | Query events in a date range |
 | `search_events` | Search events by text across one or all calendars |
 | `create_events` | Create one or more events in one operation |
-| `update_event` | Update any event field by UID (only provided fields change) |
-| `update_events` | Batch update multiple events in one operation |
+| `update_events` | Update one or more events by UID, with full recurrence support |
 | `delete_events` | Delete one or more events by UID |
 
 ### Scheduling

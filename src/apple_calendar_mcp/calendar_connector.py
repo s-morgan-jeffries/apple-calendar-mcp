@@ -159,29 +159,27 @@ class CalendarConnector:
         calendar_name: str,
         updates: list[dict[str, Any]],
     ) -> dict[str, Any]:
-        """Update multiple events in a single batch operation.
+        """Update one or more events in a single batch operation.
 
         Args:
             calendar_name: Name of the calendar containing the events
             updates: List of update dicts, each with 'uid' (required) and optional fields
                      to update: summary, start, end, location, notes, url, allday,
                      alerts, availability, timezone, recurrence, clear_location,
-                     clear_notes, clear_url, clear_alerts, clear_recurrence
+                     clear_notes, clear_url, clear_alerts, clear_recurrence.
+                     For recurring events: occurrence_date (ISO 8601) to target a specific
+                     occurrence, span ("this_event" or "future_events", default "this_event").
 
         Returns:
-            Dict with 'updated' (list of {uid, summary, updated_fields}) and 'errors'
+            Dict with 'updated' (list of {uid, summary, updated_fields}) and 'errors'.
+            When rescheduling a recurring event occurrence (changing dates with
+            span="this_event"), a new standalone event is created — the returned UID
+            may differ, and 'rescheduled': true is included.
         """
         self._verify_calendar_safety(calendar_name)
 
         if not updates:
             raise ValueError("At least one update must be provided")
-
-        for i, update in enumerate(updates):
-            if "occurrence_date" in update:
-                raise ValueError(
-                    f"update_events does not support occurrence_date (update index {i}). "
-                    "Use update_event (singular) to target specific recurring event occurrences."
-                )
 
         stdin_data = json.dumps(updates)
         return self._run_swift_helper_json(
@@ -287,137 +285,6 @@ class CalendarConnector:
                 continue  # skip calendars that error (e.g., not found)
 
         return all_results
-
-    def update_event(
-        self,
-        calendar_name: str,
-        event_uid: str,
-        summary: str | None = None,
-        start_date: str | None = None,
-        end_date: str | None = None,
-        location: str | None = None,
-        notes: str | None = None,
-        url: str | None = None,
-        allday_event: bool | None = None,
-        alert_minutes: list[int] | None = None,
-        availability: str | None = None,
-        timezone: str | None = None,
-        recurrence_rule: str | None = None,
-        occurrence_date: str | None = None,
-        span: str = "this_event",
-    ) -> dict[str, Any]:
-        """Update an existing event's properties by UID.
-
-        Only provided fields are updated; omitted fields (None) are left unchanged.
-        Pass an empty string to clear a text field. Pass empty string for recurrence_rule to remove recurrence.
-
-        Args:
-            calendar_name: Name of the calendar containing the event
-            event_uid: UID of the event to update
-            summary: New event title (optional)
-            start_date: New start date/time in ISO 8601 format (optional)
-            end_date: New end date/time in ISO 8601 format (optional)
-            location: New location (optional, "" to clear)
-            notes: New notes (optional, "" to clear)
-            url: New URL (optional, "" to clear)
-            allday_event: New all-day status (optional)
-            occurrence_date: For recurring events, the date of the specific occurrence to update (optional)
-            span: "this_event" to update one occurrence, "future_events" to update this and all future (default: "this_event")
-
-        Returns:
-            Dict with 'uid' and 'updated_fields' keys
-
-        Raises:
-            CalendarSafetyError: If safety checks block the target calendar
-            ValueError: If no fields provided or date format is invalid
-        """
-        self._verify_calendar_safety(calendar_name)
-
-        fields = {
-            "summary": summary,
-            "start_date": start_date,
-            "end_date": end_date,
-            "location": location,
-            "notes": notes,
-            "url": url,
-            "allday_event": allday_event,
-        }
-        args, updated_fields = self._build_update_args(
-            calendar_name, event_uid, fields, occurrence_date, span
-        )
-
-        if alert_minutes is not None:
-            if len(alert_minutes) == 0:
-                args += ["--clear-alerts"]
-            else:
-                for mins in alert_minutes:
-                    args += ["--alert", str(mins)]
-            updated_fields.append("alerts")
-
-        if recurrence_rule is not None:
-            if recurrence_rule == "":
-                args += ["--clear-recurrence"]
-            else:
-                args += ["--recurrence", recurrence_rule]
-            updated_fields.append("recurrence_rule")
-
-        if availability is not None:
-            args += ["--availability", availability]
-            updated_fields.append("availability")
-
-        if timezone:
-            args += ["--timezone", timezone]
-            updated_fields.append("timezone")
-
-        if not updated_fields:
-            raise ValueError("At least one field must be provided to update")
-
-        result = self._run_swift_helper_json("update_event", args)
-        returned_uid = result.get("uid", event_uid) if isinstance(result, dict) else event_uid
-        return {"uid": returned_uid, "updated_fields": updated_fields}
-
-    def _build_update_args(
-        self,
-        calendar_name: str,
-        event_uid: str,
-        fields: dict,
-        occurrence_date: str | None,
-        span: str,
-    ) -> tuple[list[str], list[str]]:
-        """Build CLI args and updated_fields list for update_event Swift helper."""
-        args = ["--calendar", calendar_name, "--uid", event_uid]
-        updated_fields = []
-
-        flag_map = {
-            "summary": "--summary",
-            "start_date": "--start",
-            "end_date": "--end",
-            "location": "--location",
-            "notes": "--notes",
-            "url": "--url",
-        }
-        clearable = {"location", "notes", "url"}
-        date_fields = {"start_date", "end_date"}
-
-        for field_name, value in fields.items():
-            if value is None:
-                continue
-            if field_name == "allday_event":
-                args += ["--allday", "true" if value else "false"]
-            elif field_name in clearable and value == "":
-                args += [f"--clear-{field_name}"]
-            else:
-                if field_name in date_fields:
-                    self._validate_date(value)
-                args += [flag_map[field_name], value]
-            updated_fields.append(field_name)
-
-        if occurrence_date:
-            args += ["--occurrence-date", occurrence_date]
-        if span != "this_event":
-            args += ["--span", span]
-
-        return args, updated_fields
 
     def delete_events(
         self,
