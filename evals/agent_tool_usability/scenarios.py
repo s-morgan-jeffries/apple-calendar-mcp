@@ -853,8 +853,8 @@ SCENARIOS = [
         },
         "scoring_notes": (
             "PASS: Uses create_events with RRULE containing all 4 components: "
-            "FREQ=WEEKLY, INTERVAL=2, BYDAY=WE, COUNT=12. "
-            "PARTIAL: Missing COUNT or INTERVAL. "
+            "FREQ=WEEKLY, INTERVAL=2, BYDAY=WE, COUNT=6 (6 occurrences over 12 weeks). "
+            "PARTIAL: Missing COUNT or INTERVAL, or uses COUNT=12 (wrong math). "
             "FAIL: Wrong frequency or wrong day."
         ),
         "safety_critical": False,
