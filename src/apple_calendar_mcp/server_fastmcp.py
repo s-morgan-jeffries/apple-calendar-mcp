@@ -171,7 +171,7 @@ def create_event(
         location: Event location (optional)
         notes: Event notes (optional)
         url: URL associated with the event (optional)
-        allday_event: Whether this is an all-day event (default: false). When true, use date-only format for start_date/end_date.
+        allday_event: Whether this is an all-day event (default: false). When true, use date-only format for start_date/end_date. For a single-day event, end_date equals start_date. For multi-day events, end_date is the last day (inclusive).
         recurrence_rule: iCalendar RRULE string for recurring events (optional, e.g., "FREQ=WEEKLY;BYDAY=MO,WE,FR" or "FREQ=DAILY;COUNT=10")
         alert_minutes: Comma-separated minutes before event to alert (optional, e.g., "15" or "15,60")
         availability: Event availability status: "free", "busy", or "tentative" (optional, default: busy)
@@ -218,8 +218,9 @@ def create_events(
         calendar_name: Exact name of the target calendar
         events: JSON array of event objects. Each object has keys: summary (required),
                 start (required, ISO 8601), end (required, ISO 8601), and optional:
-                location, notes, url, allday (bool), recurrence (RRULE string),
-                alerts (list of minutes, e.g. [15, 60]), availability ("free"/"busy"/"tentative"),
+                location, notes, url, allday (bool — when true, end is the last day inclusive),
+                recurrence (RRULE string), alerts (list of minutes, e.g. [15, 60]),
+                availability ("free"/"busy"/"tentative"),
                 timezone (IANA identifier, e.g. "America/Los_Angeles")
 
     Returns:
@@ -270,10 +271,10 @@ def update_events(
         calendar_name: Exact name of the calendar containing the events
         updates: JSON array of update objects. Each object must have "uid" (required)
                  and at least one field to update: summary, start (ISO 8601), end (ISO 8601),
-                 location, notes, url, allday (bool), alerts (list of minutes),
-                 availability ("free"/"busy"/"tentative"), timezone (IANA identifier),
-                 recurrence (RRULE string), clear_location (bool), clear_notes (bool),
-                 clear_url (bool), clear_alerts (bool), clear_recurrence (bool)
+                 location, notes, url, allday (bool — when true, end is the last day inclusive),
+                 alerts (list of minutes), availability ("free"/"busy"/"tentative"),
+                 timezone (IANA identifier), recurrence (RRULE string), clear_location (bool),
+                 clear_notes (bool), clear_url (bool), clear_alerts (bool), clear_recurrence (bool)
 
     Returns:
         Summary of updated events, each with title and list of changed fields. Any per-event
@@ -385,6 +386,7 @@ def get_events(
     Returns:
         Each event includes: uid, summary, start_date, end_date, allday_event, location, notes,
         url, status, calendar_name, availability.
+        For all-day events, end_date is the last day of the event (inclusive).
         For recurring events: is_recurring, recurrence_rule, occurrence_date, is_detached.
         If alerts are set: alerts (list with minutes_before for each).
         If attendees exist: attendees (list with name, email, role, status for each).
@@ -617,7 +619,7 @@ def update_event(
         location: New location, or "" to clear (optional)
         notes: New notes, or "" to clear (optional)
         url: New URL, or "" to clear (optional)
-        allday_event: New all-day status (optional)
+        allday_event: New all-day status (optional). When true, end_date is the last day (inclusive).
         alert_minutes: Comma-separated minutes before event to alert (e.g., "15,60"), or "none" to clear all alerts (optional)
         availability: Event availability: "free", "busy", or "tentative" (optional)
         recurrence_rule: iCalendar RRULE string to set/change recurrence (e.g., "FREQ=WEEKLY;BYDAY=MO,WE,FR"), or "" to remove recurrence (optional)
