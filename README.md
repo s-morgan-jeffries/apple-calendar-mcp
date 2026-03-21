@@ -1,24 +1,83 @@
 # Apple Calendar MCP Server
 
 [![CI](https://github.com/s-morgan-jeffries/apple-calendar-mcp/actions/workflows/test.yml/badge.svg)](https://github.com/s-morgan-jeffries/apple-calendar-mcp/actions/workflows/test.yml)
+[![Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen)](https://github.com/s-morgan-jeffries/apple-calendar-mcp)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-An [MCP](https://modelcontextprotocol.io/) server that connects Claude to Apple Calendar on macOS via AppleScript and EventKit.
+A comprehensive, fast, reliable, and agent-friendly [MCP](https://modelcontextprotocol.io/) server for Apple Calendar on macOS.
 
-## Features
+## Why This Server
 
-- **get_calendars** — List all calendars with names, access levels, and colors
-- **get_events** — Query events in a date range (fast, uses EventKit)
-- **create_event** — Create events with title, dates, location, notes, URL
-- **update_event** — Update any event field by UID
-- **delete_events** — Delete one or more events by UID (batch support)
+### Comprehensive
 
-## Requirements
+12 tools covering the full calendar lifecycle — more than any other dedicated Apple Calendar MCP server. Full CRUD for events and calendars, plus batch operations (`create_events`, `update_events`), text search, smart availability with working hours and minimum duration filters, and conflict detection. Complete recurring event support with iCalendar RRULE — create, update, and delete individual occurrences or entire series.
 
-- macOS
-- Python 3.10+
-- Calendar.app (ships with macOS)
+### Fast
+
+All event operations use Swift/EventKit via native subprocess for sub-second performance, even on calendars with thousands of events. Calendar management uses AppleScript where it's fast enough.
+
+| Operation | Typical Time | Notes |
+|-----------|-------------|-------|
+| List calendars | 0.5s | 16 calendars |
+| Read events (1 month) | 0.6s | ~100 events |
+| Read events (1 year) | 0.7s | ~1,400 events |
+| Create event | 0.5s | |
+| Update event | 0.6s | |
+| Delete events (batch of 5) | 0.4s | Single commit |
+
+### Reliable
+
+95% code coverage from 215 unit tests. 57 integration tests run against real Calendar.app — covering round-trip data integrity, recurring event edge cases, special characters, alerts, year-boundary queries, and more. Calendar safety guards prevent accidental writes to real calendars during testing.
+
+### Agent-Friendly
+
+Every tool docstring includes detailed `Returns` sections documenting fields, types, and chaining info — so Claude knows that `create_event` returns a UID usable by `update_event` without guessing. 38 blind agent eval scenarios validate tool usability across multiple models.
+
+| Model | Score | Safety |
+|-------|-------|--------|
+| Mistral Large 2411 | 70/76 (92%) | 5/5 |
+| DeepSeek V3 | 68/76 (89%) | 5/5 |
+| Qwen 2.5 72B | 67/76 (88%) | 5/5 |
+| Claude Sonnet 4 | 66/76 (87%) | 5/5 |
+| Llama 3.3 70B | 59/76 (78%) | 5/5 |
+
+All models pass all safety-critical scenarios. [Full results](evals/agent_tool_usability/results/scored_results.md).
+
+## Tools (12)
+
+### Calendars
+
+| Tool | Description |
+|------|-------------|
+| `get_calendars` | List all calendars with names, access levels, descriptions, and colors |
+| `create_calendar` | Create a new calendar |
+| `delete_calendar` | Delete a calendar and all its events |
+
+### Events
+
+| Tool | Description |
+|------|-------------|
+| `get_events` | Query events in a date range |
+| `search_events` | Search events by text across one or all calendars |
+| `create_event` | Create an event with title, dates, location, notes, URL, recurrence, alerts, availability, timezone |
+| `create_events` | Batch create multiple events in one operation |
+| `update_event` | Update any event field by UID (only provided fields change) |
+| `update_events` | Batch update multiple events in one operation |
+| `delete_events` | Delete one or more events by UID |
+
+### Scheduling
+
+| Tool | Description |
+|------|-------------|
+| `get_availability` | Find free time slots across calendars, with optional working hours and minimum duration filters |
+| `get_conflicts` | Detect double-bookings and overlapping events across calendars |
+
+## Prerequisites
+
+- **macOS** (Apple Calendar is macOS-only)
+- **Python 3.10+**
+- **Xcode Command Line Tools** — required for Swift helper compilation (`xcode-select --install`)
 
 ## Installation
 
@@ -30,9 +89,9 @@ uv tool install apple-calendar-mcp
 pip install apple-calendar-mcp
 ```
 
-On first use, macOS will prompt for calendar access permission.
+## Configuration
 
-## Usage with Claude Desktop
+### Claude Desktop
 
 Add to your Claude Desktop MCP config (`~/Library/Application Support/Claude/claude_desktop_config.json`):
 
@@ -60,46 +119,41 @@ Or if running from a local clone:
 }
 ```
 
-## Tools
+### Other MCP Clients
 
-| Tool | Parameters | Description |
-|------|-----------|-------------|
-| `get_calendars` | — | List all calendars with name, access level, description, color |
-| `get_events` | `calendar_name`, `start_date`, `end_date` | Get events in a date range (ISO 8601 dates) |
-| `create_event` | `calendar_name`, `summary`, `start_date`, `end_date`, `location?`, `description?`, `url?`, `allday_event?` | Create a new event |
-| `update_event` | `calendar_name`, `event_uid`, `summary?`, `start_date?`, `end_date?`, `location?`, `description?`, `url?`, `allday_event?` | Update event fields (only provided fields change) |
-| `delete_events` | `calendar_name`, `event_uid` (str or list) | Delete one or more events by UID |
+Run the server directly:
 
-All dates use ISO 8601 format: `"2026-03-15"` for date-only or `"2026-03-15T14:30:00"` for date-time.
+```bash
+apple-calendar-mcp
+```
 
-Calendar names are not guaranteed unique — the same name can appear across different accounts (e.g., two "Family" calendars from iCloud and Google). Use `get_calendars` to check descriptions when disambiguating.
+Or from source:
+
+```bash
+uv run python -m apple_calendar_mcp.server_fastmcp
+```
+
+## Permissions
+
+On first use, macOS will prompt for calendar access permission. Grant access to allow the server to read and write calendar events. The Swift helpers use EventKit, which requires the "Full Disk Access" or "Calendars" permission depending on your macOS version.
 
 ## Development
 
 ```bash
 make install           # Create venv and install dependencies
-make test              # Run all tests (147 unit, 57 integration)
+make test              # Run all tests (215 unit, 57 integration)
 make test-unit         # Unit tests only
 make test-integration  # Integration tests (requires test calendar)
-make test-verbose      # Tests with verbose output
+make complexity        # Check cyclomatic complexity
+make audit             # Check dependencies for vulnerabilities
 ```
 
-Integration tests automatically create and tear down an `MCP-Test-Calendar` in Calendar.app. You can also manage it manually:
+All dates use ISO 8601 format in local time: `"2026-03-15"` for date-only or `"2026-03-15T14:30:00"` for date-time. Do not append "Z" — dates are not UTC.
 
-```bash
-./scripts/test_setup.sh      # Create test calendar
-./scripts/test_teardown.sh   # Delete test calendar
-```
+## Contributing
 
-## Architecture
-
-The server uses a hybrid approach for performance:
-
-- **Writes** (create, update, delete) use AppleScript via `osascript` — fast for single-event operations
-- **Reads** (get_events) use Swift/EventKit via a compiled helper — native date-range queries, sub-second on any calendar size
-
-AppleScript event reads are too slow for large calendars (5600+ events caused timeouts), so `get_events` delegates to EventKit instead.
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-MIT
+[MIT](LICENSE)
