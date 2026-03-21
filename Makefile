@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-integration test-verbose install clean complexity help
+.PHONY: test test-unit test-integration test-verbose install clean complexity audit help
 
 help:
 	@echo "Available targets:"
@@ -8,6 +8,7 @@ help:
 	@echo "  make test-integration - Run integration tests (requires test calendar)"
 	@echo "  make test-verbose     - Run tests with verbose output"
 	@echo "  make complexity       - Check code complexity with radon"
+	@echo "  make audit            - Check dependencies for vulnerabilities"
 	@echo "  make clean            - Remove cache and build artifacts"
 
 install:
@@ -29,6 +30,9 @@ test-verbose:
 
 complexity:
 	@./scripts/check_complexity.sh
+
+audit:
+	@./scripts/check_dependencies.sh
 
 clean:
 	rm -rf __pycache__ .pytest_cache .coverage htmlcov/
