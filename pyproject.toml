@@ -57,6 +57,14 @@ markers = [
     "integration: mark test as an integration test",
 ]
 
+[tool.coverage.run]
+source = ["apple_calendar_mcp"]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+exclude_lines = ["if __name__ == \"__main__\""]
+
 [tool.pyright]
 include = ["src", "tests"]
 exclude = ["**/node_modules", "**/__pycache__", ".venv", "venv"]

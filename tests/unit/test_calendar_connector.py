@@ -1198,3 +1198,186 @@ class TestDeleteEvents:
         self.connector.delete_events("MCP-Test-Calendar", "ABC-123")
         args = mock_swift.call_args[0][1]
         assert "--span" not in args
+
+
+# ── _run_swift_helper_json error handling ─────────────────────────────────
+
+
+class TestRunSwiftHelperJson:
+    """Tests for CalendarConnector._run_swift_helper_json() error paths."""
+
+    def setup_method(self):
+        self.connector = CalendarConnector(enable_safety_checks=False)
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_called_process_error_with_json_stdout(self, mock_swift):
+        """CalledProcessError with JSON error in stdout should map to correct exception."""
+        error = subprocess.CalledProcessError(1, "swift")
+        error.stdout = json.dumps({"error": "calendar_not_found", "message": "Calendar 'X' not found"})
+        mock_swift.side_effect = error
+        with pytest.raises(ValueError, match="Calendar 'X' not found"):
+            self.connector._run_swift_helper_json("test_script", [])
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_called_process_error_with_no_output(self, mock_swift):
+        """CalledProcessError with empty stdout should raise RuntimeError."""
+        error = subprocess.CalledProcessError(1, "swift")
+        error.stdout = ""
+        mock_swift.side_effect = error
+        with pytest.raises(RuntimeError, match="failed with no output"):
+            self.connector._run_swift_helper_json("test_script", [])
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_called_process_error_with_none_stdout(self, mock_swift):
+        """CalledProcessError with None stdout should raise RuntimeError."""
+        error = subprocess.CalledProcessError(1, "swift")
+        error.stdout = None
+        mock_swift.side_effect = error
+        with pytest.raises(RuntimeError, match="failed with no output"):
+            self.connector._run_swift_helper_json("test_script", [])
+
+
+# ── create_events (batch) ─────────────────────────────────────────────────
+
+
+class TestCreateEvents:
+    """Tests for CalendarConnector.create_events()."""
+
+    def setup_method(self):
+        self.connector = CalendarConnector(enable_safety_checks=False)
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_creates_batch_events(self, mock_swift):
+        mock_swift.return_value = json.dumps({
+            "created": [{"uid": "UID-1", "summary": "Event 1"}, {"uid": "UID-2", "summary": "Event 2"}],
+            "errors": [],
+        })
+        events = [
+            {"summary": "Event 1", "start": "2026-03-15T10:00:00", "end": "2026-03-15T11:00:00"},
+            {"summary": "Event 2", "start": "2026-03-15T12:00:00", "end": "2026-03-15T13:00:00"},
+        ]
+        result = self.connector.create_events("MCP-Test-Calendar", events)
+        assert len(result["created"]) == 2
+        assert result["errors"] == []
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_partial_success(self, mock_swift):
+        mock_swift.return_value = json.dumps({
+            "created": [{"uid": "UID-1", "summary": "Event 1"}],
+            "errors": [{"index": 1, "summary": "Bad Event", "error": "invalid date"}],
+        })
+        result = self.connector.create_events("MCP-Test-Calendar", [{"summary": "Event 1"}, {"summary": "Bad Event"}])
+        assert len(result["created"]) == 1
+        assert len(result["errors"]) == 1
+
+    def test_empty_list_raises(self):
+        with pytest.raises(ValueError, match="At least one event"):
+            self.connector.create_events("MCP-Test-Calendar", [])
+
+    def test_safety_blocks_non_test_calendar(self):
+        connector = CalendarConnector(enable_safety_checks=True)
+        with pytest.raises(CalendarSafetyError):
+            connector.create_events("Personal", [{"summary": "Test"}])
+
+
+# ── update_events (batch) ─────────────────────────────────────────────────
+
+
+class TestUpdateEvents:
+    """Tests for CalendarConnector.update_events()."""
+
+    def setup_method(self):
+        self.connector = CalendarConnector(enable_safety_checks=False)
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_updates_batch(self, mock_swift):
+        mock_swift.return_value = json.dumps({
+            "updated": [{"uid": "UID-1", "summary": "Updated", "updated_fields": ["summary"]}],
+            "errors": [],
+        })
+        result = self.connector.update_events("MCP-Test-Calendar", [{"uid": "UID-1", "summary": "Updated"}])
+        assert len(result["updated"]) == 1
+
+    def test_empty_list_raises(self):
+        with pytest.raises(ValueError, match="At least one update"):
+            self.connector.update_events("MCP-Test-Calendar", [])
+
+    def test_occurrence_date_rejected(self):
+        with pytest.raises(ValueError, match="does not support occurrence_date"):
+            self.connector.update_events("MCP-Test-Calendar", [{"uid": "UID-1", "occurrence_date": "2026-03-15"}])
+
+    def test_safety_blocks_non_test_calendar(self):
+        connector = CalendarConnector(enable_safety_checks=True)
+        with pytest.raises(CalendarSafetyError):
+            connector.update_events("Personal", [{"uid": "UID-1", "summary": "Test"}])
+
+
+# ── search_events ─────────────────────────────────────────────────────────
+
+
+class TestSearchEvents:
+    """Tests for CalendarConnector.search_events()."""
+
+    def setup_method(self):
+        self.connector = CalendarConnector(enable_safety_checks=False)
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_searches_specific_calendar(self, mock_swift):
+        mock_swift.return_value = json.dumps([
+            {"uid": "UID-1", "summary": "Team Lunch", "start_date": "2026-03-15T12:00:00",
+             "end_date": "2026-03-15T13:00:00", "calendar_name": "Work"},
+        ])
+        results = self.connector.search_events("lunch", calendar_name="Work",
+                                                start_date="2026-03-01", end_date="2026-04-01")
+        assert len(results) == 1
+        assert results[0]["summary"] == "Team Lunch"
+        args = mock_swift.call_args[0][1]
+        assert "--query" in args
+        assert "lunch" in args
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_searches_all_calendars(self, mock_swift):
+        """When no calendar_name, searches all calendars."""
+        # get_calendars returns two calendars
+        def side_effect(script, args, **kwargs):
+            if script == "get_calendars":
+                return json.dumps([
+                    {"name": "Work", "writable": True, "description": "", "color": "#FF0000"},
+                    {"name": "Personal", "writable": True, "description": "", "color": "#0000FF"},
+                ])
+            # get_events returns for each calendar
+            return json.dumps([])
+        mock_swift.side_effect = side_effect
+        results = self.connector.search_events("lunch", start_date="2026-03-01", end_date="2026-04-01")
+        assert results == []
+        # Should have called get_calendars + get_events for each calendar
+        assert mock_swift.call_count == 3  # get_calendars + 2x get_events
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_default_date_range(self, mock_swift):
+        """When no dates, defaults to 1 month ago to 6 months from now."""
+        mock_swift.return_value = json.dumps([])
+        self.connector.search_events("test", calendar_name="Work")
+        args = mock_swift.call_args[0][1]
+        # Should have --start and --end with auto-generated dates
+        assert "--start" in args
+        assert "--end" in args
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_skips_calendar_not_found(self, mock_swift):
+        """Calendar not found errors should be silently skipped."""
+        def side_effect(script, args, **kwargs):
+            if script == "get_calendars":
+                return json.dumps([
+                    {"name": "Work", "writable": True, "description": "", "color": "#FF0000"},
+                    {"name": "Missing", "writable": True, "description": "", "color": "#00FF00"},
+                ])
+            # Work returns events, Missing raises ValueError
+            cal_arg_idx = args.index("--calendar") + 1 if "--calendar" in args else -1
+            if cal_arg_idx >= 0 and args[cal_arg_idx] == "Missing":
+                return json.dumps({"error": "calendar_not_found", "message": "not found"})
+            return json.dumps([{"uid": "UID-1", "summary": "Found", "start_date": "2026-03-15T10:00:00",
+                                "end_date": "2026-03-15T11:00:00", "calendar_name": "Work"}])
+        mock_swift.side_effect = side_effect
+        results = self.connector.search_events("found", start_date="2026-03-01", end_date="2026-04-01")
+        assert len(results) == 1

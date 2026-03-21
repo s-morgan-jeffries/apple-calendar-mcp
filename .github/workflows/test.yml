@@ -27,8 +27,8 @@ jobs:
           pip install -e .
           pip install pytest pytest-asyncio pytest-cov radon
 
-      - name: Run unit tests
-        run: pytest tests/ -m "not integration" -v
+      - name: Run unit tests with coverage
+        run: pytest tests/ -m "not integration" -v --cov=apple_calendar_mcp --cov-report=term-missing --cov-fail-under=90
         timeout-minutes: 5
 
       - name: Check code complexity
@@ -37,6 +37,9 @@ jobs:
 
       - name: Verify version sync
         run: ./scripts/check_version_sync.sh
+
+      - name: Check connector/server parity
+        run: ./scripts/check_client_server_parity.sh
 
   test-summary:
     name: Test Summary
