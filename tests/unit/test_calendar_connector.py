@@ -715,6 +715,19 @@ class TestGetAvailability:
         assert result[1]["end_date"] == "2026-03-15T14:00:00"
         assert result[2]["start_date"] == "2026-03-15T15:00:00"
 
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_free_events_do_not_block_availability(self, mock_swift):
+        """Events with availability='free' should not reduce available time."""
+        event = self._make_event("2026-03-15T10:00:00", "2026-03-15T11:00:00")
+        event["availability"] = "free"
+        mock_swift.return_value = json.dumps([event])
+        result = self.connector.get_availability(
+            ["Work"], "2026-03-15T09:00:00", "2026-03-15T17:00:00"
+        )
+        # Entire range should be free since the event is marked "free"
+        assert len(result) == 1
+        assert result[0]["duration_minutes"] == 480
+
 
 # ── get_availability: smart filtering ──────────────────────────────────────
 
