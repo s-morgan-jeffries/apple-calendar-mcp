@@ -882,6 +882,103 @@ class TestGetAvailabilityFiltering:
             )
 
 
+class TestGetConflicts:
+    """Tests for CalendarConnector.get_conflicts()."""
+
+    def setup_method(self):
+        self.connector = CalendarConnector(enable_safety_checks=False)
+
+    def _make_event(self, uid, summary, start, end, calendar="Work", availability="busy", allday=False):
+        return {
+            "uid": uid, "summary": summary,
+            "start_date": start, "end_date": end,
+            "calendar_name": calendar, "availability": availability,
+            "allday_event": allday,
+        }
+
+    @patch.object(CalendarConnector, "get_events")
+    def test_no_events_returns_empty(self, mock_get):
+        mock_get.return_value = []
+        result = self.connector.get_conflicts(["Work"], "2026-03-15", "2026-03-16")
+        assert result == []
+
+    @patch.object(CalendarConnector, "get_events")
+    def test_no_overlap_returns_empty(self, mock_get):
+        mock_get.return_value = [
+            self._make_event("A", "Meeting", "2026-03-15T10:00:00", "2026-03-15T11:00:00"),
+            self._make_event("B", "Lunch", "2026-03-15T12:00:00", "2026-03-15T13:00:00"),
+        ]
+        result = self.connector.get_conflicts(["Work"], "2026-03-15", "2026-03-16")
+        assert result == []
+
+    @patch.object(CalendarConnector, "get_events")
+    def test_simple_overlap(self, mock_get):
+        mock_get.return_value = [
+            self._make_event("A", "Meeting", "2026-03-15T10:00:00", "2026-03-15T11:00:00"),
+            self._make_event("B", "Call", "2026-03-15T10:30:00", "2026-03-15T11:30:00"),
+        ]
+        result = self.connector.get_conflicts(["Work"], "2026-03-15", "2026-03-16")
+        assert len(result) == 1
+        assert result[0]["event_a"]["uid"] == "A"
+        assert result[0]["event_b"]["uid"] == "B"
+        assert result[0]["overlap_minutes"] == 30
+        assert result[0]["overlap_start"] == "2026-03-15T10:30:00"
+        assert result[0]["overlap_end"] == "2026-03-15T11:00:00"
+
+    @patch.object(CalendarConnector, "get_events")
+    def test_three_way_overlap(self, mock_get):
+        mock_get.return_value = [
+            self._make_event("A", "Meeting", "2026-03-15T10:00:00", "2026-03-15T11:00:00"),
+            self._make_event("B", "Call", "2026-03-15T10:00:00", "2026-03-15T11:00:00"),
+            self._make_event("C", "Review", "2026-03-15T10:30:00", "2026-03-15T11:30:00"),
+        ]
+        result = self.connector.get_conflicts(["Work"], "2026-03-15", "2026-03-16")
+        assert len(result) == 3  # A-B, A-C, B-C
+
+    @patch.object(CalendarConnector, "get_events")
+    def test_free_events_excluded(self, mock_get):
+        mock_get.return_value = [
+            self._make_event("A", "Meeting", "2026-03-15T10:00:00", "2026-03-15T11:00:00", availability="busy"),
+            self._make_event("B", "Lunch", "2026-03-15T10:30:00", "2026-03-15T11:30:00", availability="free"),
+        ]
+        result = self.connector.get_conflicts(["Work"], "2026-03-15", "2026-03-16")
+        assert result == []
+
+    @patch.object(CalendarConnector, "get_events")
+    def test_tentative_events_included(self, mock_get):
+        mock_get.return_value = [
+            self._make_event("A", "Meeting", "2026-03-15T10:00:00", "2026-03-15T11:00:00", availability="busy"),
+            self._make_event("B", "Maybe", "2026-03-15T10:30:00", "2026-03-15T11:30:00", availability="tentative"),
+        ]
+        result = self.connector.get_conflicts(["Work"], "2026-03-15", "2026-03-16")
+        assert len(result) == 1
+
+    @patch.object(CalendarConnector, "get_events")
+    def test_multi_calendar(self, mock_get):
+        def side_effect(cal_name, start, end):
+            if cal_name == "Work":
+                return [self._make_event("A", "Meeting", "2026-03-15T10:00:00", "2026-03-15T11:00:00", "Work")]
+            return [self._make_event("B", "Dentist", "2026-03-15T10:30:00", "2026-03-15T11:30:00", "Personal")]
+        mock_get.side_effect = side_effect
+        result = self.connector.get_conflicts(["Work", "Personal"], "2026-03-15", "2026-03-16")
+        assert len(result) == 1
+        assert result[0]["event_a"]["calendar_name"] == "Work"
+        assert result[0]["event_b"]["calendar_name"] == "Personal"
+
+    @patch.object(CalendarConnector, "get_events")
+    def test_adjacent_events_no_conflict(self, mock_get):
+        mock_get.return_value = [
+            self._make_event("A", "Meeting", "2026-03-15T10:00:00", "2026-03-15T11:00:00"),
+            self._make_event("B", "Call", "2026-03-15T11:00:00", "2026-03-15T12:00:00"),
+        ]
+        result = self.connector.get_conflicts(["Work"], "2026-03-15", "2026-03-16")
+        assert result == []
+
+    def test_empty_calendar_list_raises(self):
+        with pytest.raises(ValueError, match="At least one calendar"):
+            self.connector.get_conflicts([], "2026-03-15", "2026-03-16")
+
+
 class TestParseTimeString:
     """Tests for CalendarConnector._parse_time_string()."""
 

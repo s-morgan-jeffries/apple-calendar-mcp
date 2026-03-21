@@ -726,6 +726,90 @@ class CalendarConnector:
 
         return free_slots
 
+    def get_conflicts(
+        self,
+        calendar_names: list[str],
+        start_date: str,
+        end_date: str,
+    ) -> list[dict[str, Any]]:
+        """Detect overlapping events across one or more calendars.
+
+        Fetches events from all specified calendars, filters out events marked
+        as "free", and returns pairs of events that overlap in time.
+
+        Args:
+            calendar_names: List of calendar names to check
+            start_date: Start of range in ISO 8601 format
+            end_date: End of range in ISO 8601 format
+
+        Returns:
+            List of conflict dicts, each with 'event_a', 'event_b',
+            'overlap_start', 'overlap_end', and 'overlap_minutes' keys.
+
+        Raises:
+            ValueError: If date format is invalid, calendar not found, or no calendars provided
+            PermissionError: If EventKit calendar access is denied
+        """
+        if not calendar_names:
+            raise ValueError("At least one calendar name must be provided")
+
+        all_events = []
+        for cal_name in calendar_names:
+            all_events.extend(self.get_events(cal_name, start_date, end_date))
+
+        # Filter out free events — only busy/tentative can conflict
+        busy_events = [
+            e for e in all_events
+            if e.get("availability", "busy") != "free"
+        ]
+
+        # Parse dates and sort
+        parsed = []
+        for event in busy_events:
+            evt_start = self._parse_iso_datetime(event["start_date"])
+            evt_end = self._parse_iso_datetime(event["end_date"])
+            if event.get("allday_event"):
+                evt_start = evt_start.replace(hour=0, minute=0, second=0)
+                evt_end = evt_end.replace(hour=0, minute=0, second=0)
+                if evt_end == evt_start:
+                    evt_end += timedelta(days=1)
+            parsed.append((evt_start, evt_end, event))
+        parsed.sort(key=lambda x: x[0])
+
+        # Find all overlapping pairs
+        conflicts = []
+        for i in range(len(parsed)):
+            for j in range(i + 1, len(parsed)):
+                start_a, end_a, event_a = parsed[i]
+                start_b, end_b, event_b = parsed[j]
+                if start_b >= end_a:
+                    break  # No more overlaps possible for event i
+                overlap_start = max(start_a, start_b)
+                overlap_end = min(end_a, end_b)
+                overlap_minutes = int((overlap_end - overlap_start).total_seconds() / 60)
+                if overlap_minutes > 0:
+                    conflicts.append({
+                        "event_a": {
+                            "uid": event_a["uid"],
+                            "summary": event_a["summary"],
+                            "start_date": event_a["start_date"],
+                            "end_date": event_a["end_date"],
+                            "calendar_name": event_a["calendar_name"],
+                        },
+                        "event_b": {
+                            "uid": event_b["uid"],
+                            "summary": event_b["summary"],
+                            "start_date": event_b["start_date"],
+                            "end_date": event_b["end_date"],
+                            "calendar_name": event_b["calendar_name"],
+                        },
+                        "overlap_start": overlap_start.isoformat(),
+                        "overlap_end": overlap_end.isoformat(),
+                        "overlap_minutes": overlap_minutes,
+                    })
+
+        return conflicts
+
     def get_calendars(self) -> list[dict[str, Any]]:
         """Get all calendars from Apple Calendar.
 
