@@ -1,0 +1,112 @@
+name: Release Hygiene Checks
+
+on:
+  push:
+    tags:
+      - 'v*-rc*'  # Triggers on v0.7.0-rc1, v0.7.0-rc2, etc.
+
+jobs:
+  hygiene-checks:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run all unit tests
+        run: |
+          pytest tests/ -v --tb=short
+
+      - name: Check version synchronization
+        run: |
+          ./scripts/check_version_sync.sh
+
+      - name: Check code complexity
+        run: |
+          ./scripts/check_complexity.sh
+
+      - name: Verify milestone status
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          VERSION=${TAG_NAME%-rc*}
+
+          echo "Checking milestone: $VERSION"
+
+          if ! gh api repos/${{ github.repository }}/milestones --jq ".[].title" | grep -q "^${VERSION}$"; then
+            echo "Milestone $VERSION does not exist"
+            exit 1
+          fi
+
+          MILESTONE_NUM=$(gh api repos/${{ github.repository }}/milestones --jq ".[] | select(.title == \"${VERSION}\") | .number")
+
+          OPEN_ISSUES=$(gh api repos/${{ github.repository }}/issues --jq ".[] | select(.milestone.number == ${MILESTONE_NUM} and .state == \"open\") | .number")
+
+          if [ -n "$OPEN_ISSUES" ]; then
+            echo "Milestone $VERSION has open issues:"
+            echo "$OPEN_ISSUES" | while read -r issue; do
+              TITLE=$(gh issue view "$issue" --json title --jq '.title')
+              echo "  - #$issue: $TITLE"
+            done
+            exit 1
+          fi
+
+          echo "Milestone $VERSION has no open issues"
+
+          # Check if next milestone exists
+          CURRENT_VERSION=$(echo "$VERSION" | sed 's/^v//')
+          MAJOR=$(echo "$CURRENT_VERSION" | cut -d. -f1)
+          MINOR=$(echo "$CURRENT_VERSION" | cut -d. -f2)
+          PATCH=$(echo "$CURRENT_VERSION" | cut -d. -f3)
+
+          NEXT_PATCH="v${MAJOR}.${MINOR}.$((PATCH + 1))"
+          NEXT_MINOR="v${MAJOR}.$((MINOR + 1)).0"
+
+          FOUND_NEXT=false
+          for CANDIDATE in "$NEXT_MINOR" "$NEXT_PATCH"; do
+            if gh api repos/${{ github.repository }}/milestones --jq ".[].title" | grep -q "^${CANDIDATE}$"; then
+              echo "Next milestone $CANDIDATE exists"
+              FOUND_NEXT=true
+              break
+            fi
+          done
+
+          if [ "$FOUND_NEXT" = false ]; then
+            echo "Warning: No next milestone found ($NEXT_MINOR or $NEXT_PATCH)"
+            echo "Consider creating one for future work planning"
+          fi
+
+      - name: Post results summary
+        if: always()
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          VERSION=${TAG_NAME%-rc*}
+
+          echo "## Release Hygiene Check Results for $TAG_NAME" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Target Version:** $VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "**RC Tag:** $TAG_NAME" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "**All hygiene checks passed!**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Ready to merge and tag final release." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Some hygiene checks failed.**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Fix issues and tag a new RC." >> $GITHUB_STEP_SUMMARY
+          fi
