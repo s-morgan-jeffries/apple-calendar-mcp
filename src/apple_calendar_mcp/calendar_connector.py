@@ -690,7 +690,10 @@ class CalendarConnector:
         for cal_name in calendar_names:
             all_events.extend(self.get_events(cal_name, start_date, end_date))
 
-        merged = self._build_busy_blocks(all_events)
+        # Only busy/tentative events block availability — free events are excluded
+        busy_events = [e for e in all_events if e.get("availability", "busy") != "free"]
+
+        merged = self._build_busy_blocks(busy_events)
 
         free_slots = []
         cursor = range_start
