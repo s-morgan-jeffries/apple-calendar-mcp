@@ -8,9 +8,28 @@ version = "0.6.1"
 description = "MCP server for Apple Calendar integration"
 readme = "README.md"
 requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Morgan Jeffries"}]
+keywords = ["mcp", "apple-calendar", "calendar", "eventkit", "model-context-protocol"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business :: Scheduling",
+]
 dependencies = [
     "fastmcp>=2.12.0",
 ]
+
+[project.urls]
+Repository = "https://github.com/s-morgan-jeffries/apple-calendar-mcp"
+"Bug Tracker" = "https://github.com/s-morgan-jeffries/apple-calendar-mcp/issues"
 
 [project.optional-dependencies]
 dev = [
