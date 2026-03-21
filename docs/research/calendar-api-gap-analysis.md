@@ -169,6 +169,7 @@ All write operations implemented and tested via AppleScript:
 | Text search | ✅ | AppleScript works on small calendars, likely slow on large. EventKit: fast client-side filter. | Tested 2026-03-16 |
 | Attachments | ✅ | ❌ Not exposed via EventKit or AppleScript | Tested 2026-03-16 |
 | Calendar sharing | ✅ | Read-only: type, isSubscribed, isImmutable via EventKit | Tested 2026-03-16 |
+| Calendar visibility | ⚠️ | Private API only. `EKCalendar.isHidden` in runtime headers, not public docs. AppleScript has no support. | Researched 2026-03-20 |
 
 ---
 
@@ -299,6 +300,16 @@ Each occurrence exposes:
 - **Source:** iOS Runtime Headers (github.com/nst/iOS-Runtime-Headers, EKEvent.h)
 - **Risk:** Writing to undocumented properties may cause data corruption or iCloud/Exchange sync issues. Read-only use has similar risk profile to the calendar description KVC key (safe fallback to nil).
 - **Decision:** Not implementing. Revisit if Apple documents these properties publicly (#102).
+
+---
+
+## Calendar Visibility (researched 2026-03-20)
+
+- **AppleScript:** No `visible` or `hidden` property on calendars. AppleScript's Calendar dictionary only exposes `name`, `writable`, `description`, `color`. Attempting to access visibility properties fails silently or errors. Some users resort to UI scripting via System Events (simulating checkbox clicks), but this is fragile and not suitable for production.
+- **EventKit (private/undocumented):** `EKCalendar.isHidden` exists in iOS Runtime Headers (getter: `isHidden`, setter: `setHidden:`). This is a display preference, not calendar data — it controls the sidebar checkbox in Calendar.app.
+- **Source:** iOS Runtime Headers (github.com/nst/iOS-Runtime-Headers, EKCalendar.h), Automators Talk forum, MacScripter discussions.
+- **Risk:** Lower than travel time — visibility is a UI preference, not event data. If the property breaks, calendars and events are unaffected (calendar just reappears in the sidebar). However, visibility state may not sync across devices.
+- **Decision:** Not implementing. Same private API concern as travel time. Revisit if Apple documents publicly (#104).
 
 ---
 
