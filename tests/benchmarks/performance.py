@@ -97,17 +97,16 @@ def run_benchmarks(read_calendar: str, test_calendar: str):
     )
 
     # --- Write operations (test calendar only) ---
-    print(f"\n[create_event] (calendar: {test_calendar})")
+    print(f"\n[create_events] (calendar: {test_calendar})")
 
     created_uids = []
 
     def create_and_track():
-        uid = connector.create_event(
+        result = connector.create_events(
             calendar_name=test_calendar,
-            summary="Benchmark Event",
-            start_date="2027-06-15T10:00:00",
-            end_date="2027-06-15T11:00:00",
+            events=[{"summary": "Benchmark Event", "start": "2027-06-15T10:00:00", "end": "2027-06-15T11:00:00"}],
         )
+        uid = result["created"][0]["uid"]
         created_uids.append(uid)
         return uid
 
@@ -149,15 +148,12 @@ def run_benchmarks(read_calendar: str, test_calendar: str):
         created_uids.clear()
 
     # Batch delete benchmark (create 5, delete all)
-    batch_uids = []
-    for i in range(5):
-        uid = connector.create_event(
-            calendar_name=test_calendar,
-            summary=f"Batch Bench {i}",
-            start_date="2027-07-01T10:00:00",
-            end_date="2027-07-01T11:00:00",
-        )
-        batch_uids.append(uid)
+    batch_events = [
+        {"summary": f"Batch Bench {i}", "start": "2027-07-01T10:00:00", "end": "2027-07-01T11:00:00"}
+        for i in range(5)
+    ]
+    batch_result = connector.create_events(calendar_name=test_calendar, events=batch_events)
+    batch_uids = [c["uid"] for c in batch_result["created"]]
 
     benchmark(
         lambda: connector.delete_events(test_calendar, batch_uids),

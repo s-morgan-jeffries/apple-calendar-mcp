@@ -142,18 +142,16 @@ SCENARIOS = [
             "on my Work calendar."
         ),
         "expected": {
-            "tools": ["get_calendars", "create_event"],
+            "tools": ["get_calendars", "create_events"],
             "key_params": {
-                "create_event": {
+                "create_events": {
                     "calendar_name": "Work",
-                    "summary": "Team Standup",
-                    "start_date": "2026-03-21T10:00:00",
-                    "end_date": "2026-03-21T10:30:00",
                 }
             },
         },
         "scoring_notes": (
-            "PASS: Correct calendar, summary, ISO 8601 dates, 30min duration. "
+            "PASS: Uses create_events with a 1-element array containing correct summary, "
+            "ISO 8601 dates, and 30min duration. "
             "PARTIAL: Correct but missing get_calendars verification. "
             "FAIL: Wrong duration or missing required fields."
         ),
@@ -165,21 +163,17 @@ SCENARIOS = [
         "name": "Create an all-day event",
         "prompt": "Block off next Friday March 27 as a holiday on my Personal calendar.",
         "expected": {
-            "tools": ["create_event"],
+            "tools": ["create_events"],
             "key_params": {
-                "create_event": {
+                "create_events": {
                     "calendar_name": "Personal",
-                    "summary": "Holiday",
-                    "start_date": "2026-03-27",
-                    "end_date": "2026-03-28",
-                    "allday_event": True,
                 }
             },
         },
         "scoring_notes": (
-            "PASS: allday_event=True, date-only format, end date is day after start. "
-            "PARTIAL: allday_event=True but end date same as start. "
-            "FAIL: Doesn't set allday_event=True."
+            "PASS: Uses create_events with allday=true, date-only format. "
+            "PARTIAL: allday=true but end date same as start. "
+            "FAIL: Doesn't set allday=true."
         ),
         "safety_critical": False,
     },
@@ -193,21 +187,15 @@ SCENARIOS = [
             "https://docs.example.com/q3."
         ),
         "expected": {
-            "tools": ["create_event"],
+            "tools": ["create_events"],
             "key_params": {
-                "create_event": {
+                "create_events": {
                     "calendar_name": "Work",
-                    "summary": "Lunch Meeting",
-                    "start_date": "2026-03-24T12:00:00",
-                    "end_date": "2026-03-24T13:00:00",
-                    "location": "Cafe Roma",
-                    "notes": "Discuss Q3 roadmap",
-                    "url": "https://docs.example.com/q3",
                 }
             },
         },
         "scoring_notes": (
-            "PASS: All optional fields populated — location, notes, and url. "
+            "PASS: Uses create_events with all optional fields — location, notes, and url. "
             "PARTIAL: Missing one optional field. "
             "FAIL: Missing two or more optional fields or uses 'description' instead of 'notes'."
         ),
@@ -219,9 +207,9 @@ SCENARIOS = [
         "name": "Create event on ambiguous calendar",
         "prompt": "Add a birthday party on Saturday to my Family calendar.",
         "expected": {
-            "tools": ["get_calendars", "create_event"],
+            "tools": ["get_calendars", "create_events"],
             "key_params": {
-                "create_event": {
+                "create_events": {
                     "calendar_name": "Family",
                 }
             },
@@ -247,18 +235,17 @@ SCENARIOS = [
             "Wednesday at 2pm for an hour on my Work calendar."
         ),
         "expected": {
-            "tools": ["create_event"],
+            "tools": ["create_events"],
             "key_params": {
-                "create_event": {
-                    "summary": "Sprint Planning",
-                    "recurrence_rule": "FREQ=WEEKLY;BYDAY=MO,WE",
+                "create_events": {
+                    "calendar_name": "Work",
                 }
             },
         },
         "scoring_notes": (
-            "PASS: Valid RRULE with FREQ=WEEKLY and BYDAY=MO,WE. "
+            "PASS: Uses create_events with valid RRULE containing FREQ=WEEKLY and BYDAY=MO,WE. "
             "PARTIAL: RRULE has FREQ=WEEKLY but missing one day. "
-            "FAIL: No recurrence_rule or wrong frequency."
+            "FAIL: No recurrence or wrong frequency."
         ),
         "safety_critical": False,
     },
@@ -271,16 +258,15 @@ SCENARIOS = [
             "month at 3pm for 2 hours on my Work calendar."
         ),
         "expected": {
-            "tools": ["create_event"],
+            "tools": ["create_events"],
             "key_params": {
-                "create_event": {
-                    "summary": "Board Meeting",
-                    "recurrence_rule": "FREQ=MONTHLY;BYDAY=4TU",
+                "create_events": {
+                    "calendar_name": "Work",
                 }
             },
         },
         "scoring_notes": (
-            "PASS: RRULE contains FREQ=MONTHLY and BYDAY=4TU. "
+            "PASS: Uses create_events with RRULE containing FREQ=MONTHLY and BYDAY=4TU. "
             "PARTIAL: Correct frequency but wrong BYDAY syntax. "
             "FAIL: No recurrence or wrong frequency."
         ),
@@ -295,16 +281,15 @@ SCENARIOS = [
             "on my Work calendar. 12pm to 1pm."
         ),
         "expected": {
-            "tools": ["create_event"],
+            "tools": ["create_events"],
             "key_params": {
-                "create_event": {
-                    "summary": "Team Lunch",
-                    "recurrence_rule": "FREQ=WEEKLY;BYDAY=FR;UNTIL=20261225",
+                "create_events": {
+                    "calendar_name": "Work",
                 }
             },
         },
         "scoring_notes": (
-            "PASS: RRULE has FREQ=WEEKLY, BYDAY=FR, and UNTIL near Dec 25 2026. "
+            "PASS: Uses create_events with RRULE containing FREQ=WEEKLY, BYDAY=FR, and UNTIL near Dec 25 2026. "
             "PARTIAL: Missing UNTIL or wrong date format. "
             "FAIL: Wrong frequency or day."
         ),
@@ -319,16 +304,15 @@ SCENARIOS = [
             "1 hour on Work, for the next 6 months."
         ),
         "expected": {
-            "tools": ["create_event"],
+            "tools": ["create_events"],
             "key_params": {
-                "create_event": {
-                    "summary": "Month-End Review",
-                    "recurrence_rule": "FREQ=MONTHLY;BYDAY=-1FR;COUNT=6",
+                "create_events": {
+                    "calendar_name": "Work",
                 }
             },
         },
         "scoring_notes": (
-            "PASS: RRULE has BYDAY=-1FR and COUNT=6 or appropriate UNTIL. "
+            "PASS: Uses create_events with RRULE containing BYDAY=-1FR and COUNT=6 or appropriate UNTIL. "
             "PARTIAL: Correct BYDAY but missing COUNT/UNTIL. "
             "FAIL: Wrong BYDAY syntax (e.g., 4FR instead of -1FR)."
         ),
@@ -343,16 +327,15 @@ SCENARIOS = [
             "starting next month, for 3 hours. Put it on Work."
         ),
         "expected": {
-            "tools": ["create_event"],
+            "tools": ["create_events"],
             "key_params": {
-                "create_event": {
-                    "summary": "Quarterly Planning Session",
-                    "recurrence_rule": "FREQ=MONTHLY;INTERVAL=3;BYDAY=2WE",
+                "create_events": {
+                    "calendar_name": "Work",
                 }
             },
         },
         "scoring_notes": (
-            "PASS: RRULE has FREQ=MONTHLY, INTERVAL=3, BYDAY=2WE. "
+            "PASS: Uses create_events with RRULE containing FREQ=MONTHLY, INTERVAL=3, BYDAY=2WE. "
             "PARTIAL: Missing INTERVAL or wrong nth weekday. "
             "FAIL: Uses FREQ=YEARLY or no recurrence."
         ),
@@ -389,20 +372,19 @@ SCENARIOS = [
     {
         "id": 17,
         "category": "Batch Operations",
-        "name": "Single event should not use batch",
+        "name": "Single event uses create_events",
         "prompt": "Add a dentist appointment to my Personal calendar on Friday at 2pm for an hour.",
         "expected": {
-            "tools": ["create_event"],
+            "tools": ["create_events"],
             "key_params": {
-                "create_event": {
+                "create_events": {
                     "calendar_name": "Personal",
-                    "summary": "Dentist Appointment",
                 }
             },
         },
         "scoring_notes": (
-            "PASS: Uses create_event (singular) for a single event. "
-            "FAIL: Uses create_events (batch) for a single event."
+            "PASS: Uses create_events with a 1-element array. "
+            "FAIL: Tries to call a non-existent create_event tool."
         ),
         "safety_critical": False,
     },
@@ -751,22 +733,20 @@ SCENARIOS = [
         "expected": {
             "tools": [
                 "get_events", "delete_events", "update_event",
-                "create_event", "delete_events",
+                "create_events", "delete_events",
             ],
             "key_params": {
                 "update_event": {
                     "start_date": "2026-03-24T15:00:00",
                 },
-                "create_event": {
+                "create_events": {
                     "calendar_name": "Work",
-                    "summary": "Lunch with Sarah",
-                    "start_date": "2026-03-25T12:00:00",
                 },
             },
         },
         "scoring_notes": (
             "PASS: Calls get_events first to find UIDs, then uses correct tools for each "
-            "operation (delete, update, create, delete). "
+            "operation (delete, update, create_events, delete). "
             "PARTIAL: Correct tools but skips get_events (guesses UIDs). "
             "FAIL: Tries to create/update without finding UIDs first."
         ),
@@ -808,17 +788,15 @@ SCENARIOS = [
             "and add it to Personal not Work."
         ),
         "expected": {
-            "tools": ["create_event"],
+            "tools": ["create_events"],
             "key_params": {
-                "create_event": {
+                "create_events": {
                     "calendar_name": "Personal",
-                    "summary": "Team Dinner",
-                    "start_date": "2026-03-27T19:30:00",
                 }
             },
         },
         "scoring_notes": (
-            "PASS: Uses corrected time (19:30) and calendar (Personal). "
+            "PASS: Uses create_events with corrected time (19:30) and calendar (Personal). "
             "PARTIAL: Correct calendar but wrong time, or vice versa. "
             "FAIL: Uses initial values (19:00 or Work)."
         ),
@@ -866,18 +844,16 @@ SCENARIOS = [
             "next week, for 12 weeks."
         ),
         "expected": {
-            "tools": ["create_event"],
+            "tools": ["create_events"],
             "key_params": {
-                "create_event": {
-                    "summary": "Team Sync",
-                    "start_date": "2026-03-25T14:00:00",
-                    "end_date": "2026-03-25T14:30:00",
-                    "recurrence_rule": "FREQ=WEEKLY;INTERVAL=2;BYDAY=WE;COUNT=12",
+                "create_events": {
+                    "calendar_name": "Work",
                 }
             },
         },
         "scoring_notes": (
-            "PASS: RRULE has all 4 components: FREQ=WEEKLY, INTERVAL=2, BYDAY=WE, COUNT=12. "
+            "PASS: Uses create_events with RRULE containing all 4 components: "
+            "FREQ=WEEKLY, INTERVAL=2, BYDAY=WE, COUNT=12. "
             "PARTIAL: Missing COUNT or INTERVAL. "
             "FAIL: Wrong frequency or wrong day."
         ),
@@ -896,17 +872,15 @@ SCENARIOS = [
             "I'm in US Pacific."
         ),
         "expected": {
-            "tools": ["create_event"],
+            "tools": ["create_events"],
             "key_params": {
-                "create_event": {
-                    "summary": "Call with Tokyo Office",
-                    "start_date": "2026-03-24T09:00:00",
-                    "timezone": "Asia/Tokyo",
+                "create_events": {
+                    "calendar_name": "Work",
                 }
             },
         },
         "scoring_notes": (
-            "PASS: Uses timezone='Asia/Tokyo' with 09:00 start. "
+            "PASS: Uses create_events with timezone='Asia/Tokyo' and 09:00 start. "
             "PARTIAL: Converts to local Pacific time manually (e.g., 4pm or 5pm PT). "
             "FAIL: Ignores timezone entirely or uses wrong timezone identifier."
         ),

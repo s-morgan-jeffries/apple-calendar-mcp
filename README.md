@@ -11,7 +11,7 @@ A comprehensive, fast, reliable, and agent-friendly [MCP](https://modelcontextpr
 
 ### Comprehensive
 
-12 tools covering the full calendar lifecycle — more than any other dedicated Apple Calendar MCP server. Full CRUD for events and calendars, plus batch operations (`create_events`, `update_events`), text search, smart availability with working hours and minimum duration filters, and conflict detection. Complete recurring event support with iCalendar RRULE — create, update, and delete individual occurrences or entire series.
+11 tools covering the full calendar lifecycle — more than any other dedicated Apple Calendar MCP server. Full CRUD for events and calendars, plus batch operations (`create_events`, `update_events`), text search, smart availability with working hours and minimum duration filters, and conflict detection. Complete recurring event support with iCalendar RRULE — create, update, and delete individual occurrences or entire series.
 
 ### Fast
 
@@ -32,7 +32,7 @@ All event operations use Swift/EventKit via native subprocess for sub-second per
 
 ### Agent-Friendly
 
-Every tool docstring includes detailed `Returns` sections documenting fields, types, and chaining info — so Claude knows that `create_event` returns a UID usable by `update_event` without guessing. 38 blind agent eval scenarios validate tool usability across multiple models.
+Every tool docstring includes detailed `Returns` sections documenting fields, types, and chaining info — so Claude knows that `create_events` returns UIDs usable by `update_events` without guessing. 38 blind agent eval scenarios validate tool usability across multiple models.
 
 | Model | Score | Safety |
 |-------|-------|--------|
@@ -44,7 +44,7 @@ Every tool docstring includes detailed `Returns` sections documenting fields, ty
 
 All models pass all safety-critical scenarios. [Full results](evals/agent_tool_usability/results/scored_results.md).
 
-## Tools (12)
+## Tools (11)
 
 ### Calendars
 
@@ -60,8 +60,7 @@ All models pass all safety-critical scenarios. [Full results](evals/agent_tool_u
 |------|-------------|
 | `get_events` | Query events in a date range |
 | `search_events` | Search events by text across one or all calendars |
-| `create_event` | Create an event with title, dates, location, notes, URL, recurrence, alerts, availability, timezone |
-| `create_events` | Batch create multiple events in one operation |
+| `create_events` | Create one or more events in one operation |
 | `update_event` | Update any event field by UID (only provided fields change) |
 | `update_events` | Batch update multiple events in one operation |
 | `delete_events` | Delete one or more events by UID |

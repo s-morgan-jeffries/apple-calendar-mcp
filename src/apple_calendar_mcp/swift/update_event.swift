@@ -122,7 +122,7 @@ func parseISO8601(_ str: String, timeZone: TimeZone? = nil) -> Date? {
     return nil
 }
 
-// MARK: - Recurrence Rule Parsing (duplicated from create_event.swift — Swift scripts can't share code)
+// MARK: - Recurrence Rule Parsing (duplicated from create_events.swift — Swift scripts can't share code)
 
 func parseDayOfWeek(_ day: String) -> EKRecurrenceDayOfWeek? {
     let dayMap: [String: EKWeekday] = [
