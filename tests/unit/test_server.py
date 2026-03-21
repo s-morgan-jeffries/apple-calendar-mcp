@@ -602,3 +602,502 @@ class TestServerConfiguration:
 
     def test_server_name(self):
         assert mcp.name == "apple-calendar-mcp"
+
+
+class TestParseAlertMinutes:
+    """Tests for the _parse_alert_minutes helper."""
+
+    def test_valid_single_value(self):
+        from apple_calendar_mcp.server_fastmcp import _parse_alert_minutes
+        assert _parse_alert_minutes("15") == [15]
+
+    def test_valid_multiple_values(self):
+        from apple_calendar_mcp.server_fastmcp import _parse_alert_minutes
+        assert _parse_alert_minutes("15,60") == [15, 60]
+
+    def test_whitespace_handling(self):
+        from apple_calendar_mcp.server_fastmcp import _parse_alert_minutes
+        assert _parse_alert_minutes(" 15 , 60 ") == [15, 60]
+
+    def test_empty_string_returns_none(self):
+        from apple_calendar_mcp.server_fastmcp import _parse_alert_minutes
+        assert _parse_alert_minutes("") is None
+
+    def test_invalid_value_raises_error(self):
+        from apple_calendar_mcp.server_fastmcp import _parse_alert_minutes
+        with pytest.raises(ValueError, match="comma-separated integers"):
+            _parse_alert_minutes("15,abc")
+
+    def test_all_invalid_raises_error(self):
+        from apple_calendar_mcp.server_fastmcp import _parse_alert_minutes
+        with pytest.raises(ValueError, match="comma-separated integers"):
+            _parse_alert_minutes("not_a_number")
+
+
+class TestFormatCalendarDescription:
+    """Tests for _format_calendar with description field."""
+
+    def test_calendar_with_description(self):
+        from apple_calendar_mcp.server_fastmcp import _format_calendar
+        cal = {"name": "Work", "writable": True, "description": "My work calendar", "color": "#FF0000"}
+        result = _format_calendar(cal)
+        assert "Description: My work calendar" in result
+
+    def test_calendar_without_description(self):
+        from apple_calendar_mcp.server_fastmcp import _format_calendar
+        cal = {"name": "Work", "writable": True, "description": "", "color": "#FF0000"}
+        result = _format_calendar(cal)
+        assert "Description" not in result
+
+
+class TestFormatEventDetails:
+    """Tests for _format_event_details, _format_alerts, and _format_recurrence."""
+
+    def test_allday_event(self):
+        from apple_calendar_mcp.server_fastmcp import _format_event_details
+        event = {"allday_event": True}
+        lines = _format_event_details(event)
+        assert "All-day event" in lines
+
+    def test_non_allday_event(self):
+        from apple_calendar_mcp.server_fastmcp import _format_event_details
+        event = {"allday_event": False}
+        lines = _format_event_details(event)
+        assert "All-day event" not in lines
+
+    def test_availability_free(self):
+        from apple_calendar_mcp.server_fastmcp import _format_event_details
+        event = {"availability": "free"}
+        lines = _format_event_details(event)
+        assert "Availability: free" in lines
+
+    def test_availability_busy_not_shown(self):
+        from apple_calendar_mcp.server_fastmcp import _format_event_details
+        event = {"availability": "busy"}
+        lines = _format_event_details(event)
+        assert all("Availability" not in line for line in lines)
+
+    def test_format_alerts(self):
+        from apple_calendar_mcp.server_fastmcp import _format_alerts
+        alerts = [{"minutes_before": 15}, {"minutes_before": 60}]
+        lines = _format_alerts(alerts)
+        assert len(lines) == 1
+        assert "15m before" in lines[0]
+        assert "60m before" in lines[0]
+
+    def test_format_alerts_empty(self):
+        from apple_calendar_mcp.server_fastmcp import _format_alerts
+        assert _format_alerts([]) == []
+
+    def test_format_recurrence_not_recurring(self):
+        from apple_calendar_mcp.server_fastmcp import _format_recurrence
+        event = {"is_recurring": False}
+        assert _format_recurrence(event) == []
+
+    def test_format_recurrence_detached(self):
+        from apple_calendar_mcp.server_fastmcp import _format_recurrence
+        event = {"is_recurring": True, "recurrence_rule": "FREQ=DAILY", "is_detached": True}
+        lines = _format_recurrence(event)
+        assert any("detached" in line.lower() for line in lines)
+
+
+class TestCreateEventsTool:
+    """Tests for the create_events MCP tool (batch)."""
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_batch_create_success(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.create_events.return_value = {
+            "created": [
+                {"summary": "Event A", "uid": "UID-A"},
+                {"summary": "Event B", "uid": "UID-B"},
+            ],
+            "errors": [],
+        }
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import create_events
+        events_json = json.dumps([
+            {"summary": "Event A", "start": "2026-03-15T10:00:00", "end": "2026-03-15T11:00:00"},
+            {"summary": "Event B", "start": "2026-03-15T12:00:00", "end": "2026-03-15T13:00:00"},
+        ])
+        result = create_events(calendar_name="Work", events=events_json)
+        assert "Created 2 event(s)" in result
+        assert "Event A" in result
+        assert "UID-A" in result
+        assert "Event B" in result
+        assert isinstance(result, str)
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_batch_create_error(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.create_events.side_effect = Exception("Calendar not found")
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import create_events
+        events_json = json.dumps([
+            {"summary": "Event A", "start": "2026-03-15T10:00:00", "end": "2026-03-15T11:00:00"},
+        ])
+        result = create_events(calendar_name="Nonexistent", events=events_json)
+        assert "Error" in result
+        assert isinstance(result, str)
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_batch_create_partial_success(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.create_events.return_value = {
+            "created": [{"summary": "Event A", "uid": "UID-A"}],
+            "errors": [{"index": 1, "summary": "Event B", "error": "Invalid date"}],
+        }
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import create_events
+        events_json = json.dumps([
+            {"summary": "Event A", "start": "2026-03-15T10:00:00", "end": "2026-03-15T11:00:00"},
+            {"summary": "Event B", "start": "bad-date", "end": "bad-date"},
+        ])
+        result = create_events(calendar_name="Work", events=events_json)
+        assert "Created 1 event(s)" in result
+        assert "1 error(s)" in result
+        assert "Invalid date" in result
+
+    def test_invalid_json(self):
+        from apple_calendar_mcp.server_fastmcp import create_events
+        result = create_events(calendar_name="Work", events="not json")
+        assert "Error" in result
+        assert "invalid JSON" in result
+
+    def test_non_array_json(self):
+        from apple_calendar_mcp.server_fastmcp import create_events
+        result = create_events(calendar_name="Work", events='{"summary": "test"}')
+        assert "Error" in result
+        assert "JSON array" in result
+
+
+class TestUpdateEventsTool:
+    """Tests for the update_events MCP tool (batch)."""
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_batch_update_success(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.update_events.return_value = {
+            "updated": [
+                {"summary": "Event A", "updated_fields": ["start", "end"]},
+                {"summary": "Event B", "updated_fields": ["location"]},
+            ],
+            "errors": [],
+        }
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import update_events
+        updates_json = json.dumps([
+            {"uid": "UID-A", "start": "2026-03-15T11:00:00", "end": "2026-03-15T12:00:00"},
+            {"uid": "UID-B", "location": "Room B"},
+        ])
+        result = update_events(calendar_name="Work", updates=updates_json)
+        assert "Updated 2 event(s)" in result
+        assert "Event A" in result
+        assert "start, end" in result
+        assert "location" in result
+        assert isinstance(result, str)
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_batch_update_error(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.update_events.side_effect = Exception("Calendar not found")
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import update_events
+        updates_json = json.dumps([{"uid": "UID-A", "summary": "New"}])
+        result = update_events(calendar_name="Nonexistent", updates=updates_json)
+        assert "Error" in result
+        assert isinstance(result, str)
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_batch_update_partial_with_errors(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.update_events.return_value = {
+            "updated": [{"summary": "Event A", "updated_fields": ["summary"]}],
+            "errors": [{"index": 1, "uid": "UID-B", "error": "Event not found"}],
+        }
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import update_events
+        updates_json = json.dumps([
+            {"uid": "UID-A", "summary": "New A"},
+            {"uid": "UID-B", "summary": "New B"},
+        ])
+        result = update_events(calendar_name="Work", updates=updates_json)
+        assert "Updated 1 event(s)" in result
+        assert "1 error(s)" in result
+        assert "Event not found" in result
+
+    def test_invalid_json(self):
+        from apple_calendar_mcp.server_fastmcp import update_events
+        result = update_events(calendar_name="Work", updates="not json")
+        assert "Error" in result
+        assert "invalid JSON" in result
+
+    def test_non_array_json(self):
+        from apple_calendar_mcp.server_fastmcp import update_events
+        result = update_events(calendar_name="Work", updates='{"uid": "test"}')
+        assert "Error" in result
+        assert "JSON array" in result
+
+
+class TestSearchEventsTool:
+    """Tests for the search_events MCP tool."""
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_search_with_results(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.search_events.return_value = [
+            {"uid": "S-123", "summary": "Team Standup", "start_date": "2026-03-15T09:00:00",
+             "end_date": "2026-03-15T09:30:00", "allday_event": False, "location": "",
+             "notes": "", "url": "", "status": "confirmed", "calendar_name": "Work"},
+        ]
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import search_events
+        result = search_events(query="standup", calendar_name="Work")
+        assert "Found 1 event(s)" in result
+        assert "Team Standup" in result
+        assert "in 'Work'" in result
+        assert isinstance(result, str)
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_search_no_results_specific_calendar(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.search_events.return_value = []
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import search_events
+        result = search_events(query="nonexistent", calendar_name="Work")
+        assert "No events matching" in result
+        assert "in 'Work'" in result
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_search_no_results_all_calendars(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.search_events.return_value = []
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import search_events
+        result = search_events(query="nonexistent")
+        assert "No events matching" in result
+        assert "across all calendars" in result
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_search_error(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.search_events.side_effect = Exception("Search failed")
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import search_events
+        result = search_events(query="test")
+        assert "Error" in result
+        assert isinstance(result, str)
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_search_passes_none_for_empty_optional_params(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.search_events.return_value = []
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import search_events
+        search_events(query="test")
+        mock_client.search_events.assert_called_once_with(
+            query="test",
+            calendar_name=None,
+            start_date=None,
+            end_date=None,
+        )
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_search_results_across_all_calendars(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.search_events.return_value = [
+            {"uid": "S-1", "summary": "Lunch", "start_date": "2026-03-15T12:00:00",
+             "end_date": "2026-03-15T13:00:00", "allday_event": False, "location": "",
+             "notes": "", "url": "", "status": "confirmed", "calendar_name": "Personal"},
+        ]
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import search_events
+        result = search_events(query="lunch")
+        assert "across all calendars" in result
+
+
+class TestGetConflictsTool:
+    """Tests for the get_conflicts MCP tool."""
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_conflicts_found(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.get_conflicts.return_value = [
+            {
+                "event_a": {"summary": "Meeting A", "calendar_name": "Work",
+                            "start_date": "2026-03-15T10:00:00", "end_date": "2026-03-15T11:00:00"},
+                "event_b": {"summary": "Meeting B", "calendar_name": "Work",
+                            "start_date": "2026-03-15T10:30:00", "end_date": "2026-03-15T11:30:00"},
+                "overlap_start": "2026-03-15T10:30:00",
+                "overlap_end": "2026-03-15T11:00:00",
+                "overlap_minutes": 30,
+            }
+        ]
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import get_conflicts
+        result = get_conflicts(calendar_names=["Work"], start_date="2026-03-15T00:00:00", end_date="2026-03-16T00:00:00")
+        assert "Found 1 conflict(s)" in result
+        assert "Meeting A" in result
+        assert "Meeting B" in result
+        assert "30 min overlap" in result
+        assert isinstance(result, str)
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_no_conflicts(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.get_conflicts.return_value = []
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import get_conflicts
+        result = get_conflicts(calendar_names=["Work"], start_date="2026-03-15T00:00:00", end_date="2026-03-16T00:00:00")
+        assert "No conflicts found" in result
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_conflicts_error(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.get_conflicts.side_effect = Exception("Calendar not found")
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import get_conflicts
+        result = get_conflicts(calendar_names=["Bad"], start_date="2026-03-15T00:00:00", end_date="2026-03-16T00:00:00")
+        assert "Error" in result
+        assert isinstance(result, str)
+
+
+class TestUpdateEventToolBranches:
+    """Tests for uncovered branches in the update_event tool."""
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_alert_minutes_none_clears_alerts(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.update_event.return_value = {"uid": "ABC-123", "updated_fields": ["alert_minutes"]}
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import update_event
+        result = update_event(calendar_name="Work", event_uid="ABC-123", alert_minutes="none")
+        call_kwargs = mock_client.update_event.call_args[1]
+        assert call_kwargs["alert_minutes"] == []
+        assert "ABC-123" in result
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_alert_minutes_parsed(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.update_event.return_value = {"uid": "ABC-123", "updated_fields": ["alert_minutes"]}
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import update_event
+        update_event(calendar_name="Work", event_uid="ABC-123", alert_minutes="15,60")
+        call_kwargs = mock_client.update_event.call_args[1]
+        assert call_kwargs["alert_minutes"] == [15, 60]
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_recurrence_rule_passed_through(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.update_event.return_value = {"uid": "ABC-123", "updated_fields": ["recurrence_rule"]}
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import update_event
+        update_event(calendar_name="Work", event_uid="ABC-123", recurrence_rule="FREQ=DAILY")
+        call_kwargs = mock_client.update_event.call_args[1]
+        assert call_kwargs["recurrence_rule"] == "FREQ=DAILY"
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_recurrence_rule_empty_string_clears(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.update_event.return_value = {"uid": "ABC-123", "updated_fields": ["recurrence_rule"]}
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import update_event
+        update_event(calendar_name="Work", event_uid="ABC-123", recurrence_rule="")
+        call_kwargs = mock_client.update_event.call_args[1]
+        assert call_kwargs["recurrence_rule"] == ""
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_timezone_and_occurrence_date_passed(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.update_event.return_value = {"uid": "ABC-123", "updated_fields": ["start_date"]}
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import update_event
+        update_event(
+            calendar_name="Work", event_uid="ABC-123",
+            start_date="2026-03-15T10:00:00",
+            timezone="America/Los_Angeles",
+            occurrence_date="2026-03-15T09:00:00",
+            span="future_events",
+        )
+        call_kwargs = mock_client.update_event.call_args[1]
+        assert call_kwargs["timezone"] == "America/Los_Angeles"
+        assert call_kwargs["occurrence_date"] == "2026-03-15T09:00:00"
+        assert call_kwargs["span"] == "future_events"
+
+
+class TestDeleteEventsToolBranches:
+    """Tests for uncovered branches in the delete_events tool."""
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_single_uid_string_passed_directly(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.delete_events.return_value = {
+            "deleted_uids": ["UID-1"],
+            "not_found_uids": [],
+        }
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import delete_events
+        result = delete_events(calendar_name="Work", event_uid="UID-1")
+        # event_uid is passed as-is (string) to event_uids
+        mock_client.delete_events.assert_called_once_with(
+            calendar_name="Work",
+            event_uids="UID-1",
+            span="this_event",
+            occurrence_date=None,
+        )
+        assert "Deleted 1 event(s)" in result
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_occurrence_date_and_span_passed(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.delete_events.return_value = {
+            "deleted_uids": ["UID-1"],
+            "not_found_uids": [],
+        }
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import delete_events
+        delete_events(
+            calendar_name="Work", event_uid="UID-1",
+            span="future_events",
+            occurrence_date="2026-03-15T09:00:00",
+        )
+        call_kwargs = mock_client.delete_events.call_args[1]
+        assert call_kwargs["span"] == "future_events"
+        assert call_kwargs["occurrence_date"] == "2026-03-15T09:00:00"
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_not_found_uids_reported(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.delete_events.return_value = {
+            "deleted_uids": [],
+            "not_found_uids": ["UID-GONE"],
+        }
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import delete_events
+        result = delete_events(calendar_name="Work", event_uid="UID-GONE")
+        assert "Deleted 0 event(s)" in result
+        assert "Not found" in result
+        assert "UID-GONE" in result
