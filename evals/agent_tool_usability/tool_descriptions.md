@@ -72,48 +72,21 @@ For a single event, pass an array with one element. All events go to the same ca
 
 ---
 
-### update_event
+### update_events
 
-Update an existing event's properties by UID.
+Update one or more events in a calendar.
 
-Only provided fields are updated; omitted fields are left unchanged. To clear a text field (location, notes, url), pass an empty string "".
+For a single event, pass an array with one element. Only provided fields are updated; omitted fields are left unchanged. To clear a text field, use the clear_* boolean flags.
 
 Use get_events first to find the event's UID and calendar_name.
 
 For recurring events: use occurrence_date to target a specific occurrence, and span to control whether the change affects just this occurrence or the series.
 
 **Parameters:**
-- `calendar_name` (str, required): Exact name of the calendar containing the event
-- `event_uid` (str, required): UID of the event to update (from get_events results)
-- `summary` (str | None, optional, default: None): New event title
-- `start_date` (str | None, optional, default: None): New start date/time in ISO 8601 format
-- `end_date` (str | None, optional, default: None): New end date/time in ISO 8601 format
-- `location` (str | None, optional, default: None): New location, or "" to clear
-- `notes` (str | None, optional, default: None): New notes, or "" to clear
-- `url` (str | None, optional, default: None): New URL, or "" to clear
-- `allday_event` (bool | None, optional, default: None): New all-day status. When true, end_date is the last day (inclusive).
-- `alert_minutes` (str, optional, default: ""): Comma-separated minutes before event to alert (e.g., "15,60"), or "none" to clear all alerts
-- `availability` (str | None, optional, default: None): Event availability: "free", "busy", or "tentative"
-- `timezone` (str, optional, default: ""): IANA timezone for interpreting start/end times (e.g., "America/Los_Angeles", "US/Eastern"). When provided, times are interpreted in that timezone instead of the system's local timezone.
-- `recurrence_rule` (str | None, optional, default: None): iCalendar RRULE string to set/change recurrence (e.g., "FREQ=WEEKLY;BYDAY=MO,WE,FR"), or "" to remove recurrence
-- `occurrence_date` (str, optional, default: ""): For recurring events, the occurrence_date from get_events to target a specific occurrence
-- `span` (str, optional, default: "this_event"): "this_event" to update one occurrence, "future_events" to update this and all future occurrences
-
-**Returns:** Confirmation with the event UID and list of updated fields. Note: when rescheduling a single occurrence of a recurring event (changing dates with span="this_event"), a new standalone event is created — the returned UID may differ from the original.
-
----
-
-### update_events
-
-Update multiple events in a single batch operation.
-
-More efficient than calling update_event multiple times. All events must be on the same calendar.
-
-**Parameters:**
 - `calendar_name` (str, required): Exact name of the calendar containing the events
-- `updates` (str, required): JSON array of update objects. Each object must have "uid" (required) and at least one field to update: summary, start (ISO 8601), end (ISO 8601), location, notes, url, allday (bool — when true, end is the last day inclusive), alerts (list of minutes), availability ("free"/"busy"/"tentative"), timezone (IANA identifier), recurrence (RRULE string), clear_location (bool), clear_notes (bool), clear_url (bool), clear_alerts (bool), clear_recurrence (bool)
+- `updates` (str, required): JSON array of update objects. Each object must have "uid" (required) and at least one field to update: summary, start (ISO 8601), end (ISO 8601), location, notes, url, allday (bool), alerts (list of minutes), availability ("free"/"busy"/"tentative"), timezone (IANA identifier), recurrence (RRULE string), clear_location (bool), clear_notes (bool), clear_url (bool), clear_alerts (bool), clear_recurrence (bool). For recurring events: occurrence_date (ISO 8601) to target specific occurrence, span ("this_event" or "future_events", default "this_event").
 
-**Returns:** Summary of updated events, each with title and list of changed fields. Any per-event errors are listed separately. Partial success is possible.
+**Returns:** Summary of updated events, each with title and list of changed fields. Any per-event errors are listed separately. Partial success is possible. Note: when rescheduling a recurring event occurrence (changing dates with span="this_event"), a new standalone event is created — the returned UID may differ.
 
 ---
 
@@ -128,7 +101,7 @@ Returns all events in the specified calendar that overlap with the given date ra
 - `start_date` (str, required): Start of date range in ISO 8601 format (e.g., "2026-03-15" or "2026-03-15T00:00:00")
 - `end_date` (str, required): End of date range in ISO 8601 format (must be after start_date)
 
-**Returns:** Each event includes: uid, summary, start_date, end_date, allday_event, location, notes, url, status, calendar_name, availability. For all-day events, end_date is the last day of the event (inclusive). For recurring events: is_recurring, recurrence_rule, occurrence_date, is_detached. If alerts are set: alerts (list with minutes_before for each). If attendees exist: attendees (list with name, email, role, status for each). `uid` and `calendar_name` identify the event for update_event and delete_events. For recurring events, also use `occurrence_date` to target a specific occurrence.
+**Returns:** Each event includes: uid, summary, start_date, end_date, allday_event, location, notes, url, status, calendar_name, availability. For all-day events, end_date is the last day of the event (inclusive). For recurring events: is_recurring, recurrence_rule, occurrence_date, is_detached. If alerts are set: alerts (list with minutes_before for each). If attendees exist: attendees (list with name, email, role, status for each). `uid` and `calendar_name` identify the event for update_events and delete_events. For recurring events, also use `occurrence_date` to target a specific occurrence.
 
 ---
 

@@ -474,15 +474,15 @@ SCENARIOS = [
         "name": "Simple field update (rename)",
         "prompt": "Change the title of my 2pm meeting today to 'Project Review'.",
         "expected": {
-            "tools": ["get_events", "update_event"],
+            "tools": ["get_events", "update_events"],
             "key_params": {
-                "update_event": {
+                "update_events": {
                     "summary": "Project Review",
                 }
             },
         },
         "scoring_notes": (
-            "PASS: Calls get_events to find UID, then update_event with only summary changed. "
+            "PASS: Calls get_events to find UID, then update_events with only summary changed. "
             "PARTIAL: Correct tools but modifies extra fields unnecessarily. "
             "FAIL: Fabricates a UID or uses delete+create."
         ),
@@ -494,9 +494,9 @@ SCENARIOS = [
         "name": "Update location (not time)",
         "prompt": "Move my 'Team Standup' event to Conference Room B.",
         "expected": {
-            "tools": ["get_events", "update_event"],
+            "tools": ["get_events", "update_events"],
             "key_params": {
-                "update_event": {
+                "update_events": {
                     "location": "Conference Room B",
                 }
             },
@@ -513,9 +513,9 @@ SCENARIOS = [
         "name": "Clear a field with empty string",
         "prompt": "Remove the location from my dentist appointment.",
         "expected": {
-            "tools": ["get_events", "update_event"],
+            "tools": ["get_events", "update_events"],
             "key_params": {
-                "update_event": {
+                "update_events": {
                     "location": "",
                 }
             },
@@ -532,9 +532,9 @@ SCENARIOS = [
         "name": "Reschedule preserving duration",
         "prompt": "Move my 10am meeting to 3pm today.",
         "expected": {
-            "tools": ["get_events", "update_event"],
+            "tools": ["get_events", "update_events"],
             "key_params": {
-                "update_event": {
+                "update_events": {
                     "start_date": "2026-03-20T15:00:00",
                     "end_date": "2026-03-20T16:00:00",
                 }
@@ -543,7 +543,7 @@ SCENARIOS = [
         "scoring_notes": (
             "PASS: Updates BOTH start_date and end_date, preserves original duration. "
             "PARTIAL: Updates start_date only (end_date not adjusted). "
-            "FAIL: Uses delete+create instead of update_event."
+            "FAIL: Uses delete+create instead of update_events."
         ),
         "safety_critical": False,
     },
@@ -553,9 +553,9 @@ SCENARIOS = [
         "name": "Make event recurring",
         "prompt": "Make my 'Team Sync' event on Monday repeat every week.",
         "expected": {
-            "tools": ["get_events", "update_event"],
+            "tools": ["get_events", "update_events"],
             "key_params": {
-                "update_event": {
+                "update_events": {
                     "recurrence_rule": "FREQ=WEEKLY",
                 }
             },
@@ -575,9 +575,9 @@ SCENARIOS = [
             "two weeks instead."
         ),
         "expected": {
-            "tools": ["get_events", "update_event"],
+            "tools": ["get_events", "update_events"],
             "key_params": {
-                "update_event": {
+                "update_events": {
                     "recurrence_rule": "FREQ=WEEKLY;INTERVAL=2",
                 }
             },
@@ -595,9 +595,9 @@ SCENARIOS = [
         "name": "Remove recurrence",
         "prompt": "Stop my 'Daily Standup' from repeating. Just keep the next occurrence.",
         "expected": {
-            "tools": ["get_events", "update_event"],
+            "tools": ["get_events", "update_events"],
             "key_params": {
-                "update_event": {
+                "update_events": {
                     "recurrence_rule": "",
                 }
             },
@@ -617,9 +617,9 @@ SCENARIOS = [
             "until the end of 2027."
         ),
         "expected": {
-            "tools": ["get_events", "update_event"],
+            "tools": ["get_events", "update_events"],
             "key_params": {
-                "update_event": {
+                "update_events": {
                     "recurrence_rule": "FREQ=MONTHLY;INTERVAL=3;BYDAY=2TH;UNTIL=20271231",
                 }
             },
@@ -732,11 +732,11 @@ SCENARIOS = [
         ),
         "expected": {
             "tools": [
-                "get_events", "delete_events", "update_event",
+                "get_events", "delete_events", "update_events",
                 "create_events", "delete_events",
             ],
             "key_params": {
-                "update_event": {
+                "update_events": {
                     "start_date": "2026-03-24T15:00:00",
                 },
                 "create_events": {

@@ -30,6 +30,41 @@ def connector():
     return CalendarConnector(enable_safety_checks=True)
 
 
+def _update_single_event(connector, calendar_name, event_uid, **kwargs):
+    """Update a single event via update_events and return the result."""
+    update = {"uid": event_uid}
+    field_map = {
+        "summary": "summary", "start_date": "start", "end_date": "end",
+        "location": "location", "notes": "notes", "url": "url",
+        "allday_event": "allday", "availability": "availability",
+        "timezone": "timezone", "recurrence_rule": "recurrence",
+        "occurrence_date": "occurrence_date", "span": "span",
+    }
+    for py_key, json_key in field_map.items():
+        if py_key in kwargs and kwargs[py_key] is not None:
+            value = kwargs[py_key]
+            # Handle special cases
+            if py_key == "location" and value == "":
+                update["clear_location"] = True
+                continue
+            if py_key == "recurrence_rule" and value == "":
+                update["clear_recurrence"] = True
+                continue
+            if py_key == "allday_event":
+                update[json_key] = value  # already bool
+                continue
+            update[json_key] = value
+    if "alert_minutes" in kwargs:
+        if kwargs["alert_minutes"] == []:
+            update["clear_alerts"] = True
+        else:
+            update["alerts"] = kwargs["alert_minutes"]
+    result = connector.update_events(calendar_name, [update])
+    if result.get("errors"):
+        raise ValueError(result["errors"][0].get("error", "Unknown error"))
+    return result["updated"][0] if result.get("updated") else {}
+
+
 def _delete_event_by_uid(uid: str):
     """Clean up a created event by UID."""
     script = f'''tell application "Calendar"
@@ -350,7 +385,7 @@ class TestGetEventsIntegration:
 
 
 class TestUpdateEventIntegration:
-    """Integration tests for update_event against real Calendar.app."""
+    """Integration tests for update_events against real Calendar.app."""
 
     def test_update_summary(self, connector):
         """Update summary and verify via get_events."""
@@ -361,7 +396,7 @@ class TestUpdateEventIntegration:
             end_date="2026-09-01T11:00:00",
         )
         try:
-            connector.update_event(TEST_CALENDAR, uid, summary="Updated Summary")
+            _update_single_event(connector, TEST_CALENDAR, uid, summary="Updated Summary")
             events = connector.get_events(TEST_CALENDAR, "2026-09-01T00:00:00", "2026-09-02T00:00:00")
             test_events = [e for e in events if e["uid"] == uid]
             assert len(test_events) == 1
@@ -379,7 +414,7 @@ class TestUpdateEventIntegration:
             location="Room A",
         )
         try:
-            connector.update_event(TEST_CALENDAR, uid, location="Room B")
+            _update_single_event(connector, TEST_CALENDAR, uid, location="Room B")
             events = connector.get_events(TEST_CALENDAR, "2026-09-02T00:00:00", "2026-09-03T00:00:00")
             test_events = [e for e in events if e["uid"] == uid]
             assert len(test_events) == 1
@@ -396,8 +431,7 @@ class TestUpdateEventIntegration:
             end_date="2026-09-03T11:00:00",
         )
         try:
-            connector.update_event(
-                TEST_CALENDAR, uid,
+            _update_single_event(connector, TEST_CALENDAR, uid,
                 start_date="2026-09-03T14:00:00",
                 end_date="2026-09-03T15:00:00",
             )
@@ -418,13 +452,12 @@ class TestUpdateEventIntegration:
             location="Old Place",
         )
         try:
-            result = connector.update_event(
-                TEST_CALENDAR, uid,
+            result = _update_single_event(connector, TEST_CALENDAR, uid,
                 summary="New Multi Title",
                 location="New Place",
             )
-            assert "summary" in result["updated_fields"]
-            assert "location" in result["updated_fields"]
+            assert "summary" in result.get("updated_fields", [])
+            assert "location" in result.get("updated_fields", [])
             events = connector.get_events(TEST_CALENDAR, "2026-09-04T00:00:00", "2026-09-05T00:00:00")
             test_events = [e for e in events if e["uid"] == uid]
             assert test_events[0]["summary"] == "New Multi Title"
@@ -434,8 +467,8 @@ class TestUpdateEventIntegration:
 
     def test_update_nonexistent_event(self, connector):
         """Updating a non-existent UID should raise an error."""
-        with pytest.raises(Exception, match="Event not found"):
-            connector.update_event(TEST_CALENDAR, "DOES-NOT-EXIST-UID", summary="X")
+        with pytest.raises(ValueError, match="Event not found"):
+            _update_single_event(connector, TEST_CALENDAR, "DOES-NOT-EXIST-UID", summary="X")
 
     def test_clear_location(self, connector):
         """Passing location="" should clear the location field."""
@@ -447,7 +480,7 @@ class TestUpdateEventIntegration:
             location="Will Be Cleared",
         )
         try:
-            connector.update_event(TEST_CALENDAR, uid, location="")
+            _update_single_event(connector, TEST_CALENDAR, uid, location="")
             events = connector.get_events(TEST_CALENDAR, "2026-09-05T00:00:00", "2026-09-06T00:00:00")
             test_events = [e for e in events if e["uid"] == uid]
             assert len(test_events) == 1
@@ -466,7 +499,7 @@ class TestUpdateEventIntegration:
             notes="Keep these notes",
         )
         try:
-            connector.update_event(TEST_CALENDAR, uid, summary="New Title")
+            _update_single_event(connector, TEST_CALENDAR, uid, summary="New Title")
             events = connector.get_events(TEST_CALENDAR, "2027-09-10", "2027-09-11")
             matches = [e for e in events if e["uid"] == uid]
             assert len(matches) == 1
@@ -488,7 +521,7 @@ class TestUpdateEventIntegration:
             notes="Original notes",
         )
         try:
-            connector.update_event(TEST_CALENDAR, uid, notes="Updated notes")
+            _update_single_event(connector, TEST_CALENDAR, uid, notes="Updated notes")
             events = connector.get_events(TEST_CALENDAR, "2027-09-15", "2027-09-17")
             matches = [e for e in events if e["uid"] == uid]
             assert len(matches) == 1
@@ -509,8 +542,7 @@ class TestUpdateEventIntegration:
             notes="Important meeting",
         )
         try:
-            connector.update_event(
-                TEST_CALENDAR, uid,
+            _update_single_event(connector, TEST_CALENDAR, uid,
                 start_date="2027-09-25T14:00:00",
                 end_date="2027-09-25T15:00:00",
             )
@@ -874,7 +906,7 @@ class TestRecurringEventsIntegration:
         assert matches[0]["is_recurring"] is False
 
         # Add weekly recurrence
-        connector.update_event(TEST_CALENDAR, uid, recurrence_rule="FREQ=WEEKLY;COUNT=3")
+        _update_single_event(connector, TEST_CALENDAR, uid, recurrence_rule="FREQ=WEEKLY;COUNT=3")
 
         # Verify now has 3 occurrences
         events = connector.get_events(TEST_CALENDAR, "2028-04-01", "2028-04-30")
@@ -897,7 +929,7 @@ class TestRecurringEventsIntegration:
         assert len(matches) == 4
 
         # Remove recurrence
-        connector.update_event(TEST_CALENDAR, uid, recurrence_rule="")
+        _update_single_event(connector, TEST_CALENDAR, uid, recurrence_rule="")
 
         # Verify now has 1 occurrence
         events = connector.get_events(TEST_CALENDAR, "2028-05-01", "2028-05-31")
@@ -921,8 +953,7 @@ class TestRecurringEventsIntegration:
         assert len(series) == 3
 
         # Reschedule the Jun 12 occurrence to 2pm
-        connector.update_event(
-            TEST_CALENDAR, uid,
+        _update_single_event(connector, TEST_CALENDAR, uid,
             start_date="2028-06-12T14:00:00",
             end_date="2028-06-12T15:00:00",
             occurrence_date="2028-06-12T10:00:00",
@@ -1035,7 +1066,7 @@ class TestRoundTripIntegration:
             location="Room A",
         )
         try:
-            connector.update_event(TEST_CALENDAR, uid, summary="After Update")
+            _update_single_event(connector, TEST_CALENDAR, uid, summary="After Update")
             events = connector.get_events(TEST_CALENDAR, "2027-04-01", "2027-04-02")
             matches = [e for e in events if e["uid"] == uid]
             assert len(matches) == 1
@@ -1058,7 +1089,7 @@ class TestWorkflowIntegration:
         )
         try:
             # Update
-            connector.update_event(TEST_CALENDAR, uid, summary="Updated Lifecycle")
+            _update_single_event(connector, TEST_CALENDAR, uid, summary="Updated Lifecycle")
 
             # Verify update
             events = connector.get_events(TEST_CALENDAR, "2027-05-01", "2027-05-02")

@@ -119,18 +119,6 @@ def delete_calendar(name: str) -> str:
     return f"Deleted calendar '{result['name']}'"
 
 
-def _parse_alert_minutes(alert_minutes: str) -> list[int] | None:
-    """Parse comma-separated alert minutes string into a list of ints."""
-    if not alert_minutes:
-        return None
-    try:
-        return [int(m.strip()) for m in alert_minutes.split(",") if m.strip()]
-    except ValueError:
-        raise ValueError(
-            f"alert_minutes must be comma-separated integers (e.g., '15,60'), got: {alert_minutes!r}"
-        )
-
-
 @mcp.tool()
 def create_events(
     calendar_name: str,
@@ -191,23 +179,28 @@ def update_events(
     calendar_name: str,
     updates: str,
 ) -> str:
-    """Update multiple events in a single batch operation.
+    """Update one or more events in a calendar.
 
-    More efficient than calling update_event multiple times. All events must be
-    on the same calendar.
+    For a single event, pass an array with one element. Only provided fields
+    are updated; omitted fields are left unchanged. To clear a text field,
+    use the clear_* boolean flags.
 
     Args:
         calendar_name: Exact name of the calendar containing the events
         updates: JSON array of update objects. Each object must have "uid" (required)
                  and at least one field to update: summary, start (ISO 8601), end (ISO 8601),
-                 location, notes, url, allday (bool — when true, end is the last day inclusive),
-                 alerts (list of minutes), availability ("free"/"busy"/"tentative"),
-                 timezone (IANA identifier), recurrence (RRULE string), clear_location (bool),
-                 clear_notes (bool), clear_url (bool), clear_alerts (bool), clear_recurrence (bool)
+                 location, notes, url, allday (bool), alerts (list of minutes),
+                 availability ("free"/"busy"/"tentative"), timezone (IANA identifier),
+                 recurrence (RRULE string), clear_location (bool), clear_notes (bool),
+                 clear_url (bool), clear_alerts (bool), clear_recurrence (bool).
+                 For recurring events: occurrence_date (ISO 8601) to target specific occurrence,
+                 span ("this_event" or "future_events", default "this_event").
 
     Returns:
         Summary of updated events, each with title and list of changed fields. Any per-event
         errors are listed separately. Partial success is possible.
+        Note: when rescheduling a recurring event occurrence (changing dates with
+        span="this_event"), a new standalone event is created — the returned UID may differ.
     """
     try:
         update_list = json.loads(updates)
@@ -319,7 +312,7 @@ def get_events(
         For recurring events: is_recurring, recurrence_rule, occurrence_date, is_detached.
         If alerts are set: alerts (list with minutes_before for each).
         If attendees exist: attendees (list with name, email, role, status for each).
-        `uid` and `calendar_name` identify the event for update_event and delete_events.
+        `uid` and `calendar_name` identify the event for update_events and delete_events.
         For recurring events, also use `occurrence_date` to target a specific occurrence.
     """
     client = get_client()
@@ -509,91 +502,6 @@ def get_conflicts(
 
     lines = [_format_conflict(c) for c in conflicts]
     return f"Found {len(conflicts)} conflict(s) across {cal_list}:\n\n" + "\n\n".join(lines)
-
-
-@mcp.tool()
-def update_event(
-    calendar_name: str,
-    event_uid: str,
-    summary: str | None = None,
-    start_date: str | None = None,
-    end_date: str | None = None,
-    location: str | None = None,
-    notes: str | None = None,
-    url: str | None = None,
-    allday_event: bool | None = None,
-    alert_minutes: str = "",
-    availability: str | None = None,
-    timezone: str = "",
-    recurrence_rule: str | None = None,
-    occurrence_date: str = "",
-    span: str = "this_event",
-) -> str:
-    """Update an existing event's properties by UID.
-
-    Only provided fields are updated; omitted fields are left unchanged.
-    To clear a text field (location, notes, url), pass an empty string "".
-
-    Use get_events first to find the event's UID and calendar_name.
-
-    For recurring events: use occurrence_date to target a specific occurrence,
-    and span to control whether the change affects just this occurrence or the series.
-
-    Args:
-        calendar_name: Exact name of the calendar containing the event
-        event_uid: UID of the event to update (from get_events results)
-        summary: New event title (optional)
-        start_date: New start date/time in ISO 8601 format (optional)
-        end_date: New end date/time in ISO 8601 format (optional)
-        location: New location, or "" to clear (optional)
-        notes: New notes, or "" to clear (optional)
-        url: New URL, or "" to clear (optional)
-        allday_event: New all-day status (optional). When true, end_date is the last day (inclusive).
-        alert_minutes: Comma-separated minutes before event to alert (e.g., "15,60"), or "none" to clear all alerts (optional)
-        availability: Event availability: "free", "busy", or "tentative" (optional)
-        recurrence_rule: iCalendar RRULE string to set/change recurrence (e.g., "FREQ=WEEKLY;BYDAY=MO,WE,FR"), or "" to remove recurrence (optional)
-        occurrence_date: For recurring events, the occurrence_date from get_events to target a specific occurrence (optional)
-        span: "this_event" to update one occurrence, "future_events" to update this and all future occurrences (default: "this_event")
-
-    Returns:
-        Confirmation with the event UID and list of updated fields.
-        Note: when rescheduling a single occurrence of a recurring event (changing dates with
-        span="this_event"), a new standalone event is created — the returned UID may differ
-        from the original.
-    """
-    parsed_alerts = None
-    if alert_minutes == "none":
-        parsed_alerts = []
-    elif alert_minutes:
-        parsed_alerts = _parse_alert_minutes(alert_minutes)
-    # recurrence_rule: None = not provided, "" = clear, "RRULE..." = set
-    parsed_recurrence = None
-    if recurrence_rule is not None:
-        parsed_recurrence = recurrence_rule  # pass through as-is (empty string = clear)
-    client = get_client()
-    try:
-        result = client.update_event(
-            calendar_name=calendar_name,
-            event_uid=event_uid,
-            summary=summary,
-            start_date=start_date,
-            end_date=end_date,
-            location=location,
-            notes=notes,
-            url=url,
-            allday_event=allday_event,
-            alert_minutes=parsed_alerts,
-            availability=availability,
-            timezone=timezone or None,
-            recurrence_rule=parsed_recurrence,
-            occurrence_date=occurrence_date or None,
-            span=span,
-        )
-    except Exception as e:
-        return f"Error updating event: {e}"
-
-    fields_str = ", ".join(result["updated_fields"])
-    return f"Updated event {event_uid} in calendar '{calendar_name}'\nUpdated fields: {fields_str}"
 
 
 @mcp.tool()

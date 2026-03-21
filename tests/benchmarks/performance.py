@@ -112,19 +112,19 @@ def run_benchmarks(read_calendar: str, test_calendar: str):
 
     benchmark(create_and_track, "Create single event", iterations=3)
 
-    # --- update_event ---
-    print(f"\n[update_event] (calendar: {test_calendar})")
+    # --- update_events ---
+    print(f"\n[update_events] (calendar: {test_calendar})")
 
     if created_uids:
         uid = created_uids[0]
         benchmark(
-            lambda: connector.update_event(test_calendar, uid, summary="Updated Benchmark"),
-            "Update summary (whose uid lookup)",
+            lambda: connector.update_events(test_calendar, [{"uid": uid, "summary": "Updated Benchmark"}]),
+            "Update summary (single event via batch)",
             iterations=3,
         )
 
         benchmark(
-            lambda: connector.update_event(test_calendar, uid, location="Room A"),
+            lambda: connector.update_events(test_calendar, [{"uid": uid, "location": "Room A"}]),
             "Update location",
             iterations=3,
         )
