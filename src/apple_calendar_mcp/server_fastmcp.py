@@ -16,7 +16,7 @@ CALENDAR IDENTIFICATION: Calendars are identified by name (not UID — UIDs are 
 
 EVENTS: Events have summary (title), start/end dates, location, notes, URL, status, recurrence, attendees, and editability info. Events are identified by their UID (UUID format). The is_editable field indicates whether the event can be modified — events on read-only calendars or events where you are not the organizer (invited events) are not editable. Attendees are read-only — they cannot be added via this server (use Calendar.app or email invitations).
 
-RECURRING EVENTS: Recurring events share the same UID across all occurrences. Each occurrence has a unique occurrence_date. The is_recurring field indicates if an event is part of a series. The recurrence_rule field contains the iCalendar RRULE (e.g., "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE,FR"). To modify or delete a specific occurrence, pass occurrence_date and span="this_event". To modify or delete the series from a point onward, use span="future_events".
+RECURRING EVENTS: Recurring events share the same UID across all occurrences. Each occurrence has a unique occurrence_date. The is_recurring field indicates if an event is part of a series. The recurrence_rule field contains the iCalendar RRULE (e.g., "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE,FR"). To modify or delete a specific occurrence, pass occurrence_date and span="this_event". To modify or delete the series from a point onward, use span="future_events". Before deleting, always check is_recurring — deleting without occurrence_date removes the entire series.
 
 DATES: All dates use ISO 8601 format in local time, without timezone suffix (e.g., "2026-03-15" or "2026-03-15T14:30:00"). Returned event timestamps are also in local time. Do NOT append "Z" to dates — they are not UTC. Date ranges in get_events are inclusive on start, exclusive on end — to include all events on March 29, use end_date="2026-03-30". When scheduling in another timezone, use the timezone field per event rather than converting times manually.
 """)
@@ -540,7 +540,8 @@ def delete_events(
 
     For recurring events: use occurrence_date to target a specific occurrence,
     and span to control deletion scope. Without occurrence_date, deletes the
-    base event (which may affect the entire series).
+    base event AND all its occurrences. Always check is_recurring in get_events
+    results and pass occurrence_date when deleting a single occurrence.
 
     Args:
         calendar_name: Exact name of the calendar containing the event(s).
