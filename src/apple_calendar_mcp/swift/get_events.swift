@@ -1,3 +1,4 @@
+import CoreLocation
 import EventKit
 import Foundation
 
@@ -91,6 +92,17 @@ func eventToDict(_ event: EKEvent) -> [String: Any] {
     ]
 
     dict["location"] = event.location ?? ""
+    if let sl = event.structuredLocation {
+        var slDict: [String: Any] = ["title": sl.title ?? ""]
+        if let geo = sl.geoLocation {
+            slDict["latitude"] = geo.coordinate.latitude
+            slDict["longitude"] = geo.coordinate.longitude
+        }
+        if sl.radius > 0 {
+            slDict["radius"] = sl.radius
+        }
+        dict["structured_location"] = slDict
+    }
     dict["notes"] = event.notes ?? ""
     dict["url"] = event.url?.absoluteString ?? ""
 

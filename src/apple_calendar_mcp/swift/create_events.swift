@@ -1,3 +1,4 @@
+import CoreLocation
 import EventKit
 import Foundation
 
@@ -183,6 +184,15 @@ for (index, eventData) in eventsJson.enumerated() {
     event.isAllDay = eventData["allday"] as? Bool ?? false
 
     if let location = eventData["location"] as? String { event.location = location }
+    if let slData = eventData["structured_location"] as? [String: Any] {
+        let sl = EKStructuredLocation(title: slData["title"] as? String ?? "")
+        if let lat = slData["latitude"] as? Double, let lon = slData["longitude"] as? Double {
+            sl.geoLocation = CLLocation(latitude: lat, longitude: lon)
+        }
+        if let radius = slData["radius"] as? Double { sl.radius = radius }
+        event.structuredLocation = sl
+        if event.location == nil || event.location?.isEmpty == true { event.location = sl.title }
+    }
     if let notes = eventData["notes"] as? String { event.notes = notes }
     if let urlStr = eventData["url"] as? String, let url = URL(string: urlStr) { event.url = url }
     if let rrule = eventData["recurrence"] as? String, let rule = parseRecurrenceRule(rrule) {
