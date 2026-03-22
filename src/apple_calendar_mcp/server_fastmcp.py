@@ -520,7 +520,7 @@ def get_conflicts(
 @mcp.tool()
 def delete_events(
     calendar_name: str,
-    event_uid: str | list[str],
+    event_uids: str | list[str] = "",
     span: str = "this_event",
     occurrence_date: str = "",
 ) -> str:
@@ -537,7 +537,7 @@ def delete_events(
 
     Args:
         calendar_name: Exact name of the calendar containing the event(s)
-        event_uid: UID of a single event (str) or list of UIDs to delete
+        event_uids: UID of a single event (str) or list of UIDs to delete
         span: "this_event" to delete one occurrence, "future_events" to delete the series from this point onward (default: "this_event")
         occurrence_date: For recurring events, the occurrence_date from get_events to target a specific occurrence (optional)
 
@@ -549,7 +549,7 @@ def delete_events(
     try:
         result = client.delete_events(
             calendar_name=calendar_name,
-            event_uids=event_uid,
+            event_uids=event_uids,
             span=span,
             occurrence_date=occurrence_date or None,
         )
