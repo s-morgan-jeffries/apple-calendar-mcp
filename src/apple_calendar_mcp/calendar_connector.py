@@ -605,9 +605,6 @@ class CalendarConnector:
 
         wh = self._validate_working_hours(working_hours_start, working_hours_end)
 
-        if not calendar_names:
-            raise ValueError("At least one calendar name must be provided")
-
         range_start = self._parse_iso_datetime(start_date)
         range_end = self._parse_iso_datetime(end_date)
 
@@ -645,10 +642,7 @@ class CalendarConnector:
             ValueError: If date format is invalid, calendar not found, or no calendars provided
             PermissionError: If EventKit calendar access is denied
         """
-        if not calendar_names:
-            raise ValueError("At least one calendar name must be provided")
-
-        all_events = self.get_events(calendar_names, start_date, end_date)
+        all_events = self.get_events(calendar_names or [], start_date, end_date)
 
         # Filter out free events — only busy/tentative can conflict
         busy_events = [
