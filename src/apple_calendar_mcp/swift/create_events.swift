@@ -209,7 +209,7 @@ for (index, eventData) in eventsJson.enumerated() {
 
     do {
         try store.save(event, span: .thisEvent, commit: false)
-        created.append(["uid": event.calendarItemIdentifier, "summary": summary])
+        created.append(["uid": event.calendarItemIdentifier, "summary": summary, "calendar_name": calendar.title])
     } catch {
         errors.append(["index": index, "summary": summary, "error": error.localizedDescription])
     }

@@ -170,7 +170,8 @@ def create_events(
     created = result.get("created", [])
     errors = result.get("errors", [])
 
-    parts = [f"Created {len(created)} event(s) in calendar '{calendar_name}'"]
+    resolved_calendar = created[0].get("calendar_name", calendar_name) if created else calendar_name
+    parts = [f"Created {len(created)} event(s) in calendar '{resolved_calendar}'"]
     for c in created:
         parts.append(f"  {c['summary']} (UID: {c['uid']})")
     if errors:
