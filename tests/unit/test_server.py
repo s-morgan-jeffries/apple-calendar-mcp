@@ -159,7 +159,7 @@ class TestGetEventsTool:
         mock_get_client.return_value = mock_client
 
         from apple_calendar_mcp.server_fastmcp import get_events
-        result = get_events(calendar_name="Work", start_date="2026-03-15T00:00:00", end_date="2026-03-16T00:00:00")
+        result = get_events(calendar_names=["Work"], start_date="2026-03-15T00:00:00", end_date="2026-03-16T00:00:00")
         assert "Team Meeting" in result
         assert "Room 4" in result
         assert isinstance(result, str)
@@ -177,7 +177,7 @@ class TestGetEventsTool:
         mock_get_client.return_value = mock_client
 
         from apple_calendar_mcp.server_fastmcp import get_events
-        result = get_events(calendar_name="Work", start_date="2026-07-01", end_date="2026-07-02")
+        result = get_events(calendar_names=["Work"], start_date="2026-07-01", end_date="2026-07-02")
         assert "Recurring" in result
         assert "FREQ=WEEKLY" in result
 
@@ -196,7 +196,7 @@ class TestGetEventsTool:
         mock_get_client.return_value = mock_client
 
         from apple_calendar_mcp.server_fastmcp import get_events
-        result = get_events(calendar_name="Work", start_date="2026-07-01", end_date="2026-07-02")
+        result = get_events(calendar_names=["Work"], start_date="2026-07-01", end_date="2026-07-02")
         assert "Attendees (2)" in result
         assert "Alice" in result
         assert "bob@example.com" in result
@@ -208,7 +208,7 @@ class TestGetEventsTool:
         mock_get_client.return_value = mock_client
 
         from apple_calendar_mcp.server_fastmcp import get_events
-        result = get_events(calendar_name="Work", start_date="2026-03-15T00:00:00", end_date="2026-03-16T00:00:00")
+        result = get_events(calendar_names=["Work"], start_date="2026-03-15T00:00:00", end_date="2026-03-16T00:00:00")
         assert "No events found" in result
 
     @patch("apple_calendar_mcp.server_fastmcp.get_client")
@@ -218,7 +218,7 @@ class TestGetEventsTool:
         mock_get_client.return_value = mock_client
 
         from apple_calendar_mcp.server_fastmcp import get_events
-        result = get_events(calendar_name="Foo", start_date="2026-03-15T00:00:00", end_date="2026-03-16T00:00:00")
+        result = get_events(calendar_names=["Foo"], start_date="2026-03-15T00:00:00", end_date="2026-03-16T00:00:00")
         assert "Error" in result
         assert isinstance(result, str)
 
@@ -229,7 +229,7 @@ class TestGetEventsTool:
         mock_get_client.return_value = mock_client
 
         from apple_calendar_mcp.server_fastmcp import get_events
-        result = get_events(calendar_name="Work", start_date="2026-03-15T00:00:00", end_date="2026-03-16T00:00:00")
+        result = get_events(calendar_names=["Work"], start_date="2026-03-15T00:00:00", end_date="2026-03-16T00:00:00")
         assert "Error" in result
 
 
@@ -675,7 +675,7 @@ class TestSearchEventsTool:
         mock_get_client.return_value = mock_client
 
         from apple_calendar_mcp.server_fastmcp import search_events
-        result = search_events(query="standup", calendar_name="Work")
+        result = search_events(query="standup", calendar_names=["Work"])
         assert "Found 1 event(s)" in result
         assert "Team Standup" in result
         assert "in 'Work'" in result
@@ -688,7 +688,7 @@ class TestSearchEventsTool:
         mock_get_client.return_value = mock_client
 
         from apple_calendar_mcp.server_fastmcp import search_events
-        result = search_events(query="nonexistent", calendar_name="Work")
+        result = search_events(query="nonexistent", calendar_names=["Work"])
         assert "No events matching" in result
         assert "in 'Work'" in result
 
@@ -724,7 +724,7 @@ class TestSearchEventsTool:
         search_events(query="test")
         mock_client.search_events.assert_called_once_with(
             query="test",
-            calendar_name=None,
+            calendar_names=None,
             start_date=None,
             end_date=None,
         )

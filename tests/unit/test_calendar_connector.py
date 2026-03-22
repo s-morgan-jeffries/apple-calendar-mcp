@@ -315,13 +315,69 @@ class TestGetEvents:
     def test_calls_swift_helper_with_correct_args(self, mock_swift):
         mock_swift.return_value = "[]"
         self.connector.get_events(
-            calendar_name="Work",
+            calendar_names=["Work"],
             start_date="2026-03-15T00:00:00",
             end_date="2026-03-16T00:00:00",
         )
         mock_swift.assert_called_once_with(
             "get_events",
             ["--calendar", "Work", "--start", "2026-03-15T00:00:00", "--end", "2026-03-16T00:00:00"],
+            stdin_data=None,
+        )
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_calls_swift_helper_with_multiple_calendars(self, mock_swift):
+        mock_swift.return_value = "[]"
+        self.connector.get_events(
+            calendar_names=["Work", "Personal"],
+            start_date="2026-03-15T00:00:00",
+            end_date="2026-03-16T00:00:00",
+        )
+        mock_swift.assert_called_once_with(
+            "get_events",
+            ["--calendar", "Work", "--calendar", "Personal", "--start", "2026-03-15T00:00:00", "--end", "2026-03-16T00:00:00"],
+            stdin_data=None,
+        )
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_calls_swift_helper_with_no_calendars_queries_all(self, mock_swift):
+        mock_swift.return_value = "[]"
+        self.connector.get_events(
+            calendar_names=[],
+            start_date="2026-03-15T00:00:00",
+            end_date="2026-03-16T00:00:00",
+        )
+        mock_swift.assert_called_once_with(
+            "get_events",
+            ["--start", "2026-03-15T00:00:00", "--end", "2026-03-16T00:00:00"],
+            stdin_data=None,
+        )
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_string_calendar_name_backward_compat(self, mock_swift):
+        mock_swift.return_value = "[]"
+        self.connector.get_events(
+            calendar_names="Work",
+            start_date="2026-03-15T00:00:00",
+            end_date="2026-03-16T00:00:00",
+        )
+        mock_swift.assert_called_once_with(
+            "get_events",
+            ["--calendar", "Work", "--start", "2026-03-15T00:00:00", "--end", "2026-03-16T00:00:00"],
+            stdin_data=None,
+        )
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_none_calendar_names_queries_all(self, mock_swift):
+        mock_swift.return_value = "[]"
+        self.connector.get_events(
+            calendar_names=None,
+            start_date="2026-03-15T00:00:00",
+            end_date="2026-03-16T00:00:00",
+        )
+        mock_swift.assert_called_once_with(
+            "get_events",
+            ["--start", "2026-03-15T00:00:00", "--end", "2026-03-16T00:00:00"],
             stdin_data=None,
         )
 
@@ -485,17 +541,10 @@ class TestGetAvailability:
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_overlapping_events_merged(self, mock_swift):
         """Two overlapping events across calendars should merge into one busy block."""
-        def swift_side_effect(script_name, args, stdin_data=None):
-            cal = args[args.index("--calendar") + 1]
-            if cal == "Work":
-                return json.dumps([
-                    self._make_event("2026-03-15T09:00:00", "2026-03-15T11:00:00", calendar="Work"),
-                ])
-            else:
-                return json.dumps([
-                    self._make_event("2026-03-15T10:00:00", "2026-03-15T12:00:00", calendar="Personal"),
-                ])
-        mock_swift.side_effect = swift_side_effect
+        mock_swift.return_value = json.dumps([
+            self._make_event("2026-03-15T09:00:00", "2026-03-15T11:00:00", calendar="Work"),
+            self._make_event("2026-03-15T10:00:00", "2026-03-15T12:00:00", calendar="Personal"),
+        ])
         result = self.connector.get_availability(
             ["Work", "Personal"], "2026-03-15T08:00:00", "2026-03-15T14:00:00"
         )
@@ -552,17 +601,10 @@ class TestGetAvailability:
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_multiple_calendars_combined(self, mock_swift):
         """Events from multiple calendars should be merged for availability."""
-        def swift_side_effect(script_name, args, stdin_data=None):
-            cal = args[args.index("--calendar") + 1]
-            if cal == "Work":
-                return json.dumps([
-                    self._make_event("2026-03-15T09:00:00", "2026-03-15T10:00:00", calendar="Work"),
-                ])
-            else:
-                return json.dumps([
-                    self._make_event("2026-03-15T14:00:00", "2026-03-15T15:00:00", calendar="Personal"),
-                ])
-        mock_swift.side_effect = swift_side_effect
+        mock_swift.return_value = json.dumps([
+            self._make_event("2026-03-15T09:00:00", "2026-03-15T10:00:00", calendar="Work"),
+            self._make_event("2026-03-15T14:00:00", "2026-03-15T15:00:00", calendar="Personal"),
+        ])
         result = self.connector.get_availability(
             ["Work", "Personal"], "2026-03-15T08:00:00", "2026-03-15T16:00:00"
         )
@@ -825,11 +867,10 @@ class TestGetConflicts:
 
     @patch.object(CalendarConnector, "get_events")
     def test_multi_calendar(self, mock_get):
-        def side_effect(cal_name, start, end):
-            if cal_name == "Work":
-                return [self._make_event("A", "Meeting", "2026-03-15T10:00:00", "2026-03-15T11:00:00", "Work")]
-            return [self._make_event("B", "Dentist", "2026-03-15T10:30:00", "2026-03-15T11:30:00", "Personal")]
-        mock_get.side_effect = side_effect
+        mock_get.return_value = [
+            self._make_event("A", "Meeting", "2026-03-15T10:00:00", "2026-03-15T11:00:00", "Work"),
+            self._make_event("B", "Dentist", "2026-03-15T10:30:00", "2026-03-15T11:30:00", "Personal"),
+        ]
         result = self.connector.get_conflicts(["Work", "Personal"], "2026-03-15", "2026-03-16")
         assert len(result) == 1
         assert result[0]["event_a"]["calendar_name"] == "Work"
@@ -1088,60 +1129,57 @@ class TestSearchEvents:
             {"uid": "UID-1", "summary": "Team Lunch", "start_date": "2026-03-15T12:00:00",
              "end_date": "2026-03-15T13:00:00", "calendar_name": "Work"},
         ])
-        results = self.connector.search_events("lunch", calendar_name="Work",
+        results = self.connector.search_events("lunch", calendar_names=["Work"],
                                                 start_date="2026-03-01", end_date="2026-04-01")
         assert len(results) == 1
         assert results[0]["summary"] == "Team Lunch"
         args = mock_swift.call_args[0][1]
         assert "--query" in args
         assert "lunch" in args
+        assert "--calendar" in args
+        assert "Work" in args
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_searches_multiple_calendars(self, mock_swift):
+        """When multiple calendars specified, passes all to Swift helper."""
+        mock_swift.return_value = json.dumps([])
+        self.connector.search_events("lunch", calendar_names=["Work", "Personal"],
+                                      start_date="2026-03-01", end_date="2026-04-01")
+        args = mock_swift.call_args[0][1]
+        assert args.count("--calendar") == 2
+        assert "Work" in args
+        assert "Personal" in args
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_searches_all_calendars(self, mock_swift):
-        """When no calendar_name, searches all calendars."""
-        # get_calendars returns two calendars
-        def side_effect(script, args, **kwargs):
-            if script == "get_calendars":
-                return json.dumps([
-                    {"name": "Work", "writable": True, "description": "", "color": "#FF0000", "source": "iCloud"},
-                    {"name": "Personal", "writable": True, "description": "", "color": "#0000FF"},
-                ])
-            # get_events returns for each calendar
-            return json.dumps([])
-        mock_swift.side_effect = side_effect
+        """When no calendar_names, searches all calendars (no --calendar flags)."""
+        mock_swift.return_value = json.dumps([])
         results = self.connector.search_events("lunch", start_date="2026-03-01", end_date="2026-04-01")
         assert results == []
-        # Should have called get_calendars + get_events for each calendar
-        assert mock_swift.call_count == 3  # get_calendars + 2x get_events
+        # Single call with no --calendar flags
+        assert mock_swift.call_count == 1
+        args = mock_swift.call_args[0][1]
+        assert "--calendar" not in args
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_default_date_range(self, mock_swift):
         """When no dates, defaults to 1 month ago to 6 months from now."""
         mock_swift.return_value = json.dumps([])
-        self.connector.search_events("test", calendar_name="Work")
+        self.connector.search_events("test", calendar_names=["Work"])
         args = mock_swift.call_args[0][1]
         # Should have --start and --end with auto-generated dates
         assert "--start" in args
         assert "--end" in args
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
-    def test_skips_calendar_not_found(self, mock_swift):
-        """Calendar not found errors should be silently skipped."""
-        def side_effect(script, args, **kwargs):
-            if script == "get_calendars":
-                return json.dumps([
-                    {"name": "Work", "writable": True, "description": "", "color": "#FF0000", "source": "iCloud"},
-                    {"name": "Missing", "writable": True, "description": "", "color": "#00FF00"},
-                ])
-            # Work returns events, Missing raises ValueError
-            cal_arg_idx = args.index("--calendar") + 1 if "--calendar" in args else -1
-            if cal_arg_idx >= 0 and args[cal_arg_idx] == "Missing":
-                return json.dumps({"error": "calendar_not_found", "message": "not found"})
-            return json.dumps([{"uid": "UID-1", "summary": "Found", "start_date": "2026-03-15T10:00:00",
-                                "end_date": "2026-03-15T11:00:00", "calendar_name": "Work"}])
-        mock_swift.side_effect = side_effect
-        results = self.connector.search_events("found", start_date="2026-03-01", end_date="2026-04-01")
-        assert len(results) == 1
+    def test_string_calendar_name_backward_compat(self, mock_swift):
+        """A single string calendar_names value is accepted for backward compat."""
+        mock_swift.return_value = json.dumps([])
+        self.connector.search_events("test", calendar_names="Work",
+                                      start_date="2026-03-01", end_date="2026-04-01")
+        args = mock_swift.call_args[0][1]
+        assert "--calendar" in args
+        assert "Work" in args
 
 
 # ── all-day inclusive end_date helpers ─────────────────────────────────────

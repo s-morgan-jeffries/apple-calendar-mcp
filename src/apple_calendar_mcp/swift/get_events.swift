@@ -6,17 +6,18 @@ import Foundation
 
 func printUsage() {
     let msg = """
-    Usage: get_events.swift --calendar <name> --start <ISO8601> --end <ISO8601>
+    Usage: get_events.swift [--calendar <name> ...] --start <ISO8601> --end <ISO8601>
 
     Queries Apple Calendar events using EventKit.
+    Multiple --calendar flags can be provided. If none, queries all calendars.
     Outputs JSON array to stdout.
     """
     FileHandle.standardError.write(Data(msg.utf8))
 }
 
-func parseArgs() -> (calendar: String, start: String, end: String, query: String?)? {
+func parseArgs() -> (calendars: [String], start: String, end: String, query: String?)? {
     let args = CommandLine.arguments
-    var calendar: String?
+    var calendars: [String] = []
     var start: String?
     var end: String?
     var query: String?
@@ -25,7 +26,7 @@ func parseArgs() -> (calendar: String, start: String, end: String, query: String
     while i < args.count {
         switch args[i] {
         case "--calendar":
-            i += 1; if i < args.count { calendar = args[i] }
+            i += 1; if i < args.count { calendars.append(args[i]) }
         case "--start":
             i += 1; if i < args.count { start = args[i] }
         case "--end":
@@ -38,10 +39,10 @@ func parseArgs() -> (calendar: String, start: String, end: String, query: String
         i += 1
     }
 
-    guard let cal = calendar, let s = start, let e = end else {
+    guard let s = start, let e = end else {
         return nil
     }
-    return (cal, s, e, query)
+    return (calendars, s, e, query)
 }
 
 // MARK: - Date Parsing
@@ -216,7 +217,7 @@ func participantStatusString(_ status: EKParticipantStatus) -> String {
 // MARK: - Main
 
 guard let parsed = parseArgs() else {
-    outputError("invalid_args", "Required: --calendar <name> --start <ISO8601> --end <ISO8601>")
+    outputError("invalid_args", "Required: --start <ISO8601> --end <ISO8601> [--calendar <name> ...]")
     exit(1)
 }
 
@@ -252,16 +253,27 @@ if !accessGranted {
 // Refresh sources to pick up recently-created events
 store.refreshSourcesIfNecessary()
 
-// Find the calendar by name
+// Resolve calendars: nil means all calendars, otherwise look up each by name
 let allCalendars = store.calendars(for: .event)
-guard let calendar = allCalendars.first(where: { $0.title == parsed.calendar }) else {
-    let available = allCalendars.map { $0.title }.joined(separator: ", ")
-    outputError("calendar_not_found", "Calendar '\(parsed.calendar)' not found. Available: \(available)")
-    exit(1)
+let calendarArray: [EKCalendar]?
+
+if parsed.calendars.isEmpty {
+    calendarArray = nil  // EventKit queries all calendars
+} else {
+    var resolved: [EKCalendar] = []
+    for calName in parsed.calendars {
+        guard let cal = allCalendars.first(where: { $0.title == calName }) else {
+            let available = allCalendars.map { $0.title }.joined(separator: ", ")
+            outputError("calendar_not_found", "Calendar '\(calName)' not found. Available: \(available)")
+            exit(1)
+        }
+        resolved.append(cal)
+    }
+    calendarArray = resolved
 }
 
 // Query events
-let predicate = store.predicateForEvents(withStart: startDate, end: endDate, calendars: [calendar])
+let predicate = store.predicateForEvents(withStart: startDate, end: endDate, calendars: calendarArray)
 var events = store.events(matching: predicate)
 
 // Filter by query text (case-insensitive match on title, notes, location)
