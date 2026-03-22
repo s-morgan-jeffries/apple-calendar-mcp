@@ -1271,3 +1271,56 @@ class TestSearchEventsIntegration:
             assert any(keyword in e["summary"] for e in results)
         finally:
             _delete_event_by_uid(uid)
+
+
+class TestAmbiguousCalendarIntegration:
+    """Integration tests for ambiguous calendar name rejection (#212)."""
+
+    DUPLICATE_NAME = "MCP-Test-Calendar"  # Same name as the session-scoped test calendar
+
+    def _get_sources_for_name(self, connector, name):
+        """Return list of sources for calendars with the given name."""
+        calendars = connector.get_calendars()
+        return [c["source"] for c in calendars if c["name"] == name]
+
+    def test_ambiguous_calendar_rejects_create_without_source(self, connector):
+        """create_events fails when duplicate calendar names exist and no source given."""
+        from apple_calendar_mcp.calendar_connector import run_swift_helper
+
+        # The session fixture already created MCP-Test-Calendar.
+        # Create another with the same name — EventKit allows duplicates.
+        run_swift_helper("create_calendar", ["--name", self.DUPLICATE_NAME])
+        try:
+            # Verify we actually have duplicates
+            sources = self._get_sources_for_name(connector, self.DUPLICATE_NAME)
+            assert len(sources) >= 2, f"Expected duplicates, got sources: {sources}"
+
+            # create_events without source should fail with ambiguous_calendar
+            events = [{"summary": "Ambiguity Test", "start_date": "2026-06-01T10:00:00", "end_date": "2026-06-01T11:00:00"}]
+            with pytest.raises(ValueError, match="Multiple calendars"):
+                connector.create_events(
+                    calendar_name=self.DUPLICATE_NAME,
+                    events=events,
+                )
+        finally:
+            # Delete one duplicate — after that, the name is unambiguous again.
+            # Use source to target the one we just created.
+            sources = self._get_sources_for_name(connector, self.DUPLICATE_NAME)
+            if len(sources) >= 2:
+                # Delete with source to target the right one
+                try:
+                    run_swift_helper(
+                        "delete_calendar",
+                        ["--name", self.DUPLICATE_NAME, "--source", sources[-1]],
+                    )
+                except Exception:
+                    # Fallback: if still ambiguous after source, try each source
+                    for source in sources[1:]:
+                        try:
+                            run_swift_helper(
+                                "delete_calendar",
+                                ["--name", self.DUPLICATE_NAME, "--source", source],
+                            )
+                            break
+                        except Exception:
+                            pass

@@ -122,6 +122,7 @@ class CalendarConnector:
             error_map = {
                 "calendar_access_denied": PermissionError,
                 "calendar_not_found": ValueError,
+                "ambiguous_calendar": ValueError,
                 "event_not_found": ValueError,
             }
             exc_type = error_map.get(parsed["error"], RuntimeError)
