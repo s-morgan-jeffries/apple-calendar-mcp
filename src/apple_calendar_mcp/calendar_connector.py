@@ -207,16 +207,19 @@ class CalendarConnector:
 
     def get_events(
         self,
-        calendar_name: str,
-        start_date: str,
-        end_date: str,
+        calendar_names: list[str] | str | None = None,
+        start_date: str = "",
+        end_date: str = "",
+        *,
+        calendar_name: str | None = None,  # backward compat alias
     ) -> list[dict[str, Any]]:
-        """Get events from a calendar within a date range.
+        """Get events from one or more calendars within a date range.
 
         Uses EventKit via Swift helper for fast native date-range queries.
 
         Args:
-            calendar_name: Name of the calendar to query
+            calendar_names: Calendar name(s) to query. Accepts a list of names,
+                a single name string, or None/empty list to query all calendars.
             start_date: Start of date range in ISO 8601 format
             end_date: End of date range in ISO 8601 format
 
@@ -228,10 +231,23 @@ class CalendarConnector:
             ValueError: If date format is invalid or calendar not found
             PermissionError: If EventKit calendar access is denied
         """
+        # Support backward compat: calendar_name= keyword alias
+        if calendar_name is not None and calendar_names is None:
+            calendar_names = [calendar_name] if calendar_name else []
+
+        # Normalize calendar_names to a list
+        if calendar_names is None:
+            calendar_names = []
+        elif isinstance(calendar_names, str):
+            calendar_names = [calendar_names] if calendar_names else []
+
         self._validate_date(start_date)
         self._validate_date(end_date)
 
-        args = ["--calendar", calendar_name, "--start", start_date, "--end", end_date]
+        args = []
+        for name in calendar_names:
+            args += ["--calendar", name]
+        args += ["--start", start_date, "--end", end_date]
         events = self._run_swift_helper_json("get_events", args)
         for event in events:
             if event.get("allday_event"):
@@ -241,24 +257,37 @@ class CalendarConnector:
     def search_events(
         self,
         query: str,
-        calendar_name: Optional[str] = None,
+        calendar_names: list[str] | str | None = None,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        *,
+        calendar_name: str | None = None,  # backward compat alias
     ) -> list[dict[str, Any]]:
-        """Search events by text across one or all calendars.
+        """Search events by text across one or more calendars.
 
         Searches event summaries, notes, and locations with
         case-insensitive matching.
 
         Args:
             query: Text to search for
-            calendar_name: Calendar to search (optional — searches all if omitted)
+            calendar_names: Calendar name(s) to search. Accepts a list of names,
+                a single name string, or None/empty list to search all calendars.
             start_date: Start of date range (optional — defaults to 1 month ago)
             end_date: End of date range (optional — defaults to 6 months from now)
 
         Returns:
             List of matching event dicts.
         """
+        # Normalize calendar_names to a list
+        # Support backward compat: calendar_name= keyword alias
+        if calendar_name is not None and calendar_names is None:
+            calendar_names = [calendar_name] if calendar_name else []
+
+        if calendar_names is None:
+            calendar_names = []
+        elif isinstance(calendar_names, str):
+            calendar_names = [calendar_names] if calendar_names else []
+
         if not start_date:
             start_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%dT00:00:00")
         if not end_date:
@@ -267,26 +296,16 @@ class CalendarConnector:
         self._validate_date(start_date)
         self._validate_date(end_date)
 
-        if calendar_name:
-            calendars = [calendar_name]
-        else:
-            cal_list = self.get_calendars()
-            calendars = [c["name"] for c in cal_list]
-
-        all_results = []
-        for cal in calendars:
-            args = ["--calendar", cal, "--start", start_date, "--end", end_date, "--query", query]
-            try:
-                events = self._run_swift_helper_json("get_events", args)
-                if isinstance(events, list):
-                    for event in events:
-                        if event.get("allday_event"):
-                            event["end_date"] = self._allday_end_from_eventkit(event["end_date"])
-                    all_results.extend(events)
-            except ValueError:
-                continue  # skip calendars that error (e.g., not found)
-
-        return all_results
+        args = []
+        for name in calendar_names:
+            args += ["--calendar", name]
+        args += ["--start", start_date, "--end", end_date, "--query", query]
+        events = self._run_swift_helper_json("get_events", args)
+        if isinstance(events, list):
+            for event in events:
+                if event.get("allday_event"):
+                    event["end_date"] = self._allday_end_from_eventkit(event["end_date"])
+        return events if isinstance(events, list) else []
 
     def delete_events(
         self,
@@ -499,9 +518,7 @@ class CalendarConnector:
         range_start = self._parse_iso_datetime(start_date)
         range_end = self._parse_iso_datetime(end_date)
 
-        all_events = []
-        for cal_name in calendar_names:
-            all_events.extend(self.get_events(cal_name, start_date, end_date))
+        all_events = self.get_events(calendar_names, start_date, end_date)
 
         # Only busy/tentative events block availability — free events are excluded
         busy_events = [e for e in all_events if e.get("availability", "busy") != "free"]
@@ -569,9 +586,7 @@ class CalendarConnector:
         if not calendar_names:
             raise ValueError("At least one calendar name must be provided")
 
-        all_events = []
-        for cal_name in calendar_names:
-            all_events.extend(self.get_events(cal_name, start_date, end_date))
+        all_events = self.get_events(calendar_names, start_date, end_date)
 
         # Filter out free events — only busy/tentative can conflict
         busy_events = [

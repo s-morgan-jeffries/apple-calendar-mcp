@@ -92,12 +92,12 @@ For recurring events: use occurrence_date to target a specific occurrence, and s
 
 ### get_events
 
-Get events from a calendar within a date range.
+Get events from one or more calendars within a date range.
 
-Returns all events in the specified calendar that overlap with the given date range. Use get_calendars first to find available calendar names.
+Returns all events in the specified calendar(s) that overlap with the given date range. Use get_calendars first to find available calendar names.
 
 **Parameters:**
-- `calendar_name` (str, required): Exact name of the calendar to query (use get_calendars to find available names)
+- `calendar_names` (list[str], optional, default: []): List of calendar names to query (use get_calendars to find available names). If empty, queries all calendars.
 - `start_date` (str, required): Start of date range in ISO 8601 format (e.g., "2026-03-15" or "2026-03-15T00:00:00")
 - `end_date` (str, required): End of date range in ISO 8601 format (exclusive — to include March 29, use "2026-03-30")
 
@@ -107,13 +107,13 @@ Returns all events in the specified calendar that overlap with the given date ra
 
 ### search_events
 
-Search events by text across one or all calendars.
+Search events by text across one or more calendars.
 
-Searches event summaries, notes, and locations with case-insensitive matching. If no calendar is specified, searches all calendars. If no date range is specified, searches from 1 month ago to 6 months from now.
+Searches event summaries, notes, and locations with case-insensitive matching. If no calendars are specified, searches all calendars. If no date range is specified, searches from 1 month ago to 6 months from now.
 
 **Parameters:**
 - `query` (str, required): Text to search for in event titles, notes, and locations
-- `calendar_name` (str, optional, default: ""): Calendar to search (searches all calendars if empty)
+- `calendar_names` (list[str], optional, default: []): List of calendar names to search (searches all calendars if empty)
 - `start_date` (str, optional, default: ""): Start of date range in ISO 8601 format
 - `end_date` (str, optional, default: ""): End of date range in ISO 8601 format
 

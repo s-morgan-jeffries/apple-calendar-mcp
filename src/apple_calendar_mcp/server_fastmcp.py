@@ -302,17 +302,18 @@ def _format_event(event: dict) -> str:
 
 @mcp.tool()
 def get_events(
-    calendar_name: str,
-    start_date: str,
-    end_date: str,
+    calendar_names: list[str] = [],
+    start_date: str = "",
+    end_date: str = "",
 ) -> str:
-    """Get events from a calendar within a date range.
+    """Get events from one or more calendars within a date range.
 
-    Returns all events in the specified calendar that overlap with the given
+    Returns all events in the specified calendar(s) that overlap with the given
     date range. Use get_calendars first to find available calendar names.
 
     Args:
-        calendar_name: Exact name of the calendar to query (use get_calendars to find available names)
+        calendar_names: List of calendar names to query (use get_calendars to find available names).
+                       If empty, queries all calendars.
         start_date: Start of date range in ISO 8601 format (e.g., "2026-03-15" or "2026-03-15T00:00:00")
         end_date: End of date range in ISO 8601 format (exclusive — to include March 29, use "2026-03-30")
 
@@ -332,39 +333,41 @@ def get_events(
     client = get_client()
     try:
         events = client.get_events(
-            calendar_name=calendar_name,
+            calendar_names=calendar_names,
             start_date=start_date,
             end_date=end_date,
         )
     except Exception as e:
         return f"Error getting events: {e}"
 
+    cal_desc = ", ".join(f"'{c}'" for c in calendar_names) if calendar_names else "all calendars"
+
     if not events:
-        return f"No events found in '{calendar_name}' between {start_date} and {end_date}."
+        return f"No events found in {cal_desc} between {start_date} and {end_date}."
 
     lines = []
     for event in events:
         lines.append(_format_event(event))
 
-    return f"Found {len(events)} event(s) in '{calendar_name}':\n\n" + "\n".join(lines)
+    return f"Found {len(events)} event(s) in {cal_desc}:\n\n" + "\n".join(lines)
 
 
 @mcp.tool()
 def search_events(
     query: str,
-    calendar_name: str = "",
+    calendar_names: list[str] = [],
     start_date: str = "",
     end_date: str = "",
 ) -> str:
-    """Search events by text across one or all calendars.
+    """Search events by text across one or more calendars.
 
     Searches event summaries, notes, and locations with case-insensitive
-    matching. If no calendar is specified, searches all calendars. If no date
+    matching. If no calendars are specified, searches all calendars. If no date
     range is specified, searches from 1 month ago to 6 months from now.
 
     Args:
         query: Text to search for in event titles, notes, and locations
-        calendar_name: Calendar to search (optional — searches all calendars if empty)
+        calendar_names: List of calendar names to search (optional — searches all calendars if empty)
         start_date: Start of date range in ISO 8601 format (optional)
         end_date: End of date range in ISO 8601 format (optional)
 
@@ -376,19 +379,22 @@ def search_events(
     try:
         events = client.search_events(
             query=query,
-            calendar_name=calendar_name or None,
+            calendar_names=calendar_names or None,
             start_date=start_date or None,
             end_date=end_date or None,
         )
     except Exception as e:
         return f"Error searching events: {e}"
 
+    if calendar_names:
+        scope = "in " + ", ".join(f"'{c}'" for c in calendar_names)
+    else:
+        scope = "across all calendars"
+
     if not events:
-        scope = f"in '{calendar_name}'" if calendar_name else "across all calendars"
         return f"No events matching '{query}' found {scope}."
 
     lines = [_format_event(event) for event in events]
-    scope = f"in '{calendar_name}'" if calendar_name else "across all calendars"
     return f"Found {len(events)} event(s) matching '{query}' {scope}:\n\n" + "\n".join(lines)
 
 
