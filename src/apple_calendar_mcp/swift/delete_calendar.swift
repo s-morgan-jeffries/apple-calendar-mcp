@@ -67,8 +67,7 @@ store.refreshSourcesIfNecessary()
 let calendars = store.calendars(for: .event).filter { $0.title == parsed.name }
 
 guard let calendar = calendars.first else {
-    let available = store.calendars(for: .event).map { $0.title }.joined(separator: ", ")
-    outputError("calendar_not_found", "Calendar '\(parsed.name)' not found. Available: \(available)")
+    outputError("calendar_not_found", "Calendar '\(parsed.name)' not found. Use get_calendars to see available names.")
     exit(1)
 }
 
