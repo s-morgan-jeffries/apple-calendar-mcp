@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] - 2026-03-22
+
+### Added
+
+- Source-aware disambiguation: `calendar_source` parameter on `create_events`, `update_events`, `delete_events` for targeting specific accounts when calendar names are duplicated (#200, #205)
+- `get_conflicts` and `get_availability` accept empty `calendar_names` for all-calendar queries, matching `get_events` pattern (#202, #206)
+
+### Fixed
+
+- Recurring event deletion warning strengthened: "may affect" → "WILL delete all occurrences." Added guidance to check `is_recurring` before deleting (#199, #204)
+- Documented `allday=true` requirement when updating dates on all-day events (#201, #207)
+
 ## [0.8.0] - 2026-03-22
 
 ### Added
