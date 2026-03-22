@@ -76,7 +76,67 @@ Use the Edit tool for each file. Be precise about what to change.
 
 4. Insert the new entry at the top of CHANGELOG.md (after the header, before the previous version).
 
-## Phase 6: Validation
+## Phase 6: Test Coverage Review
+
+1. Run coverage report:
+   ```bash
+   pytest --cov=apple_calendar_mcp --cov-report=term-missing tests/ -q
+   ```
+
+2. Compare overall coverage against the `fail_under` threshold in `pyproject.toml`. If coverage dropped below the threshold, **stop and report** — new code likely needs tests.
+
+3. Get the cumulative diff to identify changed files:
+   ```bash
+   git diff v{previous}..HEAD --stat
+   ```
+
+4. Audit changed `src/` files for adequate test coverage:
+   - New code paths without unit tests
+   - Modified Swift helpers without integration tests
+   - New parameters or return fields without test assertions
+
+5. Flag any gaps. If coverage dropped or critical paths are untested, stop and fix before proceeding.
+
+## Phase 7: Code Review
+
+1. Get the cumulative diff since the last release:
+   ```bash
+   git diff v{previous}..HEAD
+   ```
+
+2. Launch the `superpowers:code-reviewer` agent to review the full diff. Provide context about the release scope (PRs included, features added/changed).
+
+3. The reviewer will report issues by severity:
+   - **Critical** — security issues, data loss risks, correctness bugs → blocks the release
+   - **Important** — code quality, missed edge cases → fix or document in PR
+   - **Minor** — style, naming, suggestions → note in PR description
+
+4. If Critical issues are found, **stop and fix** before proceeding.
+
+5. Include Important/Minor findings in the release PR description under a "Code Review Notes" section.
+
+## Phase 8: Documentation Review
+
+1. Enumerate documentation to check:
+   - `README.md` — feature descriptions, installation, usage examples
+   - `.claude/CLAUDE.md` — version, test counts, coverage %, API surface count
+   - `CHANGELOG.md` — new entry completeness
+   - `docs/research/` — gap analysis, competitive analysis
+   - Tool docstrings in `src/apple_calendar_mcp/server_fastmcp.py`
+   - `evals/agent_tool_usability/tool_descriptions.md`
+   - Skill files in `.claude/skills/`
+
+2. Verify accuracy against changes in this release:
+   - Stale version numbers (should still be old version — Phase 4 bumped them)
+   - Missing feature documentation for new capabilities
+   - Incorrect cross-references between docs
+   - Test count / coverage stats in CLAUDE.md header
+   - README coverage badge matches actual coverage
+   - Tool count in README, CLAUDE.md, and tool_descriptions.md
+
+3. Flag discrepancies and fix them on the release branch before proceeding.
+
+## Phase 9: Validation
 
 Run ALL validation checks. Stop on any failure.
 
@@ -103,7 +163,7 @@ Run ALL validation checks. Stop on any failure.
 
 If any check fails, fix the issue and re-run. Do not proceed with failures.
 
-## Phase 7: Commit, Push, and PR
+## Phase 10: Commit, Push, and PR
 
 1. **Commit** the version bump and changelog:
    ```bash
@@ -123,7 +183,7 @@ If any check fails, fix the issue and re-run. Do not proceed with failures.
 
 4. Tell the user the PR is ready for review. Do NOT merge it automatically.
 
-## Phase 8: Merge, Tag, and Push Tag
+## Phase 11: Merge, Tag, and Push Tag
 
 After the user approves the PR:
 
@@ -159,7 +219,7 @@ After the user approves the PR:
    ```
    Extract the relevant section from CHANGELOG.md for the release notes body.
 
-## Phase 9: Close Milestone
+## Phase 12: Close Milestone
 
 After the tag is pushed, close the milestone:
 
