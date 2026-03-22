@@ -282,6 +282,7 @@ def _format_event(event: dict) -> str:
     """Format an event dict as human-readable text."""
     lines = [
         f"Title: {event['summary']}",
+        f"Calendar: {event['calendar_name']}",
         f"Start: {event['start_date']}",
         f"End: {event['end_date']}",
         *_format_event_details(event),
