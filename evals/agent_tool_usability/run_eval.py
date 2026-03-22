@@ -14,12 +14,14 @@ Usage:
     # Specific scenarios:
     python run_eval.py --model meta-llama/llama-3.3-70b-instruct --scenarios 1,2,3
 
-Requires OPENROUTER_API_KEY in environment or .env file at project root.
+Requires OPENROUTER_API_KEY in macOS Keychain or environment variable.
+Store in Keychain: security add-generic-password -a "openrouter" -s "apple-calendar-mcp-evals" -w "KEY"
 """
 
 import argparse
 import json
 import os
+import subprocess
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -43,17 +45,49 @@ List the exact tool calls you would make, in order, with all parameters. Explain
 {tool_descriptions}"""
 
 
+KEYCHAIN_SERVICE = "apple-calendar-mcp-evals"
+KEYCHAIN_ACCOUNT = "openrouter"
+
+
 def get_api_key() -> str:
-    """Get API key from environment or .env file."""
+    """Get API key from environment, macOS Keychain, or .env file.
+
+    Lookup order:
+        1. OPENROUTER_API_KEY environment variable
+        2. macOS Keychain (service: apple-calendar-mcp-evals, account: openrouter)
+        3. .env file at project root (deprecated — prints warning)
+
+    To store your key in Keychain:
+        security add-generic-password -a "openrouter" -s "apple-calendar-mcp-evals" -w "YOUR_KEY"
+    """
+    # 1. Environment variable
     api_key = os.environ.get("OPENROUTER_API_KEY")
-    if not api_key:
-        env_path = SCRIPT_DIR.parent.parent / ".env"
-        if env_path.exists():
-            for line in env_path.read_text().splitlines():
-                if line.startswith("OPENROUTER_API_KEY="):
-                    api_key = line.split("=", 1)[1].strip()
-                    break
-    return api_key
+    if api_key:
+        return api_key
+
+    # 2. macOS Keychain
+    try:
+        result = subprocess.run(
+            ["security", "find-generic-password", "-a", KEYCHAIN_ACCOUNT, "-s", KEYCHAIN_SERVICE, "-w"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass  # Not on macOS or security command unavailable
+
+    # 3. .env file (deprecated fallback)
+    env_path = SCRIPT_DIR.parent.parent / ".env"
+    if env_path.exists():
+        for line in env_path.read_text().splitlines():
+            if line.startswith("OPENROUTER_API_KEY="):
+                api_key = line.split("=", 1)[1].strip()
+                if api_key:
+                    print("Warning: Reading API key from .env file. "
+                          "Prefer macOS Keychain — see run_eval.py docstring.", file=sys.stderr)
+                    return api_key
+
+    return ""
 
 
 def run_scenario(client: OpenAI, model: str, scenario: dict, tool_descriptions: str) -> dict:
@@ -141,7 +175,9 @@ def main():
     api_key = get_api_key()
     if not api_key:
         print("Error: OPENROUTER_API_KEY not found.")
-        print("Set it as an environment variable or in .env at the project root.")
+        print("Store it in macOS Keychain:")
+        print('  security add-generic-password -a "openrouter" -s "apple-calendar-mcp-evals" -w "YOUR_KEY"')
+        print("Or set OPENROUTER_API_KEY as an environment variable.")
         sys.exit(1)
 
     client = OpenAI(
