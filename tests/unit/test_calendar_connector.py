@@ -594,10 +594,6 @@ class TestGetAvailability:
         with pytest.raises(ValueError, match="Invalid date format"):
             self.connector.get_availability(["Work"], "2026-03-15T00:00:00", "not-a-date")
 
-    def test_empty_calendar_list_raises(self):
-        with pytest.raises(ValueError, match="At least one calendar"):
-            self.connector.get_availability([], "2026-03-15T00:00:00", "2026-03-16T00:00:00")
-
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_multiple_calendars_combined(self, mock_swift):
         """Events from multiple calendars should be merged for availability."""
@@ -884,11 +880,6 @@ class TestGetConflicts:
         ]
         result = self.connector.get_conflicts(["Work"], "2026-03-15", "2026-03-16")
         assert result == []
-
-    def test_empty_calendar_list_raises(self):
-        with pytest.raises(ValueError, match="At least one calendar"):
-            self.connector.get_conflicts([], "2026-03-15", "2026-03-16")
-
 
 class TestParseTimeString:
     """Tests for CalendarConnector._parse_time_string()."""

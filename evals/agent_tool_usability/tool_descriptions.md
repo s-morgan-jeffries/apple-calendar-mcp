@@ -132,7 +132,7 @@ Queries all specified calendars, merges busy periods, and returns available (fre
 Use get_calendars first to find available calendar names.
 
 **Parameters:**
-- `calendar_names` (list[str], required): List of calendar names to check for combined availability
+- `calendar_names` (list[str], optional, default: []): List of calendar names to check for combined availability. If empty, checks all calendars.
 - `start_date` (str, required): Start of range in ISO 8601 format (e.g., "2026-03-15T09:00:00")
 - `end_date` (str, required): End of range in ISO 8601 format (e.g., "2026-03-15T17:00:00")
 - `min_duration_minutes` (int | None, optional, default: None): Only return slots of at least this many minutes (e.g., 45)
@@ -152,7 +152,7 @@ Finds all pairs of events that overlap in time within the date range. Useful for
 Use get_calendars first to find available calendar names.
 
 **Parameters:**
-- `calendar_names` (list[str], required): List of calendar names to check for conflicts
+- `calendar_names` (list[str], optional, default: []): List of calendar names to check for conflicts. If empty, checks all calendars.
 - `start_date` (str, required): Start of range in ISO 8601 format (e.g., "2026-03-15T00:00:00")
 - `end_date` (str, required): End of range in ISO 8601 format (e.g., "2026-03-22T00:00:00")
 
