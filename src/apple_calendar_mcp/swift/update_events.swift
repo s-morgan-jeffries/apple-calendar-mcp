@@ -1,3 +1,4 @@
+import CoreLocation
 import EventKit
 import Foundation
 
@@ -233,6 +234,18 @@ for (index, updateData) in updatesJson.enumerated() {
         newEvent.endDate = eventEnd
         newEvent.isAllDay = eventAllDay
         newEvent.location = eventLocation
+        // Copy or set structured location
+        if let slData = updateData["structured_location"] as? [String: Any] {
+            let sl = EKStructuredLocation(title: slData["title"] as? String ?? "")
+            if let lat = slData["latitude"] as? Double, let lon = slData["longitude"] as? Double {
+                sl.geoLocation = CLLocation(latitude: lat, longitude: lon)
+            }
+            if let radius = slData["radius"] as? Double { sl.radius = radius }
+            newEvent.structuredLocation = sl
+            updatedFields.append("structured_location")
+        } else if let existingSL = event.structuredLocation {
+            newEvent.structuredLocation = existingSL
+        }
         newEvent.notes = eventNotes
         newEvent.url = eventUrl
         if let alarms = eventAlarms {
@@ -273,6 +286,16 @@ for (index, updateData) in updatesJson.enumerated() {
         event.location = location; updatedFields.append("location")
     } else if updateData["clear_location"] as? Bool == true {
         event.location = nil; updatedFields.append("location")
+    }
+    if let slData = updateData["structured_location"] as? [String: Any] {
+        let sl = EKStructuredLocation(title: slData["title"] as? String ?? "")
+        if let lat = slData["latitude"] as? Double, let lon = slData["longitude"] as? Double {
+            sl.geoLocation = CLLocation(latitude: lat, longitude: lon)
+        }
+        if let radius = slData["radius"] as? Double { sl.radius = radius }
+        event.structuredLocation = sl
+        if event.location == nil || event.location?.isEmpty == true { event.location = sl.title }
+        updatedFields.append("structured_location")
     }
     if let notes = updateData["notes"] as? String {
         event.notes = notes; updatedFields.append("notes")

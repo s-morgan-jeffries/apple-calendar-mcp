@@ -137,7 +137,9 @@ def create_events(
                 location, notes, url, allday (bool), recurrence (RRULE string),
                 alerts (list of minutes, e.g. [15, 60]), availability ("free"/"busy"/"tentative"),
                 timezone (IANA identifier, e.g. "America/Los_Angeles" — use this to schedule
-                in a remote timezone rather than converting times manually).
+                in a remote timezone rather than converting times manually),
+                structured_location (object with title, latitude, longitude, radius — adds
+                map pin and geo coordinates to the event).
                 For all-day events, set allday=true and use date-only format.
                 end is inclusive for all-day events.
 
@@ -194,7 +196,8 @@ def update_events(
                  location, notes, url, allday (bool), alerts (list of minutes),
                  availability ("free"/"busy"/"tentative"), timezone (IANA identifier —
                  use to schedule in a remote timezone rather than converting manually),
-                 recurrence (RRULE string), clear_location (bool), clear_notes (bool),
+                 recurrence (RRULE string), structured_location (object with title,
+                 latitude, longitude, radius), clear_location (bool), clear_notes (bool),
                  clear_url (bool), clear_alerts (bool), clear_recurrence (bool).
                  For recurring events: occurrence_date (ISO 8601) to target specific occurrence,
                  span ("this_event" or "future_events", default "this_event").
@@ -313,6 +316,7 @@ def get_events(
         Each event includes: uid, summary, start_date, end_date, allday_event, location, notes,
         url, status, calendar_name, availability, created_date, modified_date.
         If created in a specific timezone: timezone (IANA identifier, e.g. "Asia/Tokyo").
+        If location has geo data: structured_location (title, latitude, longitude, radius).
         For all-day events, end_date is the last day of the event (inclusive).
         For recurring events: is_recurring, recurrence_rule, occurrence_date, is_detached.
         If alerts are set: alerts (list with minutes_before for each).
