@@ -433,6 +433,7 @@ class TestDeleteEventsTool:
             event_uids=["UID-1", "UID-2"],
             span="this_event",
             occurrence_date=None,
+            calendar_source="",
         )
 
 
@@ -813,6 +814,7 @@ class TestDeleteEventsToolBranches:
             event_uids="UID-1",
             span="this_event",
             occurrence_date=None,
+            calendar_source="",
         )
         assert "Deleted 1 event(s)" in result
 

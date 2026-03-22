@@ -4,15 +4,27 @@ import Foundation
 
 // MARK: - Argument Parsing
 
-func parseArgs() -> String? {
+struct UpdateEventsArgs {
+    var calendar: String = ""
+    var source: String = ""
+}
+
+func parseArgs() -> UpdateEventsArgs {
+    var result = UpdateEventsArgs()
     let args = CommandLine.arguments
-    var calendar: String?
     var i = 1
     while i < args.count {
-        if args[i] == "--calendar" { i += 1; if i < args.count { calendar = args[i] } }
+        switch args[i] {
+        case "--calendar":
+            i += 1; if i < args.count { result.calendar = args[i] }
+        case "--source":
+            i += 1; if i < args.count { result.source = args[i] }
+        default:
+            break
+        }
         i += 1
     }
-    return calendar
+    return result
 }
 
 // MARK: - Date Parsing
@@ -108,7 +120,11 @@ func outputError(_ error: String, _ message: String) {
 
 // MARK: - Main
 
-guard let calendarName = parseArgs() else {
+let parsed = parseArgs()
+let calendarName = parsed.calendar
+let sourceName = parsed.source
+
+guard !calendarName.isEmpty else {
     outputError("invalid_args", "Required: --calendar <name>. Update data is read from stdin as JSON array.")
     exit(1)
 }
@@ -135,9 +151,10 @@ if !accessGranted {
 
 store.refreshSourcesIfNecessary()
 
-guard let calendar = store.calendars(for: .event).first(where: { $0.title == calendarName }) else {
-    let available = store.calendars(for: .event).map { $0.title }.joined(separator: ", ")
-    outputError("calendar_not_found", "Calendar '\(calendarName)' not found. Available: \(available)")
+guard let calendar = store.calendars(for: .event).first(where: { $0.title == calendarName && (sourceName.isEmpty || $0.source.title == sourceName) }) else {
+    let displayName = sourceName.isEmpty ? calendarName : "\(calendarName) (\(sourceName))"
+    let available = store.calendars(for: .event).map { "\($0.title) (\($0.source.title))" }.joined(separator: ", ")
+    outputError("calendar_not_found", "Calendar '\(displayName)' not found. Available: \(available)")
     exit(1)
 }
 

@@ -67,6 +67,7 @@ For a single event, pass an array with one element. All events go to the same ca
 **Parameters:**
 - `calendar_name` (str, optional, default: ""): Name of the target calendar. If omitted, uses the system default calendar.
 - `events` (str, required): JSON array of event objects. Each object has keys: summary (required), start_date (required, ISO 8601), end_date (required, ISO 8601), and optional: location, notes, url, allday (bool), recurrence (RRULE string), alerts (list of minutes, e.g. [15, 60]), availability ("free"/"busy"/"tentative"), timezone (IANA identifier, e.g. "America/Los_Angeles" — use to schedule in a remote timezone rather than converting times manually), structured_location (object with title, latitude, longitude, radius — adds map pin and geo coordinates). For all-day events, set allday=true and use date-only format. end is inclusive for all-day events.
+- `calendar_source` (str, optional, default: ""): Source/account name to disambiguate calendars with the same name (e.g., "iCloud", "Google"). Use get_calendars to see source values.
 
 **Returns:** Each created event with title and UID. Use these UIDs with update_events or delete_events. Any per-event errors are listed separately. Partial success is possible — some events may be created while others fail.
 
@@ -85,6 +86,7 @@ For recurring events: use occurrence_date to target a specific occurrence, and s
 **Parameters:**
 - `calendar_name` (str, required): Exact name of the calendar containing the events. If a UID exists in a different calendar, use search_events to find the correct calendar_name.
 - `updates` (str, required): JSON array of update objects. Each object must have "uid" (required) and at least one field to update: summary, start_date (ISO 8601), end_date (ISO 8601), location, notes, url, allday (bool), alerts (list of minutes), availability ("free"/"busy"/"tentative"), timezone (IANA identifier), recurrence (RRULE string), clear_location (bool), clear_notes (bool), clear_url (bool), clear_alerts (bool), clear_recurrence (bool). For recurring events: occurrence_date (ISO 8601) to target specific occurrence, span ("this_event" or "future_events", default "this_event").
+- `calendar_source` (str, optional, default: ""): Source/account name to disambiguate calendars with the same name (e.g., "iCloud", "Google"). Use get_calendars to see source values.
 
 **Returns:** Summary of updated events, each with title and list of changed fields. Any per-event errors are listed separately. Partial success is possible. Note: when rescheduling a recurring event occurrence (changing dates with span="this_event"), a new standalone event is created — the returned UID may differ.
 
@@ -173,5 +175,6 @@ For recurring events: use occurrence_date to target a specific occurrence, and s
 - `event_uids` (str | list[str], required): UID of a single event (str) or list of UIDs to delete
 - `span` (str, optional, default: "this_event"): "this_event" to delete one occurrence, "future_events" to delete the series from this point onward
 - `occurrence_date` (str, optional, default: ""): For recurring events, the occurrence_date from get_events to target a specific occurrence
+- `calendar_source` (str, optional, default: ""): Source/account name to disambiguate calendars with the same name (e.g., "iCloud", "Google"). Use get_calendars to see source values.
 
 **Returns:** Count of deleted events. Any UIDs not found are listed separately — these don't cause the operation to fail.
