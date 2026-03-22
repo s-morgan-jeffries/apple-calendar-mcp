@@ -312,6 +312,7 @@ def get_events(
     Returns:
         Each event includes: uid, summary, start_date, end_date, allday_event, location, notes,
         url, status, calendar_name, availability, created_date, modified_date.
+        If created in a specific timezone: timezone (IANA identifier, e.g. "Asia/Tokyo").
         For all-day events, end_date is the last day of the event (inclusive).
         For recurring events: is_recurring, recurrence_rule, occurrence_date, is_detached.
         If alerts are set: alerts (list with minutes_before for each).
