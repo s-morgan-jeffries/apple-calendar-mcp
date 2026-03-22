@@ -65,7 +65,8 @@ def get_calendars() -> str:
 
     Returns:
         Each calendar includes: name, access level (read-write or read-only), source
-        (account name like "iCloud" or "Google"), description, color.
+        (account name like "iCloud" or "Google"), description, color, is_default (boolean).
+        The default calendar is used when create_events is called without a calendar_name.
         Use calendar names exactly as shown when calling other tools.
     """
     client = get_client()
@@ -121,8 +122,8 @@ def delete_calendar(name: str) -> str:
 
 @mcp.tool()
 def create_events(
-    calendar_name: str,
-    events: str,
+    calendar_name: str = "",
+    events: str = "",
 ) -> str:
     """Create one or more events in a calendar.
 
@@ -130,7 +131,7 @@ def create_events(
     the same calendar.
 
     Args:
-        calendar_name: Exact name of the target calendar
+        calendar_name: Name of the target calendar. If omitted, uses the system default calendar.
         events: JSON array of event objects. Each object has keys: summary (required),
                 start (required, ISO 8601), end (required, ISO 8601), and optional:
                 location, notes, url, allday (bool), recurrence (RRULE string),

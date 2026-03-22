@@ -59,6 +59,8 @@ func calendarTypeString(_ type: EKCalendarType) -> String {
     }
 }
 
+let defaultCal = store.defaultCalendarForNewEvents
+
 let calendarDicts: [[String: Any]] = calendars.map { cal in
     [
         "name": cal.title,
@@ -67,6 +69,7 @@ let calendarDicts: [[String: Any]] = calendars.map { cal in
         "color": cgColorToHex(cal.cgColor),
         "type": calendarTypeString(cal.type),
         "source": cal.source.title,
+        "is_default": cal == defaultCal,
     ]
 }
 
