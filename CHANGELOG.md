@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-03-22
+
+### Added
+
+- Structured location support: geo coordinates, radius, map pins via `EKStructuredLocation` (#175, #176)
+- Event organizer details: `organizer_name`, `organizer_email`, `organizer_status` (#163, #169)
+- Creation/modification timestamps: `created_date`, `modified_date` (#164, #169)
+- Event timezone read-back: returns IANA identifier for cross-timezone events (#166, #174)
+- Default calendar: `is_default` field in `get_calendars`, `calendar_name` optional on `create_events` (#165, #173)
+- Calendar name in `_format_event` output for search → update/delete chaining (#171, #172)
+- Cross-calendar queries: `get_events` and `search_events` accept `calendar_names: list[str]` (#185, #191)
+- Unimplemented capabilities audit in gap analysis (#161, #162)
+
+### Changed
+
+- **Breaking:** `get_events` and `search_events`: `calendar_name` → `calendar_names` (list, optional, empty = all calendars) (#185, #191)
+- **Breaking:** `create_events`/`update_events` JSON input: `start`/`end` → `start_date`/`end_date` (matches get_events output) (#178, #187)
+- **Breaking:** `delete_events`: `event_uid` → `event_uids` (matches connector, plural behavior) (#180, #189)
+- `get_availability` and `get_conflicts` now use single Swift call instead of per-calendar Python loop (#185, #191)
+- Cyclomatic complexity reduced: `get_availability` 19→6, `search_events` 14→4, via 6 extracted helpers (#158, #193)
+- Release skill expanded to 12 phases with test coverage, code review, and documentation review gates (#160, #196)
+
+### Fixed
+
+- Stale disambiguation guidance in `tool_descriptions.md`: "use description" → "use source field" (#177, #186)
+- `get_availability` Returns docstring: "duration formatted" → `duration_minutes` (integer) (#181, #186)
+- `working_hours_start`/`working_hours_end` paired requirement documented (#183, #186)
+- `is_default` rendered in `_format_calendar` output (#184, #186)
+- "UID in wrong calendar" error recovery path documented (#182, #190)
+- Resolved calendar name shown in success message when using default (#179, #188)
+- Blind eval scoring: scenarios 23/27 accept `clear_*` flags (both approaches valid) (#192, #197)
+
 ## [0.7.0] - 2026-03-21
 
 ### Added
