@@ -296,6 +296,16 @@ class TestDeleteCalendar:
         with pytest.raises(ValueError, match="not found"):
             self.connector.delete_calendar("Nonexistent")
 
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_passes_source_to_swift(self, mock_swift):
+        mock_swift.return_value = json.dumps({"name": "Family"})
+        self.connector.delete_calendar("Family", calendar_source="iCloud")
+        mock_swift.assert_called_once_with(
+            "delete_calendar",
+            ["--name", "Family", "--source", "iCloud"],
+            stdin_data=None,
+        )
+
     def test_safety_blocks_non_test_calendar(self):
         connector = CalendarConnector(enable_safety_checks=True)
         with pytest.raises(CalendarSafetyError, match="not an allowed test calendar"):

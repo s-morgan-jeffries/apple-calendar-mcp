@@ -15,6 +15,7 @@ func outputError(_ error: String, _ message: String) {
 
 struct DeleteCalendarArgs {
     var name: String = ""
+    var source: String = ""
 }
 
 func parseArgs() -> DeleteCalendarArgs {
@@ -25,6 +26,8 @@ func parseArgs() -> DeleteCalendarArgs {
         switch args[i] {
         case "--name":
             i += 1; if i < args.count { result.name = args[i] }
+        case "--source":
+            i += 1; if i < args.count { result.source = args[i] }
         default:
             break
         }
@@ -63,11 +66,15 @@ if !accessGranted {
 
 store.refreshSourcesIfNecessary()
 
-// Find the calendar by name
-let calendars = store.calendars(for: .event).filter { $0.title == parsed.name }
-
+// Find the calendar by name (and optionally source)
+let calendars = store.calendars(for: .event).filter { $0.title == parsed.name && (parsed.source.isEmpty || $0.source.title == parsed.source) }
+if calendars.count > 1 && parsed.source.isEmpty {
+    outputError("ambiguous_calendar", "Multiple calendars named '\(parsed.name)' found. Specify calendar_source to disambiguate.")
+    exit(1)
+}
 guard let calendar = calendars.first else {
-    outputError("calendar_not_found", "Calendar '\(parsed.name)' not found. Use get_calendars to see available names.")
+    let displayName = parsed.source.isEmpty ? parsed.name : "\(parsed.name) (\(parsed.source))"
+    outputError("calendar_not_found", "Calendar '\(displayName)' not found. Use get_calendars to see available names.")
     exit(1)
 }
 

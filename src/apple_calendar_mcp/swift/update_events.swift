@@ -151,7 +151,12 @@ if !accessGranted {
 
 store.refreshSourcesIfNecessary()
 
-guard let calendar = store.calendars(for: .event).first(where: { $0.title == calendarName && (sourceName.isEmpty || $0.source.title == sourceName) }) else {
+let calMatches = store.calendars(for: .event).filter { $0.title == calendarName && (sourceName.isEmpty || $0.source.title == sourceName) }
+if calMatches.count > 1 && sourceName.isEmpty {
+    outputError("ambiguous_calendar", "Multiple calendars named '\(calendarName)' found. Specify calendar_source to disambiguate.")
+    exit(1)
+}
+guard let calendar = calMatches.first else {
     let displayName = sourceName.isEmpty ? calendarName : "\(calendarName) (\(sourceName))"
     outputError("calendar_not_found", "Calendar '\(displayName)' not found. Use get_calendars to see available names.")
     exit(1)

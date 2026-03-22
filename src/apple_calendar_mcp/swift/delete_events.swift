@@ -96,7 +96,12 @@ store.refreshSourcesIfNecessary()
 
 // Find the calendar by name (and optionally source)
 let allCalendars = store.calendars(for: .event)
-guard let calendar = allCalendars.first(where: { $0.title == parsed.calendar && (parsed.source.isEmpty || $0.source.title == parsed.source) }) else {
+let calMatches = allCalendars.filter { $0.title == parsed.calendar && (parsed.source.isEmpty || $0.source.title == parsed.source) }
+if calMatches.count > 1 && parsed.source.isEmpty {
+    outputError("ambiguous_calendar", "Multiple calendars named '\(parsed.calendar)' found. Specify calendar_source to disambiguate.")
+    exit(1)
+}
+guard let calendar = calMatches.first else {
     let displayName = parsed.source.isEmpty ? parsed.calendar : "\(parsed.calendar) (\(parsed.source))"
     outputError("calendar_not_found", "Calendar '\(displayName)' not found. Use get_calendars to see available names.")
     exit(1)
