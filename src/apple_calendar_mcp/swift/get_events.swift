@@ -157,6 +157,11 @@ func eventToDict(_ event: EKEvent) -> [String: Any] {
         dict["modified_date"] = df.string(from: modified)
     }
 
+    // Timezone (preserves scheduling intent for cross-timezone events)
+    if let tz = event.timeZone {
+        dict["timezone"] = tz.identifier
+    }
+
     return dict
 }
 
