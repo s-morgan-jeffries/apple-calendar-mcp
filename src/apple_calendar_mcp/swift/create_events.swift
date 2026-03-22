@@ -158,9 +158,9 @@ var errors: [[String: Any]] = []
 
 for (index, eventData) in eventsJson.enumerated() {
     guard let summary = eventData["summary"] as? String,
-          let startStr = eventData["start"] as? String,
-          let endStr = eventData["end"] as? String else {
-        errors.append(["index": index, "summary": eventData["summary"] as? String ?? "unknown", "error": "Missing required fields: summary, start, end"])
+          let startStr = eventData["start_date"] as? String,
+          let endStr = eventData["end_date"] as? String else {
+        errors.append(["index": index, "summary": eventData["summary"] as? String ?? "unknown", "error": "Missing required fields: summary, start_date, end_date"])
         continue
     }
 

@@ -534,8 +534,8 @@ class TestCreateEventsTool:
 
         from apple_calendar_mcp.server_fastmcp import create_events
         events_json = json.dumps([
-            {"summary": "Event A", "start": "2026-03-15T10:00:00", "end": "2026-03-15T11:00:00"},
-            {"summary": "Event B", "start": "2026-03-15T12:00:00", "end": "2026-03-15T13:00:00"},
+            {"summary": "Event A", "start_date": "2026-03-15T10:00:00", "end_date": "2026-03-15T11:00:00"},
+            {"summary": "Event B", "start_date": "2026-03-15T12:00:00", "end_date": "2026-03-15T13:00:00"},
         ])
         result = create_events(calendar_name="Work", events=events_json)
         assert "Created 2 event(s)" in result
@@ -552,7 +552,7 @@ class TestCreateEventsTool:
 
         from apple_calendar_mcp.server_fastmcp import create_events
         events_json = json.dumps([
-            {"summary": "Event A", "start": "2026-03-15T10:00:00", "end": "2026-03-15T11:00:00"},
+            {"summary": "Event A", "start_date": "2026-03-15T10:00:00", "end_date": "2026-03-15T11:00:00"},
         ])
         result = create_events(calendar_name="Nonexistent", events=events_json)
         assert "Error" in result
@@ -569,8 +569,8 @@ class TestCreateEventsTool:
 
         from apple_calendar_mcp.server_fastmcp import create_events
         events_json = json.dumps([
-            {"summary": "Event A", "start": "2026-03-15T10:00:00", "end": "2026-03-15T11:00:00"},
-            {"summary": "Event B", "start": "bad-date", "end": "bad-date"},
+            {"summary": "Event A", "start_date": "2026-03-15T10:00:00", "end_date": "2026-03-15T11:00:00"},
+            {"summary": "Event B", "start_date": "bad-date", "end_date": "bad-date"},
         ])
         result = create_events(calendar_name="Work", events=events_json)
         assert "Created 1 event(s)" in result
@@ -598,7 +598,7 @@ class TestUpdateEventsTool:
         mock_client = MagicMock()
         mock_client.update_events.return_value = {
             "updated": [
-                {"summary": "Event A", "updated_fields": ["start", "end"]},
+                {"summary": "Event A", "updated_fields": ["start_date", "end_date"]},
                 {"summary": "Event B", "updated_fields": ["location"]},
             ],
             "errors": [],
@@ -607,13 +607,13 @@ class TestUpdateEventsTool:
 
         from apple_calendar_mcp.server_fastmcp import update_events
         updates_json = json.dumps([
-            {"uid": "UID-A", "start": "2026-03-15T11:00:00", "end": "2026-03-15T12:00:00"},
+            {"uid": "UID-A", "start_date": "2026-03-15T11:00:00", "end_date": "2026-03-15T12:00:00"},
             {"uid": "UID-B", "location": "Room B"},
         ])
         result = update_events(calendar_name="Work", updates=updates_json)
         assert "Updated 2 event(s)" in result
         assert "Event A" in result
-        assert "start, end" in result
+        assert "start_date, end_date" in result
         assert "location" in result
         assert isinstance(result, str)
 

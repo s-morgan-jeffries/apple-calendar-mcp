@@ -135,7 +135,7 @@ def create_events(
     Args:
         calendar_name: Name of the target calendar. If omitted, uses the system default calendar.
         events: JSON array of event objects. Each object has keys: summary (required),
-                start (required, ISO 8601), end (required, ISO 8601), and optional:
+                start_date (required, ISO 8601), end_date (required, ISO 8601), and optional:
                 location, notes, url, allday (bool), recurrence (RRULE string),
                 alerts (list of minutes, e.g. [15, 60]), availability ("free"/"busy"/"tentative"),
                 timezone (IANA identifier, e.g. "America/Los_Angeles" — use this to schedule
@@ -194,7 +194,7 @@ def update_events(
     Args:
         calendar_name: Exact name of the calendar containing the events
         updates: JSON array of update objects. Each object must have "uid" (required)
-                 and at least one field to update: summary, start (ISO 8601), end (ISO 8601),
+                 and at least one field to update: summary, start_date (ISO 8601), end_date (ISO 8601),
                  location, notes, url, allday (bool), alerts (list of minutes),
                  availability ("free"/"busy"/"tentative"), timezone (IANA identifier —
                  use to schedule in a remote timezone rather than converting manually),

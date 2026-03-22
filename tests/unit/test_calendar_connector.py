@@ -998,8 +998,8 @@ class TestCreateEvents:
             "errors": [],
         })
         events = [
-            {"summary": "Event 1", "start": "2026-03-15T10:00:00", "end": "2026-03-15T11:00:00"},
-            {"summary": "Event 2", "start": "2026-03-15T12:00:00", "end": "2026-03-15T13:00:00"},
+            {"summary": "Event 1", "start_date": "2026-03-15T10:00:00", "end_date": "2026-03-15T11:00:00"},
+            {"summary": "Event 2", "start_date": "2026-03-15T12:00:00", "end_date": "2026-03-15T13:00:00"},
         ]
         result = self.connector.create_events("MCP-Test-Calendar", events)
         assert len(result["created"]) == 2

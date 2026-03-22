@@ -104,7 +104,7 @@ def run_benchmarks(read_calendar: str, test_calendar: str):
     def create_and_track():
         result = connector.create_events(
             calendar_name=test_calendar,
-            events=[{"summary": "Benchmark Event", "start": "2027-06-15T10:00:00", "end": "2027-06-15T11:00:00"}],
+            events=[{"summary": "Benchmark Event", "start_date": "2027-06-15T10:00:00", "end_date": "2027-06-15T11:00:00"}],
         )
         uid = result["created"][0]["uid"]
         created_uids.append(uid)
@@ -149,7 +149,7 @@ def run_benchmarks(read_calendar: str, test_calendar: str):
 
     # Batch delete benchmark (create 5, delete all)
     batch_events = [
-        {"summary": f"Batch Bench {i}", "start": "2027-07-01T10:00:00", "end": "2027-07-01T11:00:00"}
+        {"summary": f"Batch Bench {i}", "start_date": "2027-07-01T10:00:00", "end_date": "2027-07-01T11:00:00"}
         for i in range(5)
     ]
     batch_result = connector.create_events(calendar_name=test_calendar, events=batch_events)
