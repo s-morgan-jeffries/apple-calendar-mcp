@@ -126,6 +126,7 @@ def delete_calendar(name: str) -> str:
 def create_events(
     calendar_name: str = "",
     events: str = "",
+    calendar_source: str = "",
 ) -> str:
     """Create one or more events in a calendar.
 
@@ -144,6 +145,8 @@ def create_events(
                 map pin and geo coordinates to the event).
                 For all-day events, set allday=true and use date-only format.
                 end is inclusive for all-day events.
+        calendar_source: Source/account name to disambiguate calendars with the same name
+                        (e.g., "iCloud", "Google"). Use get_calendars to see source values.
 
     Returns:
         Each created event with title and UID. Use these UIDs with update_events or
@@ -163,6 +166,7 @@ def create_events(
         result = client.create_events(
             calendar_name=calendar_name,
             events=event_list,
+            calendar_source=calendar_source,
         )
     except Exception as e:
         return f"Error creating events: {e}"
@@ -185,6 +189,7 @@ def create_events(
 def update_events(
     calendar_name: str,
     updates: str,
+    calendar_source: str = "",
 ) -> str:
     """Update one or more events in a calendar.
 
@@ -205,6 +210,8 @@ def update_events(
                  clear_url (bool), clear_alerts (bool), clear_recurrence (bool).
                  For recurring events: occurrence_date (ISO 8601) to target specific occurrence,
                  span ("this_event" or "future_events", default "this_event").
+        calendar_source: Source/account name to disambiguate calendars with the same name
+                        (e.g., "iCloud", "Google"). Use get_calendars to see source values.
 
     Returns:
         Summary of updated events, each with title and list of changed fields. Any per-event
@@ -225,6 +232,7 @@ def update_events(
         result = client.update_events(
             calendar_name=calendar_name,
             updates=update_list,
+            calendar_source=calendar_source,
         )
     except Exception as e:
         return f"Error updating events: {e}"
@@ -530,6 +538,7 @@ def delete_events(
     event_uids: str | list[str] = "",
     span: str = "this_event",
     occurrence_date: str = "",
+    calendar_source: str = "",
 ) -> str:
     """Delete one or more events from a calendar by UID.
 
@@ -549,6 +558,8 @@ def delete_events(
         event_uids: UID of a single event (str) or list of UIDs to delete
         span: "this_event" to delete one occurrence, "future_events" to delete the series from this point onward (default: "this_event")
         occurrence_date: For recurring events, the occurrence_date from get_events to target a specific occurrence (optional)
+        calendar_source: Source/account name to disambiguate calendars with the same name
+                        (e.g., "iCloud", "Google"). Use get_calendars to see source values.
 
     Returns:
         Count of deleted events. Any UIDs not found are listed separately — these don't cause
@@ -561,6 +572,7 @@ def delete_events(
             event_uids=event_uids,
             span=span,
             occurrence_date=occurrence_date or None,
+            calendar_source=calendar_source,
         )
     except Exception as e:
         return f"Error deleting event(s): {e}"

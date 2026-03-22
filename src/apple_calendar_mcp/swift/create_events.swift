@@ -4,18 +4,27 @@ import Foundation
 
 // MARK: - Argument Parsing
 
-func parseArgs() -> String? {
-    let args = CommandLine.arguments
-    var calendar: String?
+struct CreateEventsArgs {
+    var calendar: String = ""
+    var source: String = ""
+}
 
+func parseArgs() -> CreateEventsArgs {
+    var result = CreateEventsArgs()
+    let args = CommandLine.arguments
     var i = 1
     while i < args.count {
-        if args[i] == "--calendar" {
-            i += 1; if i < args.count { calendar = args[i] }
+        switch args[i] {
+        case "--calendar":
+            i += 1; if i < args.count { result.calendar = args[i] }
+        case "--source":
+            i += 1; if i < args.count { result.source = args[i] }
+        default:
+            break
         }
         i += 1
     }
-    return calendar
+    return result
 }
 
 // MARK: - Date Parsing
@@ -111,7 +120,9 @@ func outputError(_ error: String, _ message: String) {
 
 // MARK: - Main
 
-let calendarName = parseArgs() ?? ""
+let parsed = parseArgs()
+let calendarName = parsed.calendar
+let sourceName = parsed.source
 
 // Read JSON from stdin
 let stdinData = FileHandle.standardInput.readDataToEndOfFile()
@@ -144,9 +155,10 @@ if calendarName.isEmpty {
     }
     calendar = defaultCal
 } else {
-    guard let found = store.calendars(for: .event).first(where: { $0.title == calendarName }) else {
-        let available = store.calendars(for: .event).map { $0.title }.joined(separator: ", ")
-        outputError("calendar_not_found", "Calendar '\(calendarName)' not found. Available: \(available)")
+    guard let found = store.calendars(for: .event).first(where: { $0.title == calendarName && (sourceName.isEmpty || $0.source.title == sourceName) }) else {
+        let displayName = sourceName.isEmpty ? calendarName : "\(calendarName) (\(sourceName))"
+        let available = store.calendars(for: .event).map { "\($0.title) (\($0.source.title))" }.joined(separator: ", ")
+        outputError("calendar_not_found", "Calendar '\(displayName)' not found. Available: \(available)")
         exit(1)
     }
     calendar = found

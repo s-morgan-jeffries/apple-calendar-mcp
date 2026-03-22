@@ -132,6 +132,7 @@ class CalendarConnector:
         self,
         calendar_name: str = "",
         events: list[dict[str, Any]] | None = None,
+        calendar_source: str = "",
     ) -> dict[str, Any]:
         """Create one or more events in a calendar.
 
@@ -141,6 +142,8 @@ class CalendarConnector:
             events: List of event dicts, each with keys: summary, start, end,
                     and optional: location, notes, url, allday, recurrence,
                     alerts (list of int), availability, timezone
+            calendar_source: Source/account name to disambiguate calendars with
+                           the same name (e.g., 'iCloud', 'Google').
 
         Returns:
             Dict with 'created' (list of {uid, summary}) and 'errors' (list of {index, summary, error})
@@ -151,15 +154,20 @@ class CalendarConnector:
         if not events:
             raise ValueError("At least one event must be provided")
 
+        args = ["--calendar", calendar_name]
+        if calendar_source:
+            args += ["--source", calendar_source]
+
         stdin_data = json.dumps(events)
         return self._run_swift_helper_json(
-            "create_events", ["--calendar", calendar_name], stdin_data=stdin_data
+            "create_events", args, stdin_data=stdin_data
         )
 
     def update_events(
         self,
         calendar_name: str,
         updates: list[dict[str, Any]],
+        calendar_source: str = "",
     ) -> dict[str, Any]:
         """Update one or more events in a single batch operation.
 
@@ -171,6 +179,8 @@ class CalendarConnector:
                      clear_notes, clear_url, clear_alerts, clear_recurrence.
                      For recurring events: occurrence_date (ISO 8601) to target a specific
                      occurrence, span ("this_event" or "future_events", default "this_event").
+            calendar_source: Source/account name to disambiguate calendars with
+                           the same name (e.g., 'iCloud', 'Google').
 
         Returns:
             Dict with 'updated' (list of {uid, summary, updated_fields}) and 'errors'.
@@ -183,9 +193,13 @@ class CalendarConnector:
         if not updates:
             raise ValueError("At least one update must be provided")
 
+        args = ["--calendar", calendar_name]
+        if calendar_source:
+            args += ["--source", calendar_source]
+
         stdin_data = json.dumps(updates)
         return self._run_swift_helper_json(
-            "update_events", ["--calendar", calendar_name], stdin_data=stdin_data
+            "update_events", args, stdin_data=stdin_data
         )
 
     def _normalize_calendar_names(
@@ -399,6 +413,7 @@ class CalendarConnector:
         event_uids: str | list[str],
         span: str = "this_event",
         occurrence_date: Optional[str] = None,
+        calendar_source: str = "",
     ) -> dict[str, Any]:
         """Delete one or more events by UID.
 
@@ -407,6 +422,8 @@ class CalendarConnector:
             event_uids: Single UID string or list of UIDs to delete
             span: "this_event" to delete one occurrence, "future_events" to delete series from this point (default: "this_event")
             occurrence_date: For recurring events, the date of the specific occurrence to delete (optional)
+            calendar_source: Source/account name to disambiguate calendars with
+                           the same name (e.g., 'iCloud', 'Google').
 
         Returns:
             Dict with 'deleted_uids' and 'not_found_uids' keys
@@ -422,6 +439,8 @@ class CalendarConnector:
             raise ValueError("At least one event UID must be provided")
 
         args = ["--calendar", calendar_name]
+        if calendar_source:
+            args += ["--source", calendar_source]
         for uid in uids:
             args += ["--uid", uid]
         if span != "this_event":

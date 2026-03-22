@@ -3,34 +3,41 @@ import Foundation
 
 // MARK: - Argument Parsing
 
-func parseArgs() -> (calendar: String, uids: [String], span: EKSpan, occurrenceDate: String?)? {
-    let args = CommandLine.arguments
-    var calendar: String?
+struct DeleteEventsArgs {
+    var calendar: String = ""
+    var source: String = ""
     var uids: [String] = []
     var span: EKSpan = .thisEvent
     var occurrenceDate: String?
+}
+
+func parseArgs() -> DeleteEventsArgs? {
+    var result = DeleteEventsArgs()
+    let args = CommandLine.arguments
 
     var i = 1
     while i < args.count {
         switch args[i] {
         case "--calendar":
-            i += 1; if i < args.count { calendar = args[i] }
+            i += 1; if i < args.count { result.calendar = args[i] }
+        case "--source":
+            i += 1; if i < args.count { result.source = args[i] }
         case "--uid":
-            i += 1; if i < args.count { uids.append(args[i]) }
+            i += 1; if i < args.count { result.uids.append(args[i]) }
         case "--span":
-            i += 1; if i < args.count { span = args[i] == "future_events" ? .futureEvents : .thisEvent }
+            i += 1; if i < args.count { result.span = args[i] == "future_events" ? .futureEvents : .thisEvent }
         case "--occurrence-date":
-            i += 1; if i < args.count { occurrenceDate = args[i] }
+            i += 1; if i < args.count { result.occurrenceDate = args[i] }
         default:
             break
         }
         i += 1
     }
 
-    guard let cal = calendar, !uids.isEmpty else {
+    guard !result.calendar.isEmpty, !result.uids.isEmpty else {
         return nil
     }
-    return (cal, uids, span, occurrenceDate)
+    return result
 }
 
 // MARK: - Date Parsing
@@ -87,11 +94,12 @@ if !accessGranted {
 
 store.refreshSourcesIfNecessary()
 
-// Find the calendar by name
+// Find the calendar by name (and optionally source)
 let allCalendars = store.calendars(for: .event)
-guard let calendar = allCalendars.first(where: { $0.title == parsed.calendar }) else {
-    let available = allCalendars.map { $0.title }.joined(separator: ", ")
-    outputError("calendar_not_found", "Calendar '\(parsed.calendar)' not found. Available: \(available)")
+guard let calendar = allCalendars.first(where: { $0.title == parsed.calendar && (parsed.source.isEmpty || $0.source.title == parsed.source) }) else {
+    let displayName = parsed.source.isEmpty ? parsed.calendar : "\(parsed.calendar) (\(parsed.source))"
+    let available = allCalendars.map { "\($0.title) (\($0.source.title))" }.joined(separator: ", ")
+    outputError("calendar_not_found", "Calendar '\(displayName)' not found. Available: \(available)")
     exit(1)
 }
 
