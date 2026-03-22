@@ -34,7 +34,7 @@ def _update_single_event(connector, calendar_name, event_uid, **kwargs):
     """Update a single event via update_events and return the result."""
     update = {"uid": event_uid}
     field_map = {
-        "summary": "summary", "start_date": "start", "end_date": "end",
+        "summary": "summary", "start_date": "start_date", "end_date": "end_date",
         "location": "location", "notes": "notes", "url": "url",
         "allday_event": "allday", "availability": "availability",
         "timezone": "timezone", "recurrence_rule": "recurrence",
@@ -83,7 +83,7 @@ end tell'''
 
 def _create_single_event(connector, calendar_name, summary, start_date, end_date, **kwargs):
     """Create a single event via create_events and return the UID."""
-    event = {"summary": summary, "start": start_date, "end": end_date}
+    event = {"summary": summary, "start_date": start_date, "end_date": end_date}
     if kwargs.get("location"):
         event["location"] = kwargs["location"]
     if kwargs.get("notes"):
@@ -265,8 +265,8 @@ end tell'''
     def test_batch_creates_multiple_events(self, connector):
         """Batch create should handle multiple events in one call."""
         events = [
-            {"summary": "Batch Event 1", "start": "2026-06-20T10:00:00", "end": "2026-06-20T11:00:00"},
-            {"summary": "Batch Event 2", "start": "2026-06-20T14:00:00", "end": "2026-06-20T15:00:00"},
+            {"summary": "Batch Event 1", "start_date": "2026-06-20T10:00:00", "end_date": "2026-06-20T11:00:00"},
+            {"summary": "Batch Event 2", "start_date": "2026-06-20T14:00:00", "end_date": "2026-06-20T15:00:00"},
         ]
         result = connector.create_events(TEST_CALENDAR, events)
         uids = [c["uid"] for c in result["created"]]

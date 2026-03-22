@@ -183,8 +183,8 @@ for (index, updateData) in updatesJson.enumerated() {
     var updatedFields: [String] = []
 
     // Parse new start/end before applying
-    let newStartStr = updateData["start"] as? String
-    let newEndStr = updateData["end"] as? String
+    let newStartStr = updateData["start_date"] as? String
+    let newEndStr = updateData["end_date"] as? String
     let newStart: Date? = newStartStr.flatMap { parseISO8601($0, timeZone: tz) }
     let newEnd: Date? = newEndStr.flatMap { parseISO8601($0, timeZone: tz) }
 
