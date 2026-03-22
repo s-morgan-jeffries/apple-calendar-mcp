@@ -83,7 +83,7 @@ Use get_events first to find the event's UID and calendar_name.
 For recurring events: use occurrence_date to target a specific occurrence, and span to control whether the change affects just this occurrence or the series.
 
 **Parameters:**
-- `calendar_name` (str, required): Exact name of the calendar containing the events
+- `calendar_name` (str, required): Exact name of the calendar containing the events. If a UID exists in a different calendar, use search_events to find the correct calendar_name.
 - `updates` (str, required): JSON array of update objects. Each object must have "uid" (required) and at least one field to update: summary, start_date (ISO 8601), end_date (ISO 8601), location, notes, url, allday (bool), alerts (list of minutes), availability ("free"/"busy"/"tentative"), timezone (IANA identifier), recurrence (RRULE string), clear_location (bool), clear_notes (bool), clear_url (bool), clear_alerts (bool), clear_recurrence (bool). For recurring events: occurrence_date (ISO 8601) to target specific occurrence, span ("this_event" or "future_events", default "this_event").
 
 **Returns:** Summary of updated events, each with title and list of changed fields. Any per-event errors are listed separately. Partial success is possible. Note: when rescheduling a recurring event occurrence (changing dates with span="this_event"), a new standalone event is created — the returned UID may differ.
@@ -169,7 +169,7 @@ Use get_events first to find the event UID(s) and calendar_name.
 For recurring events: use occurrence_date to target a specific occurrence, and span to control deletion scope. Without occurrence_date, deletes the base event (which may affect the entire series).
 
 **Parameters:**
-- `calendar_name` (str, required): Exact name of the calendar containing the event(s)
+- `calendar_name` (str, required): Exact name of the calendar containing the event(s). If a UID exists in a different calendar, use search_events to find the correct calendar_name.
 - `event_uids` (str | list[str], required): UID of a single event (str) or list of UIDs to delete
 - `span` (str, optional, default: "this_event"): "this_event" to delete one occurrence, "future_events" to delete the series from this point onward
 - `occurrence_date` (str, optional, default: ""): For recurring events, the occurrence_date from get_events to target a specific occurrence

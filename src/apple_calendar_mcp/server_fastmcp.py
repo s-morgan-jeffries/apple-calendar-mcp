@@ -193,7 +193,8 @@ def update_events(
     use the clear_* boolean flags.
 
     Args:
-        calendar_name: Exact name of the calendar containing the events
+        calendar_name: Exact name of the calendar containing the events.
+                      If a UID exists in a different calendar, use search_events to find the correct calendar_name.
         updates: JSON array of update objects. Each object must have "uid" (required)
                  and at least one field to update: summary, start_date (ISO 8601), end_date (ISO 8601),
                  location, notes, url, allday (bool), alerts (list of minutes),
@@ -536,7 +537,8 @@ def delete_events(
     base event (which may affect the entire series).
 
     Args:
-        calendar_name: Exact name of the calendar containing the event(s)
+        calendar_name: Exact name of the calendar containing the event(s).
+                      If a UID exists in a different calendar, use search_events to find the correct calendar_name.
         event_uids: UID of a single event (str) or list of UIDs to delete
         span: "this_event" to delete one occurrence, "future_events" to delete the series from this point onward (default: "this_event")
         occurrence_date: For recurring events, the occurrence_date from get_events to target a specific occurrence (optional)
