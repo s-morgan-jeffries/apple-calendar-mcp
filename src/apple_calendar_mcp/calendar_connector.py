@@ -188,6 +188,117 @@ class CalendarConnector:
             "update_events", ["--calendar", calendar_name], stdin_data=stdin_data
         )
 
+    def _normalize_calendar_names(
+        self,
+        calendar_names: list[str] | str | None,
+        calendar_name: str | None = None,
+    ) -> list[str]:
+        """Normalize calendar_names parameter to a list of strings.
+
+        Handles backward-compat calendar_name alias and str/None/list inputs.
+        """
+        if calendar_name is not None and calendar_names is None:
+            calendar_names = [calendar_name] if calendar_name else []
+
+        if calendar_names is None:
+            calendar_names = []
+        elif isinstance(calendar_names, str):
+            calendar_names = [calendar_names] if calendar_names else []
+
+        return calendar_names
+
+    def _apply_search_date_defaults(
+        self,
+        start_date: Optional[str],
+        end_date: Optional[str],
+    ) -> tuple[str, str]:
+        """Apply default date range for search: 30 days ago to 180 days ahead."""
+        if not start_date:
+            start_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%dT00:00:00")
+        if not end_date:
+            end_date = (datetime.now() + timedelta(days=180)).strftime("%Y-%m-%dT00:00:00")
+        return start_date, end_date
+
+    def _process_allday_events(self, events: list[dict]) -> list[dict]:
+        """Adjust end dates for all-day events to inclusive date-only format."""
+        for event in events:
+            if event.get("allday_event"):
+                event["end_date"] = self._allday_end_from_eventkit(event["end_date"])
+        return events
+
+    def _validate_working_hours(
+        self,
+        wh_start_str: str | None,
+        wh_end_str: str | None,
+    ) -> tuple[tuple[int, int], tuple[int, int]] | None:
+        """Validate and parse working hours parameters.
+
+        Returns:
+            Parsed (start, end) tuple pair, or None if not provided.
+
+        Raises:
+            ValueError: If only one bound is provided or start >= end.
+        """
+        if wh_start_str is None and wh_end_str is None:
+            return None
+        if wh_start_str is None or wh_end_str is None:
+            raise ValueError(
+                "Both working_hours_start and working_hours_end must be provided together"
+            )
+        wh_start = self._parse_time_string(wh_start_str)
+        wh_end = self._parse_time_string(wh_end_str)
+        if wh_start >= wh_end:
+            raise ValueError(
+                "working_hours_start must be before working_hours_end"
+            )
+        return (wh_start, wh_end)
+
+    def _calculate_free_slots(
+        self,
+        merged_busy: list[tuple[datetime, datetime]],
+        range_start: datetime,
+        range_end: datetime,
+    ) -> list[dict[str, Any]]:
+        """Compute free time slots from gaps between merged busy blocks."""
+        free_slots: list[dict[str, Any]] = []
+        cursor = range_start
+
+        for busy_start, busy_end in merged_busy:
+            busy_start = max(busy_start, range_start)
+            busy_end = min(busy_end, range_end)
+
+            if cursor < busy_start:
+                duration = int((busy_start - cursor).total_seconds() / 60)
+                free_slots.append({
+                    "start_date": cursor.isoformat(),
+                    "end_date": busy_start.isoformat(),
+                    "duration_minutes": duration,
+                })
+            cursor = max(cursor, busy_end)
+
+        if cursor < range_end:
+            duration = int((range_end - cursor).total_seconds() / 60)
+            free_slots.append({
+                "start_date": cursor.isoformat(),
+                "end_date": range_end.isoformat(),
+                "duration_minutes": duration,
+            })
+
+        return free_slots
+
+    def _apply_availability_filters(
+        self,
+        slots: list[dict[str, Any]],
+        wh: tuple[tuple[int, int], tuple[int, int]] | None,
+        min_duration: int | None,
+    ) -> list[dict[str, Any]]:
+        """Apply working-hours clipping and min-duration filtering to slots."""
+        if wh is not None:
+            slots = self._clip_to_working_hours(slots, wh[0], wh[1])
+        if min_duration is not None:
+            slots = [s for s in slots if s["duration_minutes"] >= min_duration]
+        return slots
+
     def _validate_date(self, date_str: str) -> None:
         """Validate that a string is a valid ISO 8601 date.
 
@@ -231,15 +342,7 @@ class CalendarConnector:
             ValueError: If date format is invalid or calendar not found
             PermissionError: If EventKit calendar access is denied
         """
-        # Support backward compat: calendar_name= keyword alias
-        if calendar_name is not None and calendar_names is None:
-            calendar_names = [calendar_name] if calendar_name else []
-
-        # Normalize calendar_names to a list
-        if calendar_names is None:
-            calendar_names = []
-        elif isinstance(calendar_names, str):
-            calendar_names = [calendar_names] if calendar_names else []
+        calendar_names = self._normalize_calendar_names(calendar_names, calendar_name)
 
         self._validate_date(start_date)
         self._validate_date(end_date)
@@ -249,10 +352,7 @@ class CalendarConnector:
             args += ["--calendar", name]
         args += ["--start", start_date, "--end", end_date]
         events = self._run_swift_helper_json("get_events", args)
-        for event in events:
-            if event.get("allday_event"):
-                event["end_date"] = self._allday_end_from_eventkit(event["end_date"])
-        return events
+        return self._process_allday_events(events)
 
     def search_events(
         self,
@@ -278,20 +378,8 @@ class CalendarConnector:
         Returns:
             List of matching event dicts.
         """
-        # Normalize calendar_names to a list
-        # Support backward compat: calendar_name= keyword alias
-        if calendar_name is not None and calendar_names is None:
-            calendar_names = [calendar_name] if calendar_name else []
-
-        if calendar_names is None:
-            calendar_names = []
-        elif isinstance(calendar_names, str):
-            calendar_names = [calendar_names] if calendar_names else []
-
-        if not start_date:
-            start_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%dT00:00:00")
-        if not end_date:
-            end_date = (datetime.now() + timedelta(days=180)).strftime("%Y-%m-%dT00:00:00")
+        calendar_names = self._normalize_calendar_names(calendar_names, calendar_name)
+        start_date, end_date = self._apply_search_date_defaults(start_date, end_date)
 
         self._validate_date(start_date)
         self._validate_date(end_date)
@@ -302,9 +390,7 @@ class CalendarConnector:
         args += ["--start", start_date, "--end", end_date, "--query", query]
         events = self._run_swift_helper_json("get_events", args)
         if isinstance(events, list):
-            for event in events:
-                if event.get("allday_event"):
-                    event["end_date"] = self._allday_end_from_eventkit(event["end_date"])
+            self._process_allday_events(events)
         return events if isinstance(events, list) else []
 
     def delete_events(
@@ -498,19 +584,7 @@ class CalendarConnector:
         if min_duration_minutes is not None and min_duration_minutes < 1:
             raise ValueError("min_duration_minutes must be a positive integer")
 
-        wh_start = None
-        wh_end = None
-        if working_hours_start is not None or working_hours_end is not None:
-            if working_hours_start is None or working_hours_end is None:
-                raise ValueError(
-                    "Both working_hours_start and working_hours_end must be provided together"
-                )
-            wh_start = self._parse_time_string(working_hours_start)
-            wh_end = self._parse_time_string(working_hours_end)
-            if wh_start >= wh_end:
-                raise ValueError(
-                    "working_hours_start must be before working_hours_end"
-                )
+        wh = self._validate_working_hours(working_hours_start, working_hours_end)
 
         if not calendar_names:
             raise ValueError("At least one calendar name must be provided")
@@ -524,40 +598,9 @@ class CalendarConnector:
         busy_events = [e for e in all_events if e.get("availability", "busy") != "free"]
 
         merged = self._build_busy_blocks(busy_events)
+        free_slots = self._calculate_free_slots(merged, range_start, range_end)
 
-        free_slots = []
-        cursor = range_start
-
-        for busy_start, busy_end in merged:
-            busy_start = max(busy_start, range_start)
-            busy_end = min(busy_end, range_end)
-
-            if cursor < busy_start:
-                duration = int((busy_start - cursor).total_seconds() / 60)
-                free_slots.append({
-                    "start_date": cursor.isoformat(),
-                    "end_date": busy_start.isoformat(),
-                    "duration_minutes": duration,
-                })
-            cursor = max(cursor, busy_end)
-
-        if cursor < range_end:
-            duration = int((range_end - cursor).total_seconds() / 60)
-            free_slots.append({
-                "start_date": cursor.isoformat(),
-                "end_date": range_end.isoformat(),
-                "duration_minutes": duration,
-            })
-
-        if wh_start is not None and wh_end is not None:
-            free_slots = self._clip_to_working_hours(free_slots, wh_start, wh_end)
-
-        if min_duration_minutes is not None:
-            free_slots = [
-                s for s in free_slots if s["duration_minutes"] >= min_duration_minutes
-            ]
-
-        return free_slots
+        return self._apply_availability_filters(free_slots, wh, min_duration_minutes)
 
     def get_conflicts(
         self,
