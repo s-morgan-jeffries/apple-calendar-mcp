@@ -210,6 +210,8 @@ def update_events(
                  clear_url (bool), clear_alerts (bool), clear_recurrence (bool).
                  For recurring events: occurrence_date (ISO 8601) to target specific occurrence,
                  span ("this_event" or "future_events", default "this_event").
+                 When updating dates on an all-day event, include allday=true to ensure
+                 dates are interpreted correctly.
         calendar_source: Source/account name to disambiguate calendars with the same name
                         (e.g., "iCloud", "Google"). Use get_calendars to see source values.
 
