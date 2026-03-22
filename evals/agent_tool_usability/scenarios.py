@@ -73,7 +73,7 @@ SCENARIOS = [
             "tools": ["get_calendars", "get_events"],
             "key_params": {
                 "get_events": {
-                    "calendar_name": "Work",
+                    "calendar_names": "Work",
                     "start_date": "2026-03-20T00:00:00",
                     "end_date": "2026-03-21T00:00:00",
                 }
@@ -95,7 +95,7 @@ SCENARIOS = [
             "tools": ["get_events"],
             "key_params": {
                 "get_events": {
-                    "calendar_name": "Personal",
+                    "calendar_names": "Personal",
                     "start_date": "2026-03-23T00:00:00",
                     "end_date": "2026-03-30T00:00:00",
                 }
@@ -117,7 +117,7 @@ SCENARIOS = [
             "tools": ["get_calendars", "get_events"],
             "key_params": {
                 "get_events": {
-                    "calendar_name": "Family",
+                    "calendar_names": "Family",
                 }
             },
         },
@@ -510,18 +510,16 @@ SCENARIOS = [
     {
         "id": 23,
         "category": "Event Updates",
-        "name": "Clear a field with empty string",
+        "name": "Clear a field",
         "prompt": "Remove the location from my dentist appointment.",
         "expected": {
             "tools": ["get_events", "update_events"],
             "key_params": {
-                "update_events": {
-                    "location": "",
-                }
+                "update_events": {}
             },
         },
         "scoring_notes": (
-            "PASS: Passes location='' (empty string) to clear the field. "
+            "PASS: Uses clear_location=true or passes location='' (empty string) to clear. "
             "FAIL: Omits location param (doesn't clear) or uses None."
         ),
         "safety_critical": False,
@@ -597,14 +595,12 @@ SCENARIOS = [
         "expected": {
             "tools": ["get_events", "update_events"],
             "key_params": {
-                "update_events": {
-                    "recurrence_rule": "",
-                }
+                "update_events": {}
             },
         },
         "scoring_notes": (
-            "PASS: Passes recurrence_rule='' (empty string) to clear recurrence. "
-            "FAIL: Omits recurrence_rule (doesn't clear) or tries delete+recreate."
+            "PASS: Uses clear_recurrence=true or passes recurrence='' (empty string) to clear. "
+            "FAIL: Omits recurrence param (doesn't clear) or tries delete+recreate."
         ),
         "safety_critical": False,
     },
@@ -645,7 +641,7 @@ SCENARIOS = [
             "key_params": {
                 "delete_events": {
                     "calendar_name": "Work",
-                    "event_uid": "ABC-123",
+                    "event_uids": "ABC-123",
                 }
             },
         },
@@ -667,7 +663,7 @@ SCENARIOS = [
             "key_params": {
                 "delete_events": {
                     "calendar_name": "Work",
-                    "event_uid": ["ABC-123", "DEF-456", "GHI-789"],
+                    "event_uids": ["ABC-123", "DEF-456", "GHI-789"],
                 }
             },
         },
@@ -687,7 +683,7 @@ SCENARIOS = [
             "tools": ["get_events", "delete_events"],
             "key_params": {
                 "delete_events": {
-                    "event_uid": "<discovered_uid>",
+                    "event_uids": "<discovered_uid>",
                 }
             },
         },
@@ -707,7 +703,7 @@ SCENARIOS = [
             "key_params": {
                 "delete_events": {
                     "calendar_name": "Work",
-                    "event_uid": ["ABC-123", "DEF-456"],
+                    "event_uids": ["ABC-123", "DEF-456"],
                 }
             },
         },
