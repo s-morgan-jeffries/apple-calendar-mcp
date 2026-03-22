@@ -72,8 +72,7 @@ var sourcesToTry: [EKSource] = []
 if !parsed.source.isEmpty {
     // User specified a source — try only that one
     guard let source = store.sources.first(where: { $0.title == parsed.source }) else {
-        let available = store.sources.map { "\($0.title) (\($0.sourceType.rawValue))" }.joined(separator: ", ")
-        outputError("source_not_found", "Source '\(parsed.source)' not found. Available: \(available)")
+        outputError("source_not_found", "Source '\(parsed.source)' not found. Use get_calendars to see available sources.")
         exit(1)
     }
     sourcesToTry = [source]

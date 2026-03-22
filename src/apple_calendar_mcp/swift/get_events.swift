@@ -263,8 +263,7 @@ if parsed.calendars.isEmpty {
     var resolved: [EKCalendar] = []
     for calName in parsed.calendars {
         guard let cal = allCalendars.first(where: { $0.title == calName }) else {
-            let available = allCalendars.map { $0.title }.joined(separator: ", ")
-            outputError("calendar_not_found", "Calendar '\(calName)' not found. Available: \(available)")
+            outputError("calendar_not_found", "Calendar '\(calName)' not found. Use get_calendars to see available names.")
             exit(1)
         }
         resolved.append(cal)
