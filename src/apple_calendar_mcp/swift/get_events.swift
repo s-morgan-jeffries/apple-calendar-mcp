@@ -142,6 +142,21 @@ func eventToDict(_ event: EKEvent) -> [String: Any] {
     // Availability
     dict["availability"] = availabilityString(event.availability)
 
+    // Organizer details
+    if let organizer = event.organizer {
+        dict["organizer_name"] = organizer.name ?? ""
+        dict["organizer_email"] = organizer.url.absoluteString.replacingOccurrences(of: "mailto:", with: "")
+        dict["organizer_status"] = participantStatusString(organizer.participantStatus)
+    }
+
+    // Timestamps
+    if let created = event.creationDate {
+        dict["created_date"] = df.string(from: created)
+    }
+    if let modified = event.lastModifiedDate {
+        dict["modified_date"] = df.string(from: modified)
+    }
+
     return dict
 }
 
