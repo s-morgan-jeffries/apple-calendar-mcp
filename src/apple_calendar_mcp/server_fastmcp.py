@@ -103,20 +103,22 @@ def create_calendar(name: str) -> str:
 
 
 @mcp.tool()
-def delete_calendar(name: str) -> str:
+def delete_calendar(name: str, calendar_source: str = "") -> str:
     """Delete a calendar from Apple Calendar.
 
     This permanently removes the calendar and all its events. Use with caution.
 
     Args:
         name: Exact name of the calendar to delete (use get_calendars to find available names)
+        calendar_source: Source/account name to disambiguate calendars with the same name
+            (e.g., "iCloud", "Google"). Use get_calendars to see source values.
 
     Returns:
         Confirmation with the deleted calendar name.
     """
     client = get_client()
     try:
-        result = client.delete_calendar(name=name)
+        result = client.delete_calendar(name=name, calendar_source=calendar_source)
     except Exception as e:
         return f"Error deleting calendar: {e}"
     return f"Deleted calendar '{result['name']}'"

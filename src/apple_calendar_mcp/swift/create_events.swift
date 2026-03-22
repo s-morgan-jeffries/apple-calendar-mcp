@@ -155,7 +155,12 @@ if calendarName.isEmpty {
     }
     calendar = defaultCal
 } else {
-    guard let found = store.calendars(for: .event).first(where: { $0.title == calendarName && (sourceName.isEmpty || $0.source.title == sourceName) }) else {
+    let matches = store.calendars(for: .event).filter { $0.title == calendarName && (sourceName.isEmpty || $0.source.title == sourceName) }
+    if matches.count > 1 && sourceName.isEmpty {
+        outputError("ambiguous_calendar", "Multiple calendars named '\(calendarName)' found. Specify calendar_source to disambiguate.")
+        exit(1)
+    }
+    guard let found = matches.first else {
         let displayName = sourceName.isEmpty ? calendarName : "\(calendarName) (\(sourceName))"
         outputError("calendar_not_found", "Calendar '\(displayName)' not found. Use get_calendars to see available names.")
         exit(1)

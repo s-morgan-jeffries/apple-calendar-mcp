@@ -122,6 +122,7 @@ class CalendarConnector:
             error_map = {
                 "calendar_access_denied": PermissionError,
                 "calendar_not_found": ValueError,
+                "ambiguous_calendar": ValueError,
                 "event_not_found": ValueError,
             }
             exc_type = error_map.get(parsed["error"], RuntimeError)
@@ -728,21 +729,27 @@ class CalendarConnector:
         """
         return self._run_swift_helper_json("create_calendar", ["--name", name])
 
-    def delete_calendar(self, name: str) -> dict[str, str]:
+    def delete_calendar(
+        self, name: str, calendar_source: str = ""
+    ) -> dict[str, str]:
         """Delete a calendar from Apple Calendar.
 
         Uses EventKit via Swift helper for native calendar deletion.
 
         Args:
             name: Name of the calendar to delete
+            calendar_source: Source/account name to disambiguate duplicates
 
         Returns:
             Dict with 'name' key of the deleted calendar
 
         Raises:
             CalendarSafetyError: If safety checks block the target calendar
-            ValueError: If the calendar doesn't exist
+            ValueError: If the calendar doesn't exist or is ambiguous
             PermissionError: If EventKit calendar access is denied
         """
         self._verify_calendar_safety(name)
-        return self._run_swift_helper_json("delete_calendar", ["--name", name])
+        args = ["--name", name]
+        if calendar_source:
+            args += ["--source", calendar_source]
+        return self._run_swift_helper_json("delete_calendar", args)
