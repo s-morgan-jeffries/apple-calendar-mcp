@@ -130,13 +130,14 @@ class CalendarConnector:
 
     def create_events(
         self,
-        calendar_name: str,
-        events: list[dict[str, Any]],
+        calendar_name: str = "",
+        events: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
-        """Create multiple events in a single batch operation.
+        """Create one or more events in a calendar.
 
         Args:
-            calendar_name: Name of the target calendar (all events go to same calendar)
+            calendar_name: Name of the target calendar. If empty, uses the system
+                          default calendar.
             events: List of event dicts, each with keys: summary, start, end,
                     and optional: location, notes, url, allday, recurrence,
                     alerts (list of int), availability, timezone
@@ -144,7 +145,8 @@ class CalendarConnector:
         Returns:
             Dict with 'created' (list of {uid, summary}) and 'errors' (list of {index, summary, error})
         """
-        self._verify_calendar_safety(calendar_name)
+        if calendar_name:
+            self._verify_calendar_safety(calendar_name)
 
         if not events:
             raise ValueError("At least one event must be provided")

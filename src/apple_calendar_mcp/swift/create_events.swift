@@ -110,10 +110,7 @@ func outputError(_ error: String, _ message: String) {
 
 // MARK: - Main
 
-guard let calendarName = parseArgs() else {
-    outputError("invalid_args", "Required: --calendar <name>. Event data is read from stdin as JSON array.")
-    exit(1)
-}
+let calendarName = parseArgs() ?? ""
 
 // Read JSON from stdin
 let stdinData = FileHandle.standardInput.readDataToEndOfFile()
@@ -138,10 +135,20 @@ if !accessGranted {
 
 store.refreshSourcesIfNecessary()
 
-guard let calendar = store.calendars(for: .event).first(where: { $0.title == calendarName }) else {
-    let available = store.calendars(for: .event).map { $0.title }.joined(separator: ", ")
-    outputError("calendar_not_found", "Calendar '\(calendarName)' not found. Available: \(available)")
-    exit(1)
+let calendar: EKCalendar
+if calendarName.isEmpty {
+    guard let defaultCal = store.defaultCalendarForNewEvents else {
+        outputError("no_default_calendar", "No default calendar configured.")
+        exit(1)
+    }
+    calendar = defaultCal
+} else {
+    guard let found = store.calendars(for: .event).first(where: { $0.title == calendarName }) else {
+        let available = store.calendars(for: .event).map { $0.title }.joined(separator: ", ")
+        outputError("calendar_not_found", "Calendar '\(calendarName)' not found. Available: \(available)")
+        exit(1)
+    }
+    calendar = found
 }
 
 // Create events

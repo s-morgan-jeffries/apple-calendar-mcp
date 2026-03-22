@@ -28,7 +28,7 @@ Returns all calendars with their names, access level (read-write or read-only), 
 
 Note: Calendar names may not be unique across accounts. Use the source field (e.g., "iCloud", "Google") to distinguish calendars with the same name from different accounts.
 
-**Returns:** Each calendar includes: name, access level (read-write or read-only), source (account name like "iCloud" or "Google"), description, color. Use calendar names exactly as shown when calling other tools.
+**Returns:** Each calendar includes: name, access level (read-write or read-only), source (account name like "iCloud" or "Google"), description, color, is_default (boolean). The default calendar is used when create_events is called without a calendar_name. Use calendar names exactly as shown when calling other tools.
 
 **Parameters:** None
 
@@ -65,7 +65,7 @@ Create one or more events in a calendar.
 For a single event, pass an array with one element. All events go to the same calendar.
 
 **Parameters:**
-- `calendar_name` (str, required): Exact name of the target calendar
+- `calendar_name` (str, optional, default: ""): Name of the target calendar. If omitted, uses the system default calendar.
 - `events` (str, required): JSON array of event objects. Each object has keys: summary (required), start (required, ISO 8601), end (required, ISO 8601), and optional: location, notes, url, allday (bool), recurrence (RRULE string), alerts (list of minutes, e.g. [15, 60]), availability ("free"/"busy"/"tentative"), timezone (IANA identifier, e.g. "America/Los_Angeles" — use to schedule in a remote timezone rather than converting times manually). For all-day events, set allday=true and use date-only format. end is inclusive for all-day events.
 
 **Returns:** Each created event with title and UID. Use these UIDs with update_events or delete_events. Any per-event errors are listed separately. Partial success is possible — some events may be created while others fail.
