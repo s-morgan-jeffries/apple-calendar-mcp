@@ -170,7 +170,7 @@ For recurring events: use occurrence_date to target a specific occurrence, and s
 
 **Parameters:**
 - `calendar_name` (str, required): Exact name of the calendar containing the event(s)
-- `event_uid` (str | list[str], required): UID of a single event (str) or list of UIDs to delete
+- `event_uids` (str | list[str], required): UID of a single event (str) or list of UIDs to delete
 - `span` (str, optional, default: "this_event"): "this_event" to delete one occurrence, "future_events" to delete the series from this point onward
 - `occurrence_date` (str, optional, default: ""): For recurring events, the occurrence_date from get_events to target a specific occurrence
 
