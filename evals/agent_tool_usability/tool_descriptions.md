@@ -6,7 +6,7 @@ This file contains exactly what an MCP-connected agent sees: the server instruct
 
 Apple Calendar is the built-in macOS calendar application. This MCP server provides tools to interact with it.
 
-CALENDARS: Each calendar has a name, writable status, type (caldav, subscription, birthday, local), description, and color. Calendar names are NOT guaranteed unique — the same name can appear across different accounts (e.g., two "Family" calendars from iCloud and Google). Use description to disambiguate when needed.
+CALENDARS: Each calendar has a name, writable status, type (caldav, subscription, birthday, local), source (account name like "iCloud" or "Google"), description, and color. Calendar names are NOT guaranteed unique — the same name can appear across different accounts (e.g., two "Family" calendars from iCloud and Google). Use the source field to disambiguate when needed.
 
 CALENDAR IDENTIFICATION: Calendars are identified by name (not UID — UIDs are not accessible via AppleScript). When specifying a calendar, use the exact name as returned by get_calendars.
 
@@ -134,10 +134,10 @@ Use get_calendars first to find available calendar names.
 - `start_date` (str, required): Start of range in ISO 8601 format (e.g., "2026-03-15T09:00:00")
 - `end_date` (str, required): End of range in ISO 8601 format (e.g., "2026-03-15T17:00:00")
 - `min_duration_minutes` (int | None, optional, default: None): Only return slots of at least this many minutes (e.g., 45)
-- `working_hours_start` (str | None, optional, default: None): Start of working hours as HH:MM (e.g., "09:00")
-- `working_hours_end` (str | None, optional, default: None): End of working hours as HH:MM (e.g., "17:00")
+- `working_hours_start` (str | None, optional, default: None): Start of working hours as HH:MM (e.g., "09:00"). Must be provided together with working_hours_end.
+- `working_hours_end` (str | None, optional, default: None): End of working hours as HH:MM (e.g., "17:00"). Must be provided together with working_hours_start.
 
-**Returns:** Each free slot includes: start_date, end_date, duration (formatted as hours and minutes). Slots are gaps between busy periods across all specified calendars. Overlapping events are merged. Returns "No free time" if the entire range is busy.
+**Returns:** Each free slot includes: start_date, end_date, duration_minutes (integer). Slots are gaps between busy periods across all specified calendars. Overlapping events are merged. Returns "No free time" if the entire range is busy.
 
 ---
 

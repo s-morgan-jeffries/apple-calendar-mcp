@@ -45,6 +45,8 @@ def _format_calendar(cal: dict) -> str:
     result += f"Access: {writable}\n"
     if cal.get("source"):
         result += f"Source: {cal['source']}\n"
+    if cal.get("is_default"):
+        result += "Default: yes\n"
     if cal.get("description"):
         result += f"Description: {cal['description']}\n"
     result += f"Color: {cal['color']}\n"
@@ -422,11 +424,11 @@ def get_availability(
         start_date: Start of range in ISO 8601 format (e.g., "2026-03-15T09:00:00")
         end_date: End of range in ISO 8601 format (e.g., "2026-03-15T17:00:00")
         min_duration_minutes: Only return slots of at least this many minutes (e.g., 45)
-        working_hours_start: Start of working hours as HH:MM (e.g., "09:00")
-        working_hours_end: End of working hours as HH:MM (e.g., "17:00")
+        working_hours_start: Start of working hours as HH:MM (e.g., "09:00"). Must be provided together with working_hours_end.
+        working_hours_end: End of working hours as HH:MM (e.g., "17:00"). Must be provided together with working_hours_start.
 
     Returns:
-        Each free slot includes: start_date, end_date, duration (formatted as hours and minutes).
+        Each free slot includes: start_date, end_date, duration_minutes (integer).
         Slots are gaps between busy periods across all specified calendars. Overlapping events
         are merged. Returns "No free time" if the entire range is busy.
     """
