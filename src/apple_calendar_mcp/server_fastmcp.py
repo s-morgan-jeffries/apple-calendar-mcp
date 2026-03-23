@@ -149,7 +149,7 @@ def create_events(
                 or an object: {"type": "absolute", "date": "ISO 8601"} for a fixed-time alert,
                 or {"type": "proximity", "proximity": "enter"|"leave"} for a location-based
                 alert that requires structured_location on the event),
-                availability ("free"/"busy"/"tentative"),
+                availability ("free"/"busy"/"tentative"/"unavailable"),
                 timezone (IANA identifier, e.g. "America/Los_Angeles" — use this to schedule
                 in a remote timezone rather than converting times manually),
                 structured_location (object with title, latitude, longitude, radius — adds
@@ -214,7 +214,7 @@ def update_events(
         updates: JSON array of update objects. Each object must have "uid" (required)
                  and at least one field to update: summary, start_date (ISO 8601), end_date (ISO 8601),
                  location, notes, url, allday (bool), alerts (list of minutes),
-                 availability ("free"/"busy"/"tentative"), timezone (IANA identifier —
+                 availability ("free"/"busy"/"tentative"/"unavailable"), timezone (IANA identifier —
                  use to schedule in a remote timezone rather than converting manually),
                  recurrence (RRULE string OR structured object — see create_events),
                  structured_location (object with title,
@@ -349,12 +349,15 @@ def get_events(
 
     Returns:
         Each event includes: uid, summary, start_date, end_date, allday_event, location, notes,
-        url, status, calendar_name, availability, created_date, modified_date.
+        url, status, calendar_name, availability, is_editable, is_organizer,
+        created_date, modified_date.
         If created in a specific timezone: timezone (IANA identifier, e.g. "Asia/Tokyo").
         If location has geo data: structured_location (title, latitude, longitude, radius).
         For all-day events, end_date is the last day of the event (inclusive).
-        For recurring events: is_recurring, recurrence_rule, occurrence_date, is_detached.
-        If alerts are set: alerts (list with minutes_before for each).
+        For recurring events: is_recurring, recurrence_rule, recurrence_parsed (structured
+        object with frequency, interval, days_of_week, count/until), occurrence_date, is_detached.
+        Alerts: list of typed objects — {"type": "relative", "minutes_before": N},
+        {"type": "absolute", "date": "ISO 8601"}, or {"type": "proximity", "proximity": "enter"|"leave"}.
         If attendees exist: attendees (list with name, email, role, status for each).
         If organized by someone else: organizer_name, organizer_email, organizer_status.
         `uid` and `calendar_name` identify the event for update_events and delete_events.
