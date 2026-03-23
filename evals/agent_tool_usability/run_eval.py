@@ -2,7 +2,7 @@
 """Run blind agent evals against any OpenAI-compatible API.
 
 Sends each scenario prompt (with tool descriptions as context) to a model
-and saves responses for scoring.
+and saves responses for scoring. Includes rule-based automated scoring.
 
 Usage:
     # Single model:
@@ -10,6 +10,9 @@ Usage:
 
     # Multiple models in parallel:
     python run_eval.py --model meta-llama/llama-3.3-70b-instruct qwen/qwen-2.5-72b-instruct
+
+    # Multiple runs for variance analysis:
+    python run_eval.py --model meta-llama/llama-3.3-70b-instruct --runs 3
 
     # Specific scenarios:
     python run_eval.py --model meta-llama/llama-3.3-70b-instruct --scenarios 1,2,3
@@ -21,9 +24,11 @@ Store in Keychain: security add-generic-password -a "openrouter" -s "apple-calen
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import time
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -44,6 +49,12 @@ List the exact tool calls you would make, in order, with all parameters. Explain
 
 {tool_descriptions}"""
 
+TOOL_NAMES = [
+    "get_calendars", "create_calendar", "delete_calendar",
+    "get_events", "search_events", "create_events",
+    "update_events", "delete_events",
+    "get_availability", "get_conflicts",
+]
 
 KEYCHAIN_SERVICE = "apple-calendar-mcp-evals"
 KEYCHAIN_ACCOUNT = "openrouter"
@@ -90,6 +101,66 @@ def get_api_key() -> str:
     return ""
 
 
+def score_response(response_text: str, scenario: dict) -> str:
+    """Rule-based automated scoring of a model response.
+
+    Returns: "PASS", "PARTIAL", "FAIL", or "MANUAL"
+    """
+    expected = scenario["expected"]
+    expected_tools = expected.get("tools", [])
+    key_params = expected.get("key_params", {})
+
+    # Under-specified scenarios (expected tools is empty) require human judgment
+    if not expected_tools:
+        return "MANUAL"
+
+    response_lower = response_text.lower()
+
+    # Check which expected tools are mentioned in the response
+    tools_found = []
+    for tool in expected_tools:
+        # Match tool name as a word (not substring of another word)
+        if re.search(rf'\b{re.escape(tool)}\b', response_lower):
+            tools_found.append(tool)
+
+    tools_match = set(expected_tools) == set(tools_found)
+
+    if not tools_match:
+        # Check if at least the primary tool (first in list) is present
+        if expected_tools and re.search(rf'\b{re.escape(expected_tools[-1])}\b', response_lower):
+            # Primary tool found but not all tools — could be PARTIAL
+            pass
+        else:
+            return "FAIL"
+
+    # Check key parameters
+    params_found = 0
+    params_total = 0
+    for tool_name, params in key_params.items():
+        for param_key, param_value in params.items():
+            params_total += 1
+            # Check if the param key is mentioned
+            param_key_pattern = re.escape(param_key).replace("_", "[_\\s-]?")
+            if re.search(param_key_pattern, response_lower):
+                params_found += 1
+            # Also check if the value is mentioned (for string values)
+            elif isinstance(param_value, str) and param_value and param_value.lower() in response_lower:
+                params_found += 1
+            elif isinstance(param_value, list):
+                # Check if list items are mentioned
+                if all(str(v).lower() in response_lower for v in param_value):
+                    params_found += 1
+
+    if tools_match and (params_total == 0 or params_found == params_total):
+        return "PASS"
+    elif tools_match and params_found > 0:
+        return "PARTIAL"
+    elif tools_match:
+        return "PARTIAL"
+    else:
+        return "PARTIAL"
+
+
 def run_scenario(client: OpenAI, model: str, scenario: dict, tool_descriptions: str) -> dict:
     """Run a single scenario and return the result."""
     system = SYSTEM_PROMPT.format(tool_descriptions=tool_descriptions)
@@ -106,6 +177,7 @@ def run_scenario(client: OpenAI, model: str, scenario: dict, tool_descriptions: 
 
     content = response.choices[0].message.content
     usage = response.usage
+    auto_score = score_response(content, scenario)
 
     return {
         "id": scenario["id"],
@@ -113,6 +185,7 @@ def run_scenario(client: OpenAI, model: str, scenario: dict, tool_descriptions: 
         "category": scenario["category"],
         "prompt": scenario["prompt"],
         "response": content,
+        "auto_score": auto_score,
         "scoring_notes": scenario["scoring_notes"],
         "safety_critical": scenario["safety_critical"],
         "model": model,
@@ -121,44 +194,85 @@ def run_scenario(client: OpenAI, model: str, scenario: dict, tool_descriptions: 
     }
 
 
-def run_model(client: OpenAI, model: str, scenarios: list, tool_descriptions: str, output_dir: Path) -> dict:
+def run_model(client: OpenAI, model: str, scenarios: list, tool_descriptions: str,
+              output_dir: Path, runs: int = 1) -> dict:
     """Run all scenarios for a single model. Returns summary dict."""
     model_short = model.split("/")[-1]
-    results = []
+    all_results = []
     total_input = 0
     total_output = 0
 
-    for i, scenario in enumerate(scenarios, 1):
-        print(f"  [{model_short}] [{i}/{len(scenarios)}] {scenario['name']}...", end=" ", flush=True)
-        try:
-            result = run_scenario(client, model, scenario, tool_descriptions)
-            results.append(result)
-            if result["input_tokens"]:
-                total_input += result["input_tokens"]
-                total_output += result["output_tokens"]
-            print("done")
-        except Exception as e:
-            print(f"ERROR: {e}")
-            results.append({
-                "id": scenario["id"],
-                "name": scenario["name"],
-                "error": str(e),
-            })
+    for run_num in range(1, runs + 1):
+        run_label = f" run {run_num}/{runs}" if runs > 1 else ""
+        for i, scenario in enumerate(scenarios, 1):
+            print(f"  [{model_short}]{run_label} [{i}/{len(scenarios)}] {scenario['name']}...", end=" ", flush=True)
+            try:
+                result = run_scenario(client, model, scenario, tool_descriptions)
+                result["run"] = run_num
+                all_results.append(result)
+                if result["input_tokens"]:
+                    total_input += result["input_tokens"]
+                    total_output += result["output_tokens"]
+                print(f"{result['auto_score']}")
+            except Exception as e:
+                print(f"ERROR: {e}")
+                all_results.append({
+                    "id": scenario["id"],
+                    "name": scenario["name"],
+                    "run": run_num,
+                    "error": str(e),
+                    "auto_score": "ERROR",
+                })
 
     # Save results
     model_slug = model.replace("/", "_")
     output_path = output_dir / f"raw_{model_slug}.json"
     with open(output_path, "w") as f:
-        json.dump(results, f, indent=2)
+        json.dump(all_results, f, indent=2)
+
+    # Compute score summary
+    scores = [r.get("auto_score", "ERROR") for r in all_results if "error" not in r]
+    score_map = {"PASS": 2, "PARTIAL": 1, "FAIL": 0, "MANUAL": 0, "ERROR": 0}
+    total_points = sum(score_map.get(s, 0) for s in scores)
+    max_points = len(scores) * 2
 
     return {
         "model": model,
         "output_path": str(output_path),
         "scenarios": len(scenarios),
+        "runs": runs,
         "total_input_tokens": total_input,
         "total_output_tokens": total_output,
         "total_tokens": total_input + total_output,
+        "auto_scores": {
+            "PASS": scores.count("PASS"),
+            "PARTIAL": scores.count("PARTIAL"),
+            "FAIL": scores.count("FAIL"),
+            "MANUAL": scores.count("MANUAL"),
+            "ERROR": scores.count("ERROR"),
+        },
+        "auto_score_total": f"{total_points}/{max_points}",
     }
+
+
+def print_summary(summaries: list, scenarios: list, runs: int):
+    """Print a formatted summary table."""
+    print(f"\n{'='*70}")
+    print("Auto-Scoring Summary (rule-based, not model-scored)")
+    print(f"{'='*70}")
+    for s in sorted(summaries, key=lambda x: x["model"]):
+        model_short = s["model"].split("/")[-1]
+        sc = s["auto_scores"]
+        print(f"\n  {model_short}:")
+        print(f"    Score: {s['auto_score_total']} "
+              f"({sc['PASS']} PASS, {sc['PARTIAL']} PARTIAL, {sc['FAIL']} FAIL"
+              f"{f', {sc[\"MANUAL\"]} MANUAL' if sc['MANUAL'] else ''})")
+        print(f"    Tokens: {s['total_tokens']}")
+        print(f"    Output: {s['output_path']}")
+
+    if runs > 1:
+        print(f"\n  Note: {runs} runs per scenario. Scores above are aggregated across all runs.")
+        print("  Check raw JSON for per-run breakdown.")
 
 
 def main():
@@ -168,6 +282,8 @@ def main():
                         help="Model ID(s) — multiple models run in parallel")
     parser.add_argument("--scenarios", default=None,
                         help="Comma-separated scenario IDs (default: all)")
+    parser.add_argument("--runs", type=int, default=1,
+                        help="Number of runs per scenario for variance analysis (default: 1)")
     parser.add_argument("--output", default=str(SCRIPT_DIR / "results"),
                         help="Output directory")
     args = parser.parse_args()
@@ -198,20 +314,21 @@ def main():
 
     print(f"Models: {', '.join(models)}")
     print(f"Scenarios: {len(scenarios)}")
+    if args.runs > 1:
+        print(f"Runs per scenario: {args.runs}")
     print(f"Output: {args.output}")
     if len(models) > 1:
         print(f"Running {len(models)} models in parallel")
     print()
 
+    summaries = []
     if len(models) == 1:
-        summary = run_model(client, models[0], scenarios, tool_descriptions, output_dir)
-        print(f"\nResults saved to {summary['output_path']}")
-        print(f"Total tokens: {summary['total_tokens']}")
+        summary = run_model(client, models[0], scenarios, tool_descriptions, output_dir, args.runs)
+        summaries.append(summary)
     else:
-        summaries = []
         with ThreadPoolExecutor(max_workers=len(models)) as executor:
             futures = {
-                executor.submit(run_model, client, model, scenarios, tool_descriptions, output_dir): model
+                executor.submit(run_model, client, model, scenarios, tool_descriptions, output_dir, args.runs): model
                 for model in models
             }
             for future in as_completed(futures):
@@ -222,10 +339,7 @@ def main():
                 except Exception as e:
                     print(f"\n{model} FAILED: {e}")
 
-        print(f"\n{'='*60}")
-        print("Summary:")
-        for s in sorted(summaries, key=lambda x: x["model"]):
-            print(f"  {s['model']}: {s['scenarios']} scenarios, {s['total_tokens']} tokens -> {s['output_path']}")
+    print_summary(summaries, scenarios, args.runs)
 
 
 if __name__ == "__main__":

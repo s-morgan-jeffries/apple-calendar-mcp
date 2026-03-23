@@ -2,6 +2,20 @@
 
 Each scenario tests whether an agent can correctly plan tool calls
 based ONLY on tool descriptions (no codebase, no external knowledge).
+
+Scoring Rubric
+--------------
+PASS (2 pts): Correct tool(s) called with all critical parameters correct.
+PARTIAL (1 pt): Correct primary tool(s) called, at least one required
+    parameter correct, at most one critical parameter wrong or missing.
+    For batch operations, N separate single-event calls = PARTIAL.
+FAIL (0 pts): Wrong tool selected, or critical parameters entirely wrong.
+    Wrong tool selection is always FAIL, never PARTIAL.
+MANUAL: Scenario requires human judgment (e.g., under-specified requests
+    where the expected behavior is to ask for clarification).
+
+Automated scoring checks tool-name presence and key-param mentions in the
+response text. It is rule-based (not model-based) to avoid self-scoring bias.
 """
 
 SCENARIOS = [
@@ -514,7 +528,7 @@ SCENARIOS = [
         "expected": {
             "tools": ["get_events", "update_events"],
             "key_params": {
-                "update_events": {}
+                "update_events": {"clear_location": True}
             },
         },
         "scoring_notes": (
@@ -592,7 +606,7 @@ SCENARIOS = [
         "expected": {
             "tools": ["get_events", "update_events"],
             "key_params": {
-                "update_events": {}
+                "update_events": {"clear_recurrence": True}
             },
         },
         "scoring_notes": (
