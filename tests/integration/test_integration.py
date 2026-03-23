@@ -561,6 +561,77 @@ class TestUpdateEventIntegration:
         finally:
             _delete_event_by_uid(uid)
 
+    def test_clear_notes(self, connector):
+        """Clearing notes via clear_notes=True should empty the notes field."""
+        uid = _create_single_event(connector,
+            calendar_name=TEST_CALENDAR,
+            summary="Clear Notes Test",
+            start_date="2028-04-10T10:00:00",
+            end_date="2028-04-10T11:00:00",
+            notes="These notes will be cleared",
+        )
+        try:
+            connector.update_events(TEST_CALENDAR, [{"uid": uid, "clear_notes": True}])
+            events = connector.get_events(TEST_CALENDAR, "2028-04-10T00:00:00", "2028-04-11T00:00:00")
+            matches = [e for e in events if e["uid"] == uid]
+            assert len(matches) == 1
+            assert matches[0].get("notes", "") == ""
+        finally:
+            _delete_event_by_uid(uid)
+
+    def test_clear_url(self, connector):
+        """Clearing url via clear_url=True should empty the url field."""
+        uid = _create_single_event(connector,
+            calendar_name=TEST_CALENDAR,
+            summary="Clear URL Test",
+            start_date="2028-04-11T10:00:00",
+            end_date="2028-04-11T11:00:00",
+            url="https://example.com/will-be-cleared",
+        )
+        try:
+            connector.update_events(TEST_CALENDAR, [{"uid": uid, "clear_url": True}])
+            events = connector.get_events(TEST_CALENDAR, "2028-04-11T00:00:00", "2028-04-12T00:00:00")
+            matches = [e for e in events if e["uid"] == uid]
+            assert len(matches) == 1
+            assert matches[0].get("url", "") == ""
+        finally:
+            _delete_event_by_uid(uid)
+
+    def test_clear_alerts(self, connector):
+        """Clearing alerts via clear_alerts=True should remove all alerts."""
+        uid = _create_single_event(connector,
+            calendar_name=TEST_CALENDAR,
+            summary="Clear Alerts Test",
+            start_date="2028-04-12T10:00:00",
+            end_date="2028-04-12T11:00:00",
+            alert_minutes=[15, 60],
+        )
+        try:
+            _update_single_event(connector, TEST_CALENDAR, uid, alert_minutes=[])
+            events = connector.get_events(TEST_CALENDAR, "2028-04-12T00:00:00", "2028-04-13T00:00:00")
+            matches = [e for e in events if e["uid"] == uid]
+            assert len(matches) == 1
+            assert matches[0].get("alerts", []) == []
+        finally:
+            _delete_event_by_uid(uid)
+
+    def test_update_availability(self, connector):
+        """Updating availability to 'free' should be readable back."""
+        uid = _create_single_event(connector,
+            calendar_name=TEST_CALENDAR,
+            summary="Availability Update Test",
+            start_date="2028-04-13T10:00:00",
+            end_date="2028-04-13T11:00:00",
+        )
+        try:
+            _update_single_event(connector, TEST_CALENDAR, uid, availability="free")
+            events = connector.get_events(TEST_CALENDAR, "2028-04-13T00:00:00", "2028-04-14T00:00:00")
+            matches = [e for e in events if e["uid"] == uid]
+            assert len(matches) == 1
+            assert matches[0].get("availability") == "free"
+        finally:
+            _delete_event_by_uid(uid)
+
 
 class TestDeleteEventsIntegration:
     """Integration tests for delete_events against real Calendar.app."""
@@ -1164,6 +1235,30 @@ class TestTimezoneIntegration:
             assert len(matches) == 1
             assert matches[0]["allday_event"] is True
             assert "2027-08-01" in matches[0]["end_date"]
+        finally:
+            _delete_event_by_uid(uid)
+
+    def test_explicit_timezone_round_trip(self, connector):
+        """Event with explicit timezone should round-trip: create → read → requery."""
+        uid = _create_single_event(connector,
+            calendar_name=TEST_CALENDAR,
+            summary="Timezone Round Trip Test",
+            start_date="2028-05-15T09:00:00",
+            end_date="2028-05-15T10:00:00",
+            timezone="America/New_York",
+        )
+        try:
+            # Read back the event
+            events = connector.get_events(TEST_CALENDAR, "2028-05-15T00:00:00", "2028-05-16T00:00:00")
+            matches = [e for e in events if e["uid"] == uid]
+            assert len(matches) == 1
+            returned_start = matches[0]["start_date"]
+
+            # Use the returned timestamp to re-query — this is the round-trip that
+            # caught the timezone bug in issue #37
+            events2 = connector.get_events(TEST_CALENDAR, returned_start, "2028-05-16T00:00:00")
+            matches2 = [e for e in events2 if e["uid"] == uid]
+            assert len(matches2) == 1, f"Event not found when re-querying with returned start_date '{returned_start}'"
         finally:
             _delete_event_by_uid(uid)
 
