@@ -264,9 +264,9 @@ def print_summary(summaries: list, scenarios: list, runs: int):
         model_short = s["model"].split("/")[-1]
         sc = s["auto_scores"]
         print(f"\n  {model_short}:")
+        manual_str = f", {sc['MANUAL']} MANUAL" if sc['MANUAL'] else ""
         print(f"    Score: {s['auto_score_total']} "
-              f"({sc['PASS']} PASS, {sc['PARTIAL']} PARTIAL, {sc['FAIL']} FAIL"
-              f"{f', {sc[\"MANUAL\"]} MANUAL' if sc['MANUAL'] else ''})")
+              f"({sc['PASS']} PASS, {sc['PARTIAL']} PARTIAL, {sc['FAIL']} FAIL{manual_str})")
         print(f"    Tokens: {s['total_tokens']}")
         print(f"    Output: {s['output_path']}")
 
