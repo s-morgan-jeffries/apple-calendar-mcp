@@ -12,7 +12,7 @@ import uuid
 
 import pytest
 
-from apple_calendar_mcp.calendar_connector import CalendarConnector, run_applescript, run_swift_helper
+from apple_calendar_mcp.calendar_connector import CalendarConnector, CalendarSafetyError, run_applescript, run_swift_helper
 
 
 # Skip entire module if not in test mode
@@ -1504,3 +1504,30 @@ class TestBatchLimitsIntegration:
         uids = [f"UID-{i}" for i in range(51)]
         with pytest.raises(ValueError, match="exceeds limit of 50"):
             connector.delete_events(TEST_CALENDAR, uids)
+
+
+# ── calendar safety guards ─────────────────────────────────────────────────
+
+
+class TestCalendarSafetyIntegration:
+    """Verify safety guards block destructive operations on non-test calendars."""
+
+    def test_create_events_blocked_on_non_test_calendar(self, connector):
+        with pytest.raises(CalendarSafetyError):
+            connector.create_events("Work", [{"summary": "Test"}])
+
+    def test_delete_events_blocked_on_non_test_calendar(self, connector):
+        with pytest.raises(CalendarSafetyError):
+            connector.delete_events("Work", "UID-1")
+
+    def test_update_events_blocked_on_non_test_calendar(self, connector):
+        with pytest.raises(CalendarSafetyError):
+            connector.update_events("Work", [{"uid": "UID-1", "summary": "Test"}])
+
+    def test_delete_calendar_blocked_on_non_test_calendar(self, connector):
+        with pytest.raises(CalendarSafetyError):
+            connector.delete_calendar("Work")
+
+    def test_create_calendar_blocked_on_non_test_name(self, connector):
+        with pytest.raises(CalendarSafetyError):
+            connector.create_calendar("Work")
