@@ -1,7 +1,7 @@
 # Apple Calendar MCP Server
 
 [![CI](https://github.com/s-morgan-jeffries/apple-calendar-mcp/actions/workflows/test.yml/badge.svg)](https://github.com/s-morgan-jeffries/apple-calendar-mcp/actions/workflows/test.yml)
-[![Coverage](https://img.shields.io/badge/coverage-98%25-brightgreen)](https://github.com/s-morgan-jeffries/apple-calendar-mcp)
+[![Coverage](https://img.shields.io/badge/coverage-97%25-brightgreen)](https://github.com/s-morgan-jeffries/apple-calendar-mcp)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
@@ -28,7 +28,7 @@ All event operations use Swift/EventKit via native subprocess for sub-second per
 
 ### Reliable
 
-98% code coverage from 176 unit tests. 58 integration tests run against real Calendar.app — covering round-trip data integrity, recurring event edge cases, special characters, alerts, year-boundary queries, and more. Calendar safety guards prevent accidental writes to real calendars during testing.
+97% code coverage from 184 unit tests. 59 integration tests run against real Calendar.app — covering round-trip data integrity, recurring event edge cases, special characters, alerts, year-boundary queries, and more. Calendar safety guards prevent accidental writes to real calendars during testing.
 
 ### Agent-Friendly
 

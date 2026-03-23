@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.2] - 2026-03-22
+
+### Added
+
+- SECURITY.md: threat model, operational security, prompt injection risk, architecture security properties (#210, #215, #216, #219, #224, #225)
+- Ambiguous calendar rejection: write operations fail when duplicate calendar names exist without `calendar_source` (#212, #221)
+- `calendar_source` parameter on `delete_calendar` for source disambiguation (#212, #221)
+- Per-call batch size limit of 50 for `create_events`, `update_events`, `delete_events` (#214, #223)
+- CLI argument prefix validation: calendar names and UIDs starting with `--` are rejected (#217, #226)
+- `EVENT CONTENT` warning in server instructions about untrusted event data (#215, #224)
+
+### Fixed
+
+- `create_events` safety bypass when `calendar_name` is empty — now blocked in test mode (#213, #222)
+
+### Changed
+
+- OpenRouter API key moved from `.env` to macOS Keychain in eval runner (#209, #218)
+- Calendar-not-found errors no longer enumerate all available calendars (#211, #220)
+- `ambiguous_calendar` error mapped to `ValueError` in Swift helper error handling (#212, #221)
+
 ## [0.8.1] - 2026-03-22
 
 ### Added
