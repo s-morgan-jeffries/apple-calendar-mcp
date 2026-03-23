@@ -530,6 +530,24 @@ class TestFormatEventDetails:
         lines = _format_recurrence(event)
         assert any("detached" in line.lower() for line in lines)
 
+    def test_format_event_details_location(self):
+        from apple_calendar_mcp.server_fastmcp import _format_event_details
+        event = {"location": "Room 4"}
+        lines = _format_event_details(event)
+        assert any("Location: Room 4" in line for line in lines)
+
+    def test_format_event_details_notes(self):
+        from apple_calendar_mcp.server_fastmcp import _format_event_details
+        event = {"notes": "Bring laptop"}
+        lines = _format_event_details(event)
+        assert any("Notes: Bring laptop" in line for line in lines)
+
+    def test_format_event_details_url(self):
+        from apple_calendar_mcp.server_fastmcp import _format_event_details
+        event = {"url": "https://meet.example.com"}
+        lines = _format_event_details(event)
+        assert any("URL: https://meet.example.com" in line for line in lines)
+
 
 class TestCreateEventsTool:
     """Tests for the create_events MCP tool (batch)."""
@@ -802,6 +820,11 @@ class TestGetConflictsTool:
         assert "Meeting B" in result
         assert "30 min overlap" in result
         assert isinstance(result, str)
+        # Verify calendar name and time range are included in formatting
+        assert "Work" in result
+        assert "2026-03-15T10:00:00" in result
+        assert "2026-03-15T11:00:00" in result
+        assert "2026-03-15T10:30:00" in result
 
     @patch("apple_calendar_mcp.server_fastmcp.get_client")
     def test_no_conflicts(self, mock_get_client):
