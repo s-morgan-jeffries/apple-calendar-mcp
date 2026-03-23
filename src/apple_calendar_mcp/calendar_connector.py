@@ -149,6 +149,11 @@ class CalendarConnector:
         Returns:
             Dict with 'created' (list of {uid, summary}) and 'errors' (list of {index, summary, error})
         """
+        if self.enable_safety_checks and not calendar_name:
+            raise CalendarSafetyError(
+                "calendar_name is required when safety checks are enabled "
+                "(empty name would target the default calendar)"
+            )
         if calendar_name:
             self._verify_calendar_safety(calendar_name)
 

@@ -1066,6 +1066,11 @@ class TestCreateEvents:
         with pytest.raises(CalendarSafetyError):
             connector.create_events("Personal", [{"summary": "Test"}])
 
+    def test_safety_blocks_empty_calendar_name(self):
+        connector = CalendarConnector(enable_safety_checks=True)
+        with pytest.raises(CalendarSafetyError, match="calendar_name is required"):
+            connector.create_events("", [{"summary": "Test"}])
+
 
 # ── update_events (batch) ─────────────────────────────────────────────────
 
