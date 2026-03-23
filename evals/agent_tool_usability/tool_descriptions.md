@@ -55,6 +55,7 @@ This permanently removes the calendar and all its events. Use with caution.
 
 **Parameters:**
 - `name` (str, required): Exact name of the calendar to delete (use get_calendars to find available names)
+- `calendar_source` (str, optional): Account source to disambiguate calendars with the same name (e.g., "iCloud", "Google"). Use when get_calendars shows multiple calendars with the same name from different accounts.
 
 **Returns:** Confirmation with the deleted calendar name.
 
