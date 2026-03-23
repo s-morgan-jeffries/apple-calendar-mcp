@@ -38,9 +38,15 @@ def fresh_calendar():
 
     Used by recurring event tests where events can't be fully deleted
     via the API — the calendar must be recreated to ensure clean state.
+
+    WARNING: Not compatible with parallel test execution (pytest-xdist).
     """
     delete_test_calendar(TEST_CALENDAR)
     create_test_calendar(TEST_CALENDAR)
     yield
-    delete_test_calendar(TEST_CALENDAR)
-    create_test_calendar(TEST_CALENDAR)
+    try:
+        delete_test_calendar(TEST_CALENDAR)
+    finally:
+        # Always recreate, even if delete failed or was partial
+        if not calendar_exists(TEST_CALENDAR):
+            create_test_calendar(TEST_CALENDAR)
