@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.3] - 2026-03-23
+
+### Added
+
+- Critic review of test suite completeness and quality (#149) — 51 findings across unit tests, integration tests, benchmarks, and blind evals
+- Unit test mocks updated to match real Swift helper output: `type`, `is_default`, `calendar_name` fields (#228)
+- 21 new unit tests covering previously-untested code paths: backward-compat kwarg alias, error codes, `calendar_source`, `occurrence_date`, tentative availability, formatter fields (#229)
+- Batch size boundary tests at exactly 50 items for create/update/delete (#230)
+- `get_conflicts` integration tests, benchmark, and eval scenario (#231)
+- `search_events` expanded: notes/location matching, zero-result query, all-calendars search, benchmark, eval scenarios (#232)
+- Explicit calendar safety guard tests — `CalendarSafetyError` now deliberately triggered (#233)
+- `update_events` tests for `clear_notes`, `clear_url`, `clear_alerts`, availability updates, and explicit timezone round-trip (#234)
+- Benchmark improvements: warm-up phase, std deviation, batch create scaling, `--output` JSON flag, increased write iterations (#235)
+- Dynamic date generation in tests — replaces 220+ hard-coded 2026-2028 dates with `_future_date()` helper (#236)
+- 6 new eval scenarios: `create_calendar`, `delete_calendar` (safety-critical), recurring-event deletion safety, multi-calendar `get_events`, under-specified requests (#237)
+- Standardized eval scoring rubric with PASS/PARTIAL/FAIL definitions and rule-based automated scoring in `run_eval.py` (#238)
+- Multi-calendar `get_availability` integration test and benchmark (#241)
+- `create_tag.sh` now runs pre-tag hygiene checks before creating tags (#75)
+- GitHub Actions added to Dependabot monitoring (#110)
+
+### Fixed
+
+- `fresh_calendar` fixture hardened against teardown failure with try/finally guard (#239)
+- `delete_calendar` eval tool description: added missing `calendar_source` parameter (#237)
+- Eval scenarios 4 and 24: removed date-anchored expected params that broke on re-runs (#237)
+- Field-clearing eval scenarios 23 and 27: populated empty `key_params` (#238)
+
 ## [0.8.2] - 2026-03-22
 
 ### Added
