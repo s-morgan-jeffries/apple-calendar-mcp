@@ -92,6 +92,12 @@ class CalendarConnector:
     def __init__(self, enable_safety_checks: bool = True):
         self.enable_safety_checks = enable_safety_checks
 
+    @staticmethod
+    def _validate_cli_arg(value: str, name: str) -> None:
+        """Reject values starting with '--' to prevent CLI arg confusion."""
+        if value.startswith("--"):
+            raise ValueError(f"{name} must not start with '--': {value!r}")
+
     def _verify_calendar_safety(self, calendar_name: str) -> None:
         """Verify that a write operation targets an allowed test calendar.
 
@@ -166,6 +172,11 @@ class CalendarConnector:
                 f"Split into multiple calls."
             )
 
+        if calendar_name:
+            self._validate_cli_arg(calendar_name, "calendar_name")
+        if calendar_source:
+            self._validate_cli_arg(calendar_source, "calendar_source")
+
         args = ["--calendar", calendar_name]
         if calendar_source:
             args += ["--source", calendar_source]
@@ -201,6 +212,9 @@ class CalendarConnector:
             may differ, and 'rescheduled': true is included.
         """
         self._verify_calendar_safety(calendar_name)
+        self._validate_cli_arg(calendar_name, "calendar_name")
+        if calendar_source:
+            self._validate_cli_arg(calendar_source, "calendar_source")
 
         if not updates:
             raise ValueError("At least one update must be provided")
@@ -374,6 +388,8 @@ class CalendarConnector:
             PermissionError: If EventKit calendar access is denied
         """
         calendar_names = self._normalize_calendar_names(calendar_names, calendar_name)
+        for name in calendar_names:
+            self._validate_cli_arg(name, "calendar_name")
 
         self._validate_date(start_date)
         self._validate_date(end_date)
@@ -410,6 +426,8 @@ class CalendarConnector:
             List of matching event dicts.
         """
         calendar_names = self._normalize_calendar_names(calendar_names, calendar_name)
+        for name in calendar_names:
+            self._validate_cli_arg(name, "calendar_name")
         start_date, end_date = self._apply_search_date_defaults(start_date, end_date)
 
         self._validate_date(start_date)
@@ -450,10 +468,15 @@ class CalendarConnector:
             ValueError: If event_uids is empty
         """
         self._verify_calendar_safety(calendar_name)
+        self._validate_cli_arg(calendar_name, "calendar_name")
+        if calendar_source:
+            self._validate_cli_arg(calendar_source, "calendar_source")
 
         uids = [event_uids] if isinstance(event_uids, str) else event_uids
         if not uids:
             raise ValueError("At least one event UID must be provided")
+        for uid in uids:
+            self._validate_cli_arg(uid, "event_uid")
         if len(uids) > self.MAX_BATCH_SIZE:
             raise ValueError(
                 f"Batch size {len(uids)} exceeds limit of {self.MAX_BATCH_SIZE}. "
@@ -748,6 +771,7 @@ class CalendarConnector:
             RuntimeError: If Swift helper execution fails
             PermissionError: If EventKit calendar access is denied
         """
+        self._validate_cli_arg(name, "name")
         return self._run_swift_helper_json("create_calendar", ["--name", name])
 
     def delete_calendar(
@@ -770,6 +794,9 @@ class CalendarConnector:
             PermissionError: If EventKit calendar access is denied
         """
         self._verify_calendar_safety(name)
+        self._validate_cli_arg(name, "name")
+        if calendar_source:
+            self._validate_cli_arg(calendar_source, "calendar_source")
         args = ["--name", name]
         if calendar_source:
             args += ["--source", calendar_source]
