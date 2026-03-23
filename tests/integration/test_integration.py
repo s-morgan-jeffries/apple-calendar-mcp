@@ -1326,6 +1326,91 @@ class TestAmbiguousCalendarIntegration:
                             pass
 
 
+# ── get_conflicts ──────────────────────────────────────────────────────────
+
+
+class TestGetConflictsIntegration:
+    """Integration tests for get_conflicts."""
+
+    def test_overlapping_events_detected(self, connector):
+        """Two overlapping events should produce a conflict."""
+        tag = uuid.uuid4().hex[:8]
+        uid1 = _create_single_event(
+            connector, TEST_CALENDAR, f"Conflict-A-{tag}",
+            "2028-09-15T10:00:00", "2028-09-15T11:00:00",
+        )
+        uid2 = _create_single_event(
+            connector, TEST_CALENDAR, f"Conflict-B-{tag}",
+            "2028-09-15T10:30:00", "2028-09-15T11:30:00",
+        )
+        try:
+            conflicts = connector.get_conflicts(
+                [TEST_CALENDAR], "2028-09-15T00:00:00", "2028-09-16T00:00:00"
+            )
+            # Find the conflict involving our events
+            our_conflict = [
+                c for c in conflicts
+                if {c["event_a"]["summary"], c["event_b"]["summary"]}
+                == {f"Conflict-A-{tag}", f"Conflict-B-{tag}"}
+            ]
+            assert len(our_conflict) == 1
+            assert our_conflict[0]["overlap_minutes"] == 30
+        finally:
+            _delete_event_by_uid(uid1)
+            _delete_event_by_uid(uid2)
+
+    def test_adjacent_events_no_conflict(self, connector):
+        """Two adjacent (non-overlapping) events should produce no conflict."""
+        tag = uuid.uuid4().hex[:8]
+        uid1 = _create_single_event(
+            connector, TEST_CALENDAR, f"Adjacent-A-{tag}",
+            "2028-09-16T10:00:00", "2028-09-16T11:00:00",
+        )
+        uid2 = _create_single_event(
+            connector, TEST_CALENDAR, f"Adjacent-B-{tag}",
+            "2028-09-16T11:00:00", "2028-09-16T12:00:00",
+        )
+        try:
+            conflicts = connector.get_conflicts(
+                [TEST_CALENDAR], "2028-09-16T00:00:00", "2028-09-17T00:00:00"
+            )
+            our_conflicts = [
+                c for c in conflicts
+                if f"Adjacent-A-{tag}" in (c["event_a"]["summary"], c["event_b"]["summary"])
+                or f"Adjacent-B-{tag}" in (c["event_a"]["summary"], c["event_b"]["summary"])
+            ]
+            assert len(our_conflicts) == 0
+        finally:
+            _delete_event_by_uid(uid1)
+            _delete_event_by_uid(uid2)
+
+    def test_free_event_excluded_from_conflicts(self, connector):
+        """An event marked availability='free' should not produce conflicts."""
+        tag = uuid.uuid4().hex[:8]
+        uid1 = _create_single_event(
+            connector, TEST_CALENDAR, f"Busy-{tag}",
+            "2028-09-17T10:00:00", "2028-09-17T11:00:00",
+        )
+        uid2 = _create_single_event(
+            connector, TEST_CALENDAR, f"Free-{tag}",
+            "2028-09-17T10:30:00", "2028-09-17T11:30:00",
+            availability="free",
+        )
+        try:
+            conflicts = connector.get_conflicts(
+                [TEST_CALENDAR], "2028-09-17T00:00:00", "2028-09-18T00:00:00"
+            )
+            our_conflicts = [
+                c for c in conflicts
+                if f"Busy-{tag}" in (c["event_a"]["summary"], c["event_b"]["summary"])
+                or f"Free-{tag}" in (c["event_a"]["summary"], c["event_b"]["summary"])
+            ]
+            assert len(our_conflicts) == 0
+        finally:
+            _delete_event_by_uid(uid1)
+            _delete_event_by_uid(uid2)
+
+
 # ── batch size limits ──────────────────────────────────────────────────────
 
 
