@@ -172,6 +172,28 @@ class TestVerifyCalendarSafety:
             connector._verify_calendar_safety("")
 
 
+class TestValidateCliArg:
+    """Tests for CalendarConnector._validate_cli_arg()."""
+
+    def test_rejects_double_dash_prefix(self):
+        with pytest.raises(ValueError, match="must not start with '--'"):
+            CalendarConnector._validate_cli_arg("--malicious", "calendar_name")
+
+    def test_allows_normal_name(self):
+        CalendarConnector._validate_cli_arg("Personal", "calendar_name")
+
+    def test_allows_hyphenated_name(self):
+        CalendarConnector._validate_cli_arg("My-Calendar", "calendar_name")
+
+    def test_allows_single_dash(self):
+        CalendarConnector._validate_cli_arg("-notes", "calendar_name")
+
+    def test_rejects_in_create_events(self):
+        connector = CalendarConnector(enable_safety_checks=False)
+        with pytest.raises(ValueError, match="must not start with '--'"):
+            connector.create_events("--evil", [{"summary": "Test"}])
+
+
 # ── get_calendars ────────────────────────────────────────────────────────────
 
 
