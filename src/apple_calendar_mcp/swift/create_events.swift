@@ -247,9 +247,26 @@ for (index, eventData) in eventsJson.enumerated() {
     } else if let recDict = eventData["recurrence"] as? [String: Any], let rule = parseStructuredRecurrence(recDict) {
         event.addRecurrenceRule(rule)
     }
-    if let alerts = eventData["alerts"] as? [Int] {
-        for mins in alerts {
-            event.addAlarm(EKAlarm(relativeOffset: TimeInterval(-mins * 60)))
+    if let alerts = eventData["alerts"] as? [Any] {
+        for alert in alerts {
+            if let mins = alert as? Int {
+                event.addAlarm(EKAlarm(relativeOffset: TimeInterval(-mins * 60)))
+            } else if let dict = alert as? [String: Any], let type = dict["type"] as? String {
+                switch type {
+                case "absolute":
+                    if let dateStr = dict["date"] as? String, let date = parseISO8601(dateStr) {
+                        event.addAlarm(EKAlarm(absoluteDate: date))
+                    }
+                case "proximity":
+                    if let proxStr = dict["proximity"] as? String, let sl = event.structuredLocation {
+                        let alarm = EKAlarm()
+                        alarm.structuredLocation = sl
+                        alarm.proximity = proxStr == "leave" ? .leave : .enter
+                        event.addAlarm(alarm)
+                    }
+                default: break
+                }
+            }
         }
     }
     if let avail = eventData["availability"] as? String {

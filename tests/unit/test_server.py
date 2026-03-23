@@ -509,7 +509,7 @@ class TestFormatEventDetails:
 
     def test_format_alerts(self):
         from apple_calendar_mcp.server_fastmcp import _format_alerts
-        alerts = [{"minutes_before": 15}, {"minutes_before": 60}]
+        alerts = [{"type": "relative", "minutes_before": 15}, {"type": "relative", "minutes_before": 60}]
         lines = _format_alerts(alerts)
         assert len(lines) == 1
         assert "15m before" in lines[0]
@@ -518,6 +518,30 @@ class TestFormatEventDetails:
     def test_format_alerts_empty(self):
         from apple_calendar_mcp.server_fastmcp import _format_alerts
         assert _format_alerts([]) == []
+
+    def test_format_alerts_absolute(self):
+        from apple_calendar_mcp.server_fastmcp import _format_alerts
+        alerts = [{"type": "absolute", "date": "2026-03-15T09:00:00"}]
+        lines = _format_alerts(alerts)
+        assert "at 2026-03-15T09:00:00" in lines[0]
+
+    def test_format_alerts_proximity(self):
+        from apple_calendar_mcp.server_fastmcp import _format_alerts
+        alerts = [{"type": "proximity", "proximity": "enter"}]
+        lines = _format_alerts(alerts)
+        assert "on enter" in lines[0]
+
+    def test_format_alerts_mixed_types(self):
+        from apple_calendar_mcp.server_fastmcp import _format_alerts
+        alerts = [
+            {"type": "relative", "minutes_before": 15},
+            {"type": "absolute", "date": "2026-03-15T09:00:00"},
+            {"type": "proximity", "proximity": "leave"},
+        ]
+        lines = _format_alerts(alerts)
+        assert "15m before" in lines[0]
+        assert "at 2026-03-15T09:00:00" in lines[0]
+        assert "on leave" in lines[0]
 
     def test_format_recurrence_not_recurring(self):
         from apple_calendar_mcp.server_fastmcp import _format_recurrence
