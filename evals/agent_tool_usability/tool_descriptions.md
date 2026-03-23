@@ -69,7 +69,7 @@ For a single event, pass an array with one element. All events go to the same ca
 
 **Parameters:**
 - `calendar_name` (str, optional, default: ""): Name of the target calendar. If omitted, uses the system default calendar.
-- `events` (str, required): JSON array of event objects. Each object has keys: summary (required), start_date (required, ISO 8601), end_date (required, ISO 8601), and optional: location, notes, url, allday (bool), recurrence (RRULE string like "FREQ=WEEKLY;INTERVAL=2;BYDAY=MO;COUNT=10" OR structured object like {"frequency": "weekly", "interval": 2, "days_of_week": ["MO"], "count": 10} — structured format fields: frequency (required: daily/weekly/monthly/yearly), interval (default 1), days_of_week (e.g. ["MO","WE"] or ["4MO","-1FR"]), count (number of occurrences), until (end date)), alerts (list — each element is an integer for minutes-before like 15, or an object: {"type": "absolute", "date": "ISO 8601"} for fixed-time alert, or {"type": "proximity", "proximity": "enter"|"leave"} for location-based alert requiring structured_location), availability ("free"/"busy"/"tentative"/"unavailable"), timezone (IANA identifier, e.g. "America/Los_Angeles" — use to schedule in a remote timezone rather than converting times manually), structured_location (object with title, latitude, longitude, radius — adds map pin and geo coordinates). For all-day events, set allday=true and use date-only format. end is inclusive for all-day events.
+- `events` (str, required): JSON array of event objects. Each object has keys: summary (required), start_date (required, ISO 8601), end_date (required, ISO 8601), and optional: location, notes, url, allday (bool), recurrence (RRULE string like "FREQ=WEEKLY;INTERVAL=2;BYDAY=MO;COUNT=10" OR structured object like {"frequency": "weekly", "interval": 2, "days_of_week": ["MO"], "count": 10} — structured format fields: frequency (required: daily/weekly/monthly/yearly), interval (default 1), days_of_week (e.g. ["MO","WE"] or ["4MO","-1FR"]), count (number of occurrences), until (end date)), alerts (list — each element is an integer for minutes-before like 15, or an object: {"type": "absolute", "date": "ISO 8601"} for fixed-time alert, or {"type": "proximity", "proximity": "enter"|"leave"} for location-based alert requiring structured_location), availability ("free"/"busy"/"tentative"/"unavailable"), timezone (IANA identifier, e.g. "America/Los_Angeles" — use to schedule in a remote timezone rather than converting times manually), structured_location (object with title, latitude, longitude, radius — adds map pin and geo coordinates). For all-day events: set allday=true with date-only format (e.g., start_date="2026-03-27", end_date="2026-03-27" — no time component). end_date is inclusive for all-day events.
 - `calendar_source` (str, optional, default: ""): Source/account name to disambiguate calendars with the same name (e.g., "iCloud", "Google"). Use get_calendars to see source values.
 
 **Returns:** Each created event with title and UID. Use these UIDs with update_events or delete_events. Any per-event errors are listed separately. Partial success is possible — some events may be created while others fail.
@@ -82,7 +82,7 @@ Update one or more events in a calendar.
 
 For a single event, pass an array with one element. Only provided fields are updated; omitted fields are left unchanged. To clear a text field, use the clear_* boolean flags.
 
-Use get_events first to find the event's UID and calendar_name.
+Use get_events or search_events first to find the event's UID and calendar_name.
 
 For recurring events: use occurrence_date to target a specific occurrence, and span to control whether the change affects just this occurrence or the series.
 
@@ -169,7 +169,7 @@ Delete one or more events from a calendar by UID.
 
 Accepts a single UID or a list of UIDs for batch deletion. Events that don't exist are reported but don't cause the entire operation to fail.
 
-Use get_events first to find the event UID(s) and calendar_name.
+Use get_events or search_events first to find the event UID(s) and calendar_name.
 
 For recurring events: use occurrence_date to target a specific occurrence, and span to control deletion scope. Without occurrence_date, deletes the base event AND all its occurrences. Always check is_recurring in get_events results and pass occurrence_date when deleting a single occurrence.
 
