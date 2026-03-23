@@ -87,6 +87,7 @@ class CalendarConnector:
         "MCP-Test-Calendar",
         "MCP-Test-Calendar-2",
     }
+    MAX_BATCH_SIZE = 50
 
     def __init__(self, enable_safety_checks: bool = True):
         self.enable_safety_checks = enable_safety_checks
@@ -159,6 +160,11 @@ class CalendarConnector:
 
         if not events:
             raise ValueError("At least one event must be provided")
+        if len(events) > self.MAX_BATCH_SIZE:
+            raise ValueError(
+                f"Batch size {len(events)} exceeds limit of {self.MAX_BATCH_SIZE}. "
+                f"Split into multiple calls."
+            )
 
         args = ["--calendar", calendar_name]
         if calendar_source:
@@ -198,6 +204,11 @@ class CalendarConnector:
 
         if not updates:
             raise ValueError("At least one update must be provided")
+        if len(updates) > self.MAX_BATCH_SIZE:
+            raise ValueError(
+                f"Batch size {len(updates)} exceeds limit of {self.MAX_BATCH_SIZE}. "
+                f"Split into multiple calls."
+            )
 
         args = ["--calendar", calendar_name]
         if calendar_source:
@@ -443,6 +454,11 @@ class CalendarConnector:
         uids = [event_uids] if isinstance(event_uids, str) else event_uids
         if not uids:
             raise ValueError("At least one event UID must be provided")
+        if len(uids) > self.MAX_BATCH_SIZE:
+            raise ValueError(
+                f"Batch size {len(uids)} exceeds limit of {self.MAX_BATCH_SIZE}. "
+                f"Split into multiple calls."
+            )
 
         args = ["--calendar", calendar_name]
         if calendar_source:
