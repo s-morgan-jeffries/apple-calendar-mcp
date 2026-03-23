@@ -17,7 +17,7 @@ import math
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from apple_calendar_mcp.calendar_connector import CalendarConnector
 from tests.helpers.calendar_setup import create_test_calendar
@@ -60,6 +60,13 @@ def run_benchmarks(read_calendar: str, test_calendar: str):
     """Run all benchmarks and print results."""
     connector = CalendarConnector(enable_safety_checks=False)
 
+    # Dynamic year constants for date ranges
+    this_year = date.today().year
+    read_year = str(this_year)
+    write_year = str(this_year + 1)
+    past_year = str(this_year - 6)
+    future_year = str(this_year + 4)
+
     # Ensure test calendar exists
     create_test_calendar(test_calendar)
 
@@ -88,21 +95,21 @@ def run_benchmarks(read_calendar: str, test_calendar: str):
     print(f"\n[get_events] (calendar: {read_calendar})")
 
     benchmark(
-        lambda: connector.get_events(read_calendar, "2026-03-01", "2026-03-31"),
+        lambda: connector.get_events(read_calendar, f"{read_year}-03-01", f"{read_year}-03-31"),
         "1-month range",
         iterations=3,
         section="get_events",
     )
 
     benchmark(
-        lambda: connector.get_events(read_calendar, "2026-01-01", "2026-12-31"),
+        lambda: connector.get_events(read_calendar, f"{read_year}-01-01", f"{read_year}-12-31"),
         "1-year range",
         iterations=3,
         section="get_events",
     )
 
     events = benchmark(
-        lambda: connector.get_events(read_calendar, "2020-01-01", "2030-12-31"),
+        lambda: connector.get_events(read_calendar, f"{past_year}-01-01", f"{future_year}-12-31"),
         "10-year range",
         iterations=3,
         section="get_events",
@@ -113,14 +120,14 @@ def run_benchmarks(read_calendar: str, test_calendar: str):
     print(f"\n[get_availability] (calendar: {read_calendar})")
 
     benchmark(
-        lambda: connector.get_availability([read_calendar], "2026-03-01", "2026-03-31"),
+        lambda: connector.get_availability([read_calendar], f"{read_year}-03-01", f"{read_year}-03-31"),
         "1-month range",
         iterations=3,
         section="get_availability",
     )
 
     benchmark(
-        lambda: connector.get_availability([read_calendar], "2026-01-01", "2026-12-31"),
+        lambda: connector.get_availability([read_calendar], f"{read_year}-01-01", f"{read_year}-12-31"),
         "1-year range",
         iterations=3,
         section="get_availability",
@@ -130,14 +137,14 @@ def run_benchmarks(read_calendar: str, test_calendar: str):
     print(f"\n[get_conflicts] (calendar: {read_calendar})")
 
     benchmark(
-        lambda: connector.get_conflicts([read_calendar], "2026-03-01", "2026-03-31"),
+        lambda: connector.get_conflicts([read_calendar], f"{read_year}-03-01", f"{read_year}-03-31"),
         "1-month range",
         iterations=3,
         section="get_conflicts",
     )
 
     benchmark(
-        lambda: connector.get_conflicts([read_calendar], "2026-01-01", "2026-12-31"),
+        lambda: connector.get_conflicts([read_calendar], f"{read_year}-01-01", f"{read_year}-12-31"),
         "1-year range",
         iterations=3,
         section="get_conflicts",
@@ -148,7 +155,7 @@ def run_benchmarks(read_calendar: str, test_calendar: str):
 
     benchmark(
         lambda: connector.search_events("Meeting", calendar_names=[read_calendar],
-                                         start_date="2026-03-01", end_date="2026-03-31"),
+                                         start_date=f"{read_year}-03-01", end_date=f"{read_year}-03-31"),
         "1-month range",
         iterations=3,
         section="search_events",
@@ -156,7 +163,7 @@ def run_benchmarks(read_calendar: str, test_calendar: str):
 
     benchmark(
         lambda: connector.search_events("Meeting", calendar_names=[read_calendar],
-                                         start_date="2026-01-01", end_date="2026-12-31"),
+                                         start_date=f"{read_year}-01-01", end_date=f"{read_year}-12-31"),
         "1-year range",
         iterations=3,
         section="search_events",
@@ -170,7 +177,7 @@ def run_benchmarks(read_calendar: str, test_calendar: str):
     def create_and_track():
         result = connector.create_events(
             calendar_name=test_calendar,
-            events=[{"summary": "Benchmark Event", "start_date": "2027-06-15T10:00:00", "end_date": "2027-06-15T11:00:00"}],
+            events=[{"summary": "Benchmark Event", "start_date": f"{write_year}-06-15T10:00:00", "end_date": f"{write_year}-06-15T11:00:00"}],
         )
         uid = result["created"][0]["uid"]
         created_uids.append(uid)
@@ -181,7 +188,7 @@ def run_benchmarks(read_calendar: str, test_calendar: str):
     # Batch create scaling
     def batch_create(n):
         events = [
-            {"summary": f"Batch {n} Event {i}", "start_date": "2027-07-15T10:00:00", "end_date": "2027-07-15T11:00:00"}
+            {"summary": f"Batch {n} Event {i}", "start_date": f"{write_year}-07-15T10:00:00", "end_date": f"{write_year}-07-15T11:00:00"}
             for i in range(n)
         ]
         result = connector.create_events(calendar_name=test_calendar, events=events)
@@ -218,7 +225,7 @@ def run_benchmarks(read_calendar: str, test_calendar: str):
     def create_then_delete():
         result = connector.create_events(
             calendar_name=test_calendar,
-            events=[{"summary": "Delete Bench", "start_date": "2027-08-01T10:00:00", "end_date": "2027-08-01T11:00:00"}],
+            events=[{"summary": "Delete Bench", "start_date": f"{write_year}-08-01T10:00:00", "end_date": f"{write_year}-08-01T11:00:00"}],
         )
         uid = result["created"][0]["uid"]
         return connector.delete_events(test_calendar, uid)
@@ -228,7 +235,7 @@ def run_benchmarks(read_calendar: str, test_calendar: str):
     # Batch delete (3 iterations, create batch each time)
     def create_batch_then_delete(n):
         events = [
-            {"summary": f"DelBatch {i}", "start_date": "2027-08-15T10:00:00", "end_date": "2027-08-15T11:00:00"}
+            {"summary": f"DelBatch {i}", "start_date": f"{write_year}-08-15T10:00:00", "end_date": f"{write_year}-08-15T11:00:00"}
             for i in range(n)
         ]
         result = connector.create_events(calendar_name=test_calendar, events=events)
