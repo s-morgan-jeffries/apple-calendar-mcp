@@ -4,21 +4,29 @@ Measures real-world timing of each operation against Calendar.app.
 Requires CALENDAR_TEST_MODE=true for write operations.
 
 Usage:
-    python tests/benchmarks/performance.py [--read-calendar NAME]
+    python tests/benchmarks/performance.py [--read-calendar NAME] [--output FILE]
 
 Options:
     --read-calendar NAME   Calendar to use for read benchmarks (default: MCP-Test-Calendar)
+    --output FILE          Write JSON results to FILE for historical comparison
 """
 
 import argparse
+import json
+import math
+import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 
 from apple_calendar_mcp.calendar_connector import CalendarConnector
 from tests.helpers.calendar_setup import create_test_calendar
 
+# Collect results for JSON output
+_results = []
 
-def benchmark(fn, label, iterations=1):
+
+def benchmark(fn, label, iterations=1, section=""):
     """Run a function and report timing."""
     times = []
     result = None
@@ -30,9 +38,21 @@ def benchmark(fn, label, iterations=1):
 
     mean = sum(times) / len(times)
     if iterations > 1:
-        print(f"  {label}: {mean:.3f}s (mean of {iterations}, min={min(times):.3f}s, max={max(times):.3f}s)")
+        std = math.sqrt(sum((t - mean) ** 2 for t in times) / len(times))
+        print(f"  {label}: {mean:.3f}s (mean of {iterations}, std={std:.3f}s, min={min(times):.3f}s, max={max(times):.3f}s)")
     else:
+        std = 0.0
         print(f"  {label}: {mean:.3f}s")
+
+    _results.append({
+        "section": section,
+        "label": label,
+        "mean": round(mean, 4),
+        "min": round(min(times), 4),
+        "max": round(max(times), 4),
+        "std": round(std, 4),
+        "iterations": iterations,
+    })
     return result
 
 
@@ -47,9 +67,14 @@ def run_benchmarks(read_calendar: str, test_calendar: str):
     print("Apple Calendar MCP — Performance Benchmarks")
     print("=" * 60)
 
+    # Warm-up: trigger Swift compilation caching before timed runs
+    print("\n[warm-up]")
+    connector.get_calendars()
+    print("  Swift helper compiled and cached")
+
     # --- get_calendars ---
     print("\n[get_calendars]")
-    calendars = benchmark(connector.get_calendars, "List all calendars", iterations=3)
+    calendars = benchmark(connector.get_calendars, "List all calendars", iterations=3, section="get_calendars")
     cal_names = [c["name"] for c in calendars]
     print(f"  Found {len(calendars)} calendars")
 
@@ -66,18 +91,21 @@ def run_benchmarks(read_calendar: str, test_calendar: str):
         lambda: connector.get_events(read_calendar, "2026-03-01", "2026-03-31"),
         "1-month range",
         iterations=3,
+        section="get_events",
     )
 
     benchmark(
         lambda: connector.get_events(read_calendar, "2026-01-01", "2026-12-31"),
         "1-year range",
         iterations=3,
+        section="get_events",
     )
 
     events = benchmark(
         lambda: connector.get_events(read_calendar, "2020-01-01", "2030-12-31"),
         "10-year range",
         iterations=3,
+        section="get_events",
     )
     print(f"  Events in 10-year range: {len(events)}")
 
@@ -88,12 +116,14 @@ def run_benchmarks(read_calendar: str, test_calendar: str):
         lambda: connector.get_availability([read_calendar], "2026-03-01", "2026-03-31"),
         "1-month range",
         iterations=3,
+        section="get_availability",
     )
 
     benchmark(
         lambda: connector.get_availability([read_calendar], "2026-01-01", "2026-12-31"),
         "1-year range",
         iterations=3,
+        section="get_availability",
     )
 
     # --- get_conflicts ---
@@ -103,12 +133,14 @@ def run_benchmarks(read_calendar: str, test_calendar: str):
         lambda: connector.get_conflicts([read_calendar], "2026-03-01", "2026-03-31"),
         "1-month range",
         iterations=3,
+        section="get_conflicts",
     )
 
     benchmark(
         lambda: connector.get_conflicts([read_calendar], "2026-01-01", "2026-12-31"),
         "1-year range",
         iterations=3,
+        section="get_conflicts",
     )
 
     # --- search_events ---
@@ -119,6 +151,7 @@ def run_benchmarks(read_calendar: str, test_calendar: str):
                                          start_date="2026-03-01", end_date="2026-03-31"),
         "1-month range",
         iterations=3,
+        section="search_events",
     )
 
     benchmark(
@@ -126,6 +159,7 @@ def run_benchmarks(read_calendar: str, test_calendar: str):
                                          start_date="2026-01-01", end_date="2026-12-31"),
         "1-year range",
         iterations=3,
+        section="search_events",
     )
 
     # --- Write operations (test calendar only) ---
@@ -142,7 +176,21 @@ def run_benchmarks(read_calendar: str, test_calendar: str):
         created_uids.append(uid)
         return uid
 
-    benchmark(create_and_track, "Create single event", iterations=3)
+    benchmark(create_and_track, "Create single event", iterations=3, section="create_events")
+
+    # Batch create scaling
+    def batch_create(n):
+        events = [
+            {"summary": f"Batch {n} Event {i}", "start_date": "2027-07-15T10:00:00", "end_date": "2027-07-15T11:00:00"}
+            for i in range(n)
+        ]
+        result = connector.create_events(calendar_name=test_calendar, events=events)
+        for c in result["created"]:
+            created_uids.append(c["uid"])
+        return result
+
+    benchmark(lambda: batch_create(5), f"Batch create 5 events", iterations=3, section="create_events")
+    benchmark(lambda: batch_create(10), f"Batch create 10 events", iterations=3, section="create_events")
 
     # --- update_events ---
     print(f"\n[update_events] (calendar: {test_calendar})")
@@ -153,48 +201,65 @@ def run_benchmarks(read_calendar: str, test_calendar: str):
             lambda: connector.update_events(test_calendar, [{"uid": uid, "summary": "Updated Benchmark"}]),
             "Update summary (single event via batch)",
             iterations=3,
+            section="update_events",
         )
 
         benchmark(
             lambda: connector.update_events(test_calendar, [{"uid": uid, "location": "Room A"}]),
             "Update location",
             iterations=3,
+            section="update_events",
         )
 
     # --- delete_events ---
     print(f"\n[delete_events] (calendar: {test_calendar})")
 
-    if len(created_uids) >= 1:
-        uid = created_uids.pop()
-        benchmark(
-            lambda: connector.delete_events(test_calendar, uid),
-            "Delete single event",
+    # Single delete (3 iterations, create fresh event each time)
+    def create_then_delete():
+        result = connector.create_events(
+            calendar_name=test_calendar,
+            events=[{"summary": "Delete Bench", "start_date": "2027-08-01T10:00:00", "end_date": "2027-08-01T11:00:00"}],
         )
+        uid = result["created"][0]["uid"]
+        return connector.delete_events(test_calendar, uid)
 
-    # Batch delete remaining
+    benchmark(create_then_delete, "Create + delete single event", iterations=3, section="delete_events")
+
+    # Batch delete (3 iterations, create batch each time)
+    def create_batch_then_delete(n):
+        events = [
+            {"summary": f"DelBatch {i}", "start_date": "2027-08-15T10:00:00", "end_date": "2027-08-15T11:00:00"}
+            for i in range(n)
+        ]
+        result = connector.create_events(calendar_name=test_calendar, events=events)
+        uids = [c["uid"] for c in result["created"]]
+        return connector.delete_events(test_calendar, uids)
+
+    benchmark(lambda: create_batch_then_delete(5), "Create + batch delete 5 events", iterations=3, section="delete_events")
+
+    # Clean up remaining tracked UIDs
     if created_uids:
-        benchmark(
-            lambda: connector.delete_events(test_calendar, created_uids),
-            f"Batch delete {len(created_uids)} events",
-        )
+        try:
+            connector.delete_events(test_calendar, created_uids)
+        except Exception:
+            pass
         created_uids.clear()
-
-    # Batch delete benchmark (create 5, delete all)
-    batch_events = [
-        {"summary": f"Batch Bench {i}", "start_date": "2027-07-01T10:00:00", "end_date": "2027-07-01T11:00:00"}
-        for i in range(5)
-    ]
-    batch_result = connector.create_events(calendar_name=test_calendar, events=batch_events)
-    batch_uids = [c["uid"] for c in batch_result["created"]]
-
-    benchmark(
-        lambda: connector.delete_events(test_calendar, batch_uids),
-        "Batch delete 5 events",
-    )
 
     print("\n" + "=" * 60)
     print("Benchmarks complete.")
     print("=" * 60)
+
+
+def _get_git_sha():
+    """Get current git SHA, or 'unknown' if not in a git repo."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True, text=True, timeout=5,
+        )
+        return result.stdout.strip() if result.returncode == 0 else "unknown"
+    except Exception:
+        return "unknown"
 
 
 def main():
@@ -209,8 +274,23 @@ def main():
         default="MCP-Test-Calendar",
         help="Calendar for write benchmarks (default: MCP-Test-Calendar)",
     )
+    parser.add_argument(
+        "--output",
+        default=None,
+        help="Write JSON results to this file for historical comparison",
+    )
     args = parser.parse_args()
     run_benchmarks(args.read_calendar, args.test_calendar)
+
+    if args.output:
+        output = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "git_sha": _get_git_sha(),
+            "results": _results,
+        }
+        with open(args.output, "w") as f:
+            json.dump(output, f, indent=2)
+        print(f"\nResults written to {args.output}")
 
 
 if __name__ == "__main__":
