@@ -117,11 +117,13 @@ def score_response(response_text: str, scenario: dict) -> str:
     response_lower = response_text.lower()
 
     # Check which expected tools are mentioned in the response
+    # search_events is accepted as a valid alternative to get_events for UID lookup
     tools_found = []
     for tool in expected_tools:
-        # Match tool name as a word (not substring of another word)
         if re.search(rf'\b{re.escape(tool)}\b', response_lower):
             tools_found.append(tool)
+        elif tool == "get_events" and re.search(r'\bsearch_events\b', response_lower):
+            tools_found.append(tool)  # search_events is valid for finding UIDs
 
     tools_match = set(expected_tools) == set(tools_found)
 
