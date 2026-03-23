@@ -58,8 +58,8 @@ class TestGetCalendarsTool:
     def test_returns_formatted_calendar_list(self, mock_get_client):
         mock_client = MagicMock()
         mock_client.get_calendars.return_value = [
-            {"name": "Personal", "writable": True, "description": "", "color": "#0072FF", "source": "iCloud"},
-            {"name": "Work", "writable": True, "description": "", "color": "#FF0023", "source": "Google"},
+            {"name": "Personal", "writable": True, "description": "", "color": "#0072FF", "source": "iCloud", "type": "caldav", "is_default": True},
+            {"name": "Work", "writable": True, "description": "", "color": "#FF0023", "source": "Google", "type": "caldav", "is_default": False},
         ]
         mock_get_client.return_value = mock_client
 
@@ -74,7 +74,7 @@ class TestGetCalendarsTool:
     def test_returns_string(self, mock_get_client):
         mock_client = MagicMock()
         mock_client.get_calendars.return_value = [
-            {"name": "Test", "writable": True, "description": "", "color": "#000000", "source": "iCloud"},
+            {"name": "Test", "writable": True, "description": "", "color": "#000000", "source": "iCloud", "type": "caldav", "is_default": False},
         ]
         mock_get_client.return_value = mock_client
 
@@ -454,17 +454,30 @@ class TestFormatCalendarDescription:
 
     def test_calendar_with_description(self):
         from apple_calendar_mcp.server_fastmcp import _format_calendar
-        cal = {"name": "Work", "writable": True, "description": "My work calendar", "color": "#FF0000", "source": "iCloud"}
+        cal = {"name": "Work", "writable": True, "description": "My work calendar", "color": "#FF0000", "source": "iCloud", "type": "caldav", "is_default": False}
         result = _format_calendar(cal)
         assert "Description: My work calendar" in result
         assert "Source: iCloud" in result
+        assert "Default" not in result
 
     def test_calendar_without_description(self):
         from apple_calendar_mcp.server_fastmcp import _format_calendar
-        cal = {"name": "Work", "writable": True, "description": "", "color": "#FF0000", "source": "Google"}
+        cal = {"name": "Work", "writable": True, "description": "", "color": "#FF0000", "source": "Google", "type": "caldav", "is_default": False}
         result = _format_calendar(cal)
         assert "Description" not in result
         assert "Source: Google" in result
+
+    def test_default_calendar(self):
+        from apple_calendar_mcp.server_fastmcp import _format_calendar
+        cal = {"name": "Personal", "writable": True, "description": "", "color": "#0072FF", "source": "iCloud", "type": "caldav", "is_default": True}
+        result = _format_calendar(cal)
+        assert "Default: yes" in result
+
+    def test_non_default_calendar(self):
+        from apple_calendar_mcp.server_fastmcp import _format_calendar
+        cal = {"name": "Work", "writable": True, "description": "", "color": "#FF0000", "source": "Google", "type": "caldav", "is_default": False}
+        result = _format_calendar(cal)
+        assert "Default" not in result
 
 
 class TestFormatEventDetails:
@@ -526,8 +539,8 @@ class TestCreateEventsTool:
         mock_client = MagicMock()
         mock_client.create_events.return_value = {
             "created": [
-                {"summary": "Event A", "uid": "UID-A"},
-                {"summary": "Event B", "uid": "UID-B"},
+                {"summary": "Event A", "uid": "UID-A", "calendar_name": "Work"},
+                {"summary": "Event B", "uid": "UID-B", "calendar_name": "Work"},
             ],
             "errors": [],
         }
@@ -563,7 +576,7 @@ class TestCreateEventsTool:
     def test_batch_create_partial_success(self, mock_get_client):
         mock_client = MagicMock()
         mock_client.create_events.return_value = {
-            "created": [{"summary": "Event A", "uid": "UID-A"}],
+            "created": [{"summary": "Event A", "uid": "UID-A", "calendar_name": "Work"}],
             "errors": [{"index": 1, "summary": "Event B", "error": "Invalid date"}],
         }
         mock_get_client.return_value = mock_client
@@ -589,6 +602,24 @@ class TestCreateEventsTool:
         result = create_events(calendar_name="Work", events='{"summary": "test"}')
         assert "Error" in result
         assert "JSON array" in result
+
+    @patch("apple_calendar_mcp.server_fastmcp.get_client")
+    def test_resolved_calendar_from_swift_result(self, mock_get_client):
+        """When Swift returns a calendar_name, it should be used in the output message."""
+        mock_client = MagicMock()
+        mock_client.create_events.return_value = {
+            "created": [{"summary": "Event A", "uid": "UID-A", "calendar_name": "Default Calendar"}],
+            "errors": [],
+        }
+        mock_get_client.return_value = mock_client
+
+        from apple_calendar_mcp.server_fastmcp import create_events
+        events_json = json.dumps([
+            {"summary": "Event A", "start_date": "2026-03-15T10:00:00", "end_date": "2026-03-15T11:00:00"},
+        ])
+        result = create_events(calendar_name="", events=events_json)
+        assert "Default Calendar" in result
+        assert "'Default Calendar'" in result
 
 
 class TestUpdateEventsTool:

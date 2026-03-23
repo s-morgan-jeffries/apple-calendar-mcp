@@ -206,8 +206,8 @@ class TestGetCalendars:
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_returns_list_of_calendar_dicts(self, mock_swift):
         mock_swift.return_value = json.dumps([
-            {"name": "Personal", "writable": True, "description": "", "color": "#0072FF", "source": "iCloud"},
-            {"name": "Work", "writable": True, "description": "", "color": "#FF0023", "source": "Google"},
+            {"name": "Personal", "writable": True, "description": "", "color": "#0072FF", "source": "iCloud", "type": "caldav", "is_default": True},
+            {"name": "Work", "writable": True, "description": "", "color": "#FF0023", "source": "Google", "type": "caldav", "is_default": False},
         ])
         result = self.connector.get_calendars()
         assert isinstance(result, list)
@@ -218,7 +218,7 @@ class TestGetCalendars:
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_calendar_has_expected_keys(self, mock_swift):
         mock_swift.return_value = json.dumps([
-            {"name": "Personal", "writable": True, "description": "my cal", "color": "#0072FF", "source": "iCloud"},
+            {"name": "Personal", "writable": True, "description": "my cal", "color": "#0072FF", "source": "iCloud", "type": "caldav", "is_default": False},
         ])
         result = self.connector.get_calendars()
         cal = result[0]
@@ -226,6 +226,8 @@ class TestGetCalendars:
         assert "writable" in cal
         assert "description" in cal
         assert "color" in cal
+        assert "type" in cal
+        assert "is_default" in cal
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_empty_calendar_list(self, mock_swift):
@@ -236,7 +238,7 @@ class TestGetCalendars:
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_read_only_calendar(self, mock_swift):
         mock_swift.return_value = json.dumps([
-            {"name": "Holidays", "writable": False, "description": "US Holidays", "color": "#8882FE", "source": "Other"},
+            {"name": "Holidays", "writable": False, "description": "US Holidays", "color": "#8882FE", "source": "Other", "type": "local", "is_default": False},
         ])
         result = self.connector.get_calendars()
         assert result[0]["writable"] is False
@@ -244,7 +246,7 @@ class TestGetCalendars:
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_calendar_with_empty_description(self, mock_swift):
         mock_swift.return_value = json.dumps([
-            {"name": "Work", "writable": True, "description": "", "color": "#FF0000", "source": "iCloud"},
+            {"name": "Work", "writable": True, "description": "", "color": "#FF0000", "source": "iCloud", "type": "caldav", "is_default": False},
         ])
         result = self.connector.get_calendars()
         assert result[0]["description"] == ""
@@ -1063,7 +1065,7 @@ class TestCreateEvents:
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_creates_batch_events(self, mock_swift):
         mock_swift.return_value = json.dumps({
-            "created": [{"uid": "UID-1", "summary": "Event 1"}, {"uid": "UID-2", "summary": "Event 2"}],
+            "created": [{"uid": "UID-1", "summary": "Event 1", "calendar_name": "MCP-Test-Calendar"}, {"uid": "UID-2", "summary": "Event 2", "calendar_name": "MCP-Test-Calendar"}],
             "errors": [],
         })
         events = [
@@ -1077,7 +1079,7 @@ class TestCreateEvents:
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_partial_success(self, mock_swift):
         mock_swift.return_value = json.dumps({
-            "created": [{"uid": "UID-1", "summary": "Event 1"}],
+            "created": [{"uid": "UID-1", "summary": "Event 1", "calendar_name": "MCP-Test-Calendar"}],
             "errors": [{"index": 1, "summary": "Bad Event", "error": "invalid date"}],
         })
         result = self.connector.create_events("MCP-Test-Calendar", [{"summary": "Event 1"}, {"summary": "Bad Event"}])
