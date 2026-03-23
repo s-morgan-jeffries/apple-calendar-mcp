@@ -96,6 +96,21 @@ def run_benchmarks(read_calendar: str, test_calendar: str):
         iterations=3,
     )
 
+    # --- get_conflicts ---
+    print(f"\n[get_conflicts] (calendar: {read_calendar})")
+
+    benchmark(
+        lambda: connector.get_conflicts([read_calendar], "2026-03-01", "2026-03-31"),
+        "1-month range",
+        iterations=3,
+    )
+
+    benchmark(
+        lambda: connector.get_conflicts([read_calendar], "2026-01-01", "2026-12-31"),
+        "1-year range",
+        iterations=3,
+    )
+
     # --- Write operations (test calendar only) ---
     print(f"\n[create_events] (calendar: {test_calendar})")
 

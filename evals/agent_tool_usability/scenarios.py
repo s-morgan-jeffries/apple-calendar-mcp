@@ -882,4 +882,27 @@ SCENARIOS = [
         ),
         "safety_critical": False,
     },
+    # =========================================================================
+    # Category 12: Conflict Detection
+    # =========================================================================
+    {
+        "id": 39,
+        "category": "Conflict Detection",
+        "name": "Check for double-bookings",
+        "prompt": "Do I have any double-bookings on my Work calendar this week?",
+        "expected": {
+            "tools": ["get_conflicts"],
+            "key_params": {
+                "get_conflicts": {
+                    "calendar_names": ["Work"],
+                }
+            },
+        },
+        "scoring_notes": (
+            "PASS: Uses get_conflicts with calendar_names=['Work'] and appropriate date range. "
+            "PARTIAL: Uses get_events and manually scans for overlaps. "
+            "FAIL: Uses get_availability or wrong tool."
+        ),
+        "safety_critical": False,
+    },
 ]
