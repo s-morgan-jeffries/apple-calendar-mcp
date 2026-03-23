@@ -1263,12 +1263,84 @@ class TestSearchEventsIntegration:
         try:
             results = connector.search_events(
                 query=keyword,
-                calendar_name=TEST_CALENDAR,
+                calendar_names=[TEST_CALENDAR],
                 start_date="2027-10-01",
                 end_date="2028-04-01",
             )
             assert len(results) >= 1, f"Expected to find event with keyword '{keyword}'"
             assert any(keyword in e["summary"] for e in results)
+        finally:
+            _delete_event_by_uid(uid)
+
+    def test_search_finds_event_by_notes(self, connector):
+        """Search should match keywords in event notes."""
+        keyword = f"NotesKey{uuid.uuid4().hex[:8]}"
+        uid = _create_single_event(connector,
+            calendar_name=TEST_CALENDAR,
+            summary="Generic Meeting",
+            start_date="2028-01-20T10:00:00",
+            end_date="2028-01-20T11:00:00",
+            notes=f"Remember to discuss {keyword} topic",
+        )
+        try:
+            results = connector.search_events(
+                query=keyword,
+                calendar_names=[TEST_CALENDAR],
+                start_date="2028-01-01",
+                end_date="2028-02-01",
+            )
+            assert len(results) >= 1, f"Expected to find event with notes keyword '{keyword}'"
+        finally:
+            _delete_event_by_uid(uid)
+
+    def test_search_finds_event_by_location(self, connector):
+        """Search should match keywords in event location."""
+        keyword = f"LocKey{uuid.uuid4().hex[:8]}"
+        uid = _create_single_event(connector,
+            calendar_name=TEST_CALENDAR,
+            summary="Office Meeting",
+            start_date="2028-02-20T10:00:00",
+            end_date="2028-02-20T11:00:00",
+            location=f"Building {keyword}",
+        )
+        try:
+            results = connector.search_events(
+                query=keyword,
+                calendar_names=[TEST_CALENDAR],
+                start_date="2028-02-01",
+                end_date="2028-03-01",
+            )
+            assert len(results) >= 1, f"Expected to find event with location keyword '{keyword}'"
+        finally:
+            _delete_event_by_uid(uid)
+
+    def test_search_returns_empty_for_no_match(self, connector):
+        """Search for a nonexistent keyword should return empty results."""
+        nonsense = f"ZZZZZ{uuid.uuid4().hex}"
+        results = connector.search_events(
+            query=nonsense,
+            calendar_names=[TEST_CALENDAR],
+            start_date="2028-01-01",
+            end_date="2028-12-31",
+        )
+        assert results == []
+
+    def test_search_across_all_calendars(self, connector):
+        """Search without specifying calendar_names should search all calendars."""
+        keyword = f"AllCalSearch{uuid.uuid4().hex[:8]}"
+        uid = _create_single_event(connector,
+            calendar_name=TEST_CALENDAR,
+            summary=f"Findme {keyword}",
+            start_date="2028-03-20T10:00:00",
+            end_date="2028-03-20T11:00:00",
+        )
+        try:
+            results = connector.search_events(
+                query=keyword,
+                start_date="2028-03-01",
+                end_date="2028-04-01",
+            )
+            assert len(results) >= 1, f"Expected to find event across all calendars"
         finally:
             _delete_event_by_uid(uid)
 

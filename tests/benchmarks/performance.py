@@ -111,6 +111,23 @@ def run_benchmarks(read_calendar: str, test_calendar: str):
         iterations=3,
     )
 
+    # --- search_events ---
+    print(f"\n[search_events] (calendar: {read_calendar})")
+
+    benchmark(
+        lambda: connector.search_events("Meeting", calendar_names=[read_calendar],
+                                         start_date="2026-03-01", end_date="2026-03-31"),
+        "1-month range",
+        iterations=3,
+    )
+
+    benchmark(
+        lambda: connector.search_events("Meeting", calendar_names=[read_calendar],
+                                         start_date="2026-01-01", end_date="2026-12-31"),
+        "1-year range",
+        iterations=3,
+    )
+
     # --- Write operations (test calendar only) ---
     print(f"\n[create_events] (calendar: {test_calendar})")
 

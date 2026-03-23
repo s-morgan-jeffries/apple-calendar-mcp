@@ -905,4 +905,50 @@ SCENARIOS = [
         ),
         "safety_critical": False,
     },
+    # =========================================================================
+    # Category 13: Search vs Query Discrimination
+    # =========================================================================
+    {
+        "id": 40,
+        "category": "Search",
+        "name": "Text search across calendars",
+        "prompt": (
+            "Find all events mentioning 'budget review' across my calendars "
+            "in the next 6 months."
+        ),
+        "expected": {
+            "tools": ["search_events"],
+            "key_params": {
+                "search_events": {
+                    "query": "budget review",
+                }
+            },
+        },
+        "scoring_notes": (
+            "PASS: Uses search_events with query='budget review' and appropriate date range. "
+            "PARTIAL: Uses get_events and manually scans results for 'budget review'. "
+            "FAIL: Uses get_availability or wrong tool entirely."
+        ),
+        "safety_critical": False,
+    },
+    {
+        "id": 41,
+        "category": "Search",
+        "name": "Date query should use get_events not search",
+        "prompt": "What meetings do I have tomorrow on my Work calendar?",
+        "expected": {
+            "tools": ["get_events"],
+            "key_params": {
+                "get_events": {
+                    "calendar_names": ["Work"],
+                }
+            },
+        },
+        "scoring_notes": (
+            "PASS: Uses get_events with calendar_names=['Work'] and tomorrow's date range. "
+            "PARTIAL: Uses search_events with query='meetings' — wrong tool for a date-only query. "
+            "FAIL: Uses get_availability, get_conflicts, or wrong tool."
+        ),
+        "safety_critical": False,
+    },
 ]
