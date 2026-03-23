@@ -505,6 +505,24 @@ class TestGetEvents:
         assert event["occurrence_date"] == "2026-07-01T09:00:00"
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_recurrence_parsed_field_returned(self, mock_swift):
+        """recurrence_parsed structured object should be passed through from Swift."""
+        mock_swift.return_value = json.dumps([
+            {"uid": "REC-456", "summary": "Parsed Recurrence", "start_date": "2026-07-01T09:00:00",
+             "end_date": "2026-07-01T09:30:00", "allday_event": False, "location": "",
+             "notes": "", "url": "", "status": "confirmed", "calendar_name": "Work",
+             "is_recurring": True, "recurrence_rule": "FREQ=WEEKLY;INTERVAL=2;BYDAY=MO",
+             "recurrence_parsed": {"frequency": "weekly", "interval": 2, "days_of_week": ["MO"], "count": 10},
+             "is_detached": False, "occurrence_date": "2026-07-01T09:00:00"},
+        ])
+        result = self.connector.get_events("Work", "2026-07-01", "2026-07-02")
+        event = result[0]
+        assert event["recurrence_parsed"]["frequency"] == "weekly"
+        assert event["recurrence_parsed"]["interval"] == 2
+        assert event["recurrence_parsed"]["days_of_week"] == ["MO"]
+        assert event["recurrence_parsed"]["count"] == 10
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_attendees_returned(self, mock_swift):
         mock_swift.return_value = json.dumps([
             {"uid": "ATT-123", "summary": "Team Meeting", "start_date": "2026-07-01T14:00:00",

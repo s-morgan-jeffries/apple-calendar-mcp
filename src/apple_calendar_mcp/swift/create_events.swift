@@ -69,6 +69,37 @@ func parseUntilDate(_ value: String) -> Date? {
     return parseISO8601(value)
 }
 
+func parseStructuredRecurrence(_ dict: [String: Any]) -> EKRecurrenceRule? {
+    guard let freqStr = dict["frequency"] as? String else { return nil }
+
+    var frequency: EKRecurrenceFrequency
+    switch freqStr.lowercased() {
+    case "daily": frequency = .daily
+    case "weekly": frequency = .weekly
+    case "monthly": frequency = .monthly
+    case "yearly": frequency = .yearly
+    default: return nil
+    }
+
+    let interval = dict["interval"] as? Int ?? 1
+
+    var daysOfWeek: [EKRecurrenceDayOfWeek]?
+    if let days = dict["days_of_week"] as? [String] {
+        daysOfWeek = days.compactMap { parseDayOfWeek($0) }
+    }
+
+    var end: EKRecurrenceEnd?
+    if let count = dict["count"] as? Int {
+        end = EKRecurrenceEnd(occurrenceCount: count)
+    } else if let untilStr = dict["until"] as? String, let untilDate = parseISO8601(untilStr) ?? parseUntilDate(untilStr) {
+        end = EKRecurrenceEnd(end: untilDate)
+    }
+
+    return EKRecurrenceRule(recurrenceWith: frequency, interval: interval,
+        daysOfTheWeek: daysOfWeek, daysOfTheMonth: nil, monthsOfTheYear: nil,
+        weeksOfTheYear: nil, daysOfTheYear: nil, setPositions: nil, end: end)
+}
+
 func parseRecurrenceRule(_ rrule: String) -> EKRecurrenceRule? {
     var frequency: EKRecurrenceFrequency = .daily
     var interval = 1
@@ -212,6 +243,8 @@ for (index, eventData) in eventsJson.enumerated() {
     if let notes = eventData["notes"] as? String { event.notes = notes }
     if let urlStr = eventData["url"] as? String, let url = URL(string: urlStr) { event.url = url }
     if let rrule = eventData["recurrence"] as? String, let rule = parseRecurrenceRule(rrule) {
+        event.addRecurrenceRule(rule)
+    } else if let recDict = eventData["recurrence"] as? [String: Any], let rule = parseStructuredRecurrence(recDict) {
         event.addRecurrenceRule(rule)
     }
     if let alerts = eventData["alerts"] as? [Int] {

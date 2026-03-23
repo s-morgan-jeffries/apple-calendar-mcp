@@ -128,6 +128,35 @@ func eventToDict(_ event: EKEvent) -> [String: Any] {
         } else {
             dict["recurrence_rule"] = ruleStr
         }
+
+        // Structured recurrence output
+        var parsed: [String: Any] = [:]
+        switch rule.frequency {
+        case .daily: parsed["frequency"] = "daily"
+        case .weekly: parsed["frequency"] = "weekly"
+        case .monthly: parsed["frequency"] = "monthly"
+        case .yearly: parsed["frequency"] = "yearly"
+        @unknown default: parsed["frequency"] = "unknown"
+        }
+        parsed["interval"] = rule.interval
+        if let days = rule.daysOfTheWeek {
+            parsed["days_of_week"] = days.map { day -> String in
+                let dayNames = ["", "SU", "MO", "TU", "WE", "TH", "FR", "SA"]
+                let dayStr = dayNames[day.dayOfTheWeek.rawValue]
+                if day.weekNumber != 0 {
+                    return "\(day.weekNumber)\(dayStr)"
+                }
+                return dayStr
+            }
+        }
+        if let recEnd = rule.recurrenceEnd {
+            if let endDate = recEnd.endDate {
+                parsed["until"] = df.string(from: endDate)
+            } else if recEnd.occurrenceCount > 0 {
+                parsed["count"] = recEnd.occurrenceCount
+            }
+        }
+        dict["recurrence_parsed"] = parsed
     } else {
         dict["recurrence_rule"] = NSNull()
     }

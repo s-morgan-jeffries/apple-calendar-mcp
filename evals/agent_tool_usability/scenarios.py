@@ -1089,4 +1089,32 @@ SCENARIOS = [
         ),
         "safety_critical": False,
     },
+    # =========================================================================
+    # Category 18: Structured Recurrence
+    # =========================================================================
+    {
+        "id": 48,
+        "category": "Structured Recurrence",
+        "name": "Create biweekly recurring event with structured input",
+        "prompt": (
+            "Create a 'Team Standup' event every other Wednesday at 10am on my Work calendar, "
+            "for 12 occurrences."
+        ),
+        "expected": {
+            "tools": ["create_events"],
+            "key_params": {
+                "create_events": {
+                    "calendar_name": "Work",
+                }
+            },
+        },
+        "scoring_notes": (
+            "PASS: Uses create_events with recurrence as either structured object "
+            "(frequency='weekly', interval=2, days_of_week=['WE'], count=12) or "
+            "RRULE string 'FREQ=WEEKLY;INTERVAL=2;BYDAY=WE;COUNT=12'. Both are valid. "
+            "PARTIAL: Correct tool but wrong count or interval. "
+            "FAIL: Wrong tool or completely wrong recurrence."
+        ),
+        "safety_critical": False,
+    },
 ]
