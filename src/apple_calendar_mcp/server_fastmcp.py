@@ -145,7 +145,11 @@ def create_events(
                 recurrence (RRULE string like "FREQ=WEEKLY;INTERVAL=2;BYDAY=MO;COUNT=10"
                 OR structured object like {"frequency": "weekly", "interval": 2,
                 "days_of_week": ["MO"], "count": 10}),
-                alerts (list of minutes, e.g. [15, 60]), availability ("free"/"busy"/"tentative"),
+                alerts (list — each element is either an integer (minutes before, e.g. 15)
+                or an object: {"type": "absolute", "date": "ISO 8601"} for a fixed-time alert,
+                or {"type": "proximity", "proximity": "enter"|"leave"} for a location-based
+                alert that requires structured_location on the event),
+                availability ("free"/"busy"/"tentative"),
                 timezone (IANA identifier, e.g. "America/Los_Angeles" — use this to schedule
                 in a remote timezone rather than converting times manually),
                 structured_location (object with title, latitude, longitude, radius — adds
@@ -292,8 +296,16 @@ def _format_alerts(alerts: list[dict]) -> list[str]:
     """Format alert list for display."""
     if not alerts:
         return []
-    alert_strs = [f"{a['minutes_before']}m before" for a in alerts]
-    return [f"Alerts: {', '.join(alert_strs)}"]
+    parts = []
+    for a in alerts:
+        alert_type = a.get("type", "relative")
+        if alert_type == "absolute":
+            parts.append(f"at {a.get('date', '?')}")
+        elif alert_type == "proximity":
+            parts.append(f"on {a.get('proximity', 'enter')}")
+        else:
+            parts.append(f"{a.get('minutes_before', '?')}m before")
+    return [f"Alerts: {', '.join(parts)}"]
 
 
 def _format_attendees(attendees: list[dict]) -> list[str]:

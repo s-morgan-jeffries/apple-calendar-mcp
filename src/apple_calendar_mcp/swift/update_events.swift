@@ -306,8 +306,27 @@ for (index, updateData) in updatesJson.enumerated() {
         // Apply new alerts if provided
         if updateData["clear_alerts"] as? Bool == true || updateData["alerts"] != nil {
             newEvent.alarms = nil
-            if let alerts = updateData["alerts"] as? [Int] {
-                for mins in alerts { newEvent.addAlarm(EKAlarm(relativeOffset: TimeInterval(-mins * 60))) }
+            if let alerts = updateData["alerts"] as? [Any] {
+                for alert in alerts {
+                    if let mins = alert as? Int {
+                        newEvent.addAlarm(EKAlarm(relativeOffset: TimeInterval(-mins * 60)))
+                    } else if let dict = alert as? [String: Any], let type = dict["type"] as? String {
+                        switch type {
+                        case "absolute":
+                            if let dateStr = dict["date"] as? String, let date = parseISO8601(dateStr) {
+                                newEvent.addAlarm(EKAlarm(absoluteDate: date))
+                            }
+                        case "proximity":
+                            if let proxStr = dict["proximity"] as? String, let sl = newEvent.structuredLocation {
+                                let alarm = EKAlarm()
+                                alarm.structuredLocation = sl
+                                alarm.proximity = proxStr == "leave" ? .leave : .enter
+                                newEvent.addAlarm(alarm)
+                            }
+                        default: break
+                        }
+                    }
+                }
             }
         }
         if let avail = updateData["availability"] as? String {
@@ -367,8 +386,27 @@ for (index, updateData) in updatesJson.enumerated() {
     }
     if updateData["clear_alerts"] as? Bool == true || updateData["alerts"] != nil {
         event.alarms = nil
-        if let alerts = updateData["alerts"] as? [Int] {
-            for mins in alerts { event.addAlarm(EKAlarm(relativeOffset: TimeInterval(-mins * 60))) }
+        if let alerts = updateData["alerts"] as? [Any] {
+            for alert in alerts {
+                if let mins = alert as? Int {
+                    event.addAlarm(EKAlarm(relativeOffset: TimeInterval(-mins * 60)))
+                } else if let dict = alert as? [String: Any], let type = dict["type"] as? String {
+                    switch type {
+                    case "absolute":
+                        if let dateStr = dict["date"] as? String, let date = parseISO8601(dateStr) {
+                            event.addAlarm(EKAlarm(absoluteDate: date))
+                        }
+                    case "proximity":
+                        if let proxStr = dict["proximity"] as? String, let sl = event.structuredLocation {
+                            let alarm = EKAlarm()
+                            alarm.structuredLocation = sl
+                            alarm.proximity = proxStr == "leave" ? .leave : .enter
+                            event.addAlarm(alarm)
+                        }
+                    default: break
+                    }
+                }
+            }
         }
         updatedFields.append("alerts")
     }

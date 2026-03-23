@@ -1472,6 +1472,26 @@ class TestAlertsIntegration:
         finally:
             _delete_event_by_uid(uid)
 
+    def test_absolute_date_alarm(self, connector):
+        """Create event with absolute date alarm — alarm fires at a specific time."""
+        result = connector.create_events(TEST_CALENDAR, [{
+            "summary": "Absolute Alarm Test",
+            "start_date": _future_date(4, 11, 10, "14:00:00"),
+            "end_date": _future_date(4, 11, 10, "15:00:00"),
+            "alerts": [{"type": "absolute", "date": _future_date(4, 11, 10, "13:00:00")}],
+        }])
+        uid = result["created"][0]["uid"]
+        try:
+            events = connector.get_events(TEST_CALENDAR, _future_date(4, 11, 10), _future_date(4, 11, 11))
+            matches = [e for e in events if e["uid"] == uid]
+            assert len(matches) == 1
+            alerts = matches[0].get("alerts", [])
+            assert len(alerts) == 1
+            assert alerts[0]["type"] == "absolute"
+            assert "13:00:00" in alerts[0]["date"]
+        finally:
+            _delete_event_by_uid(uid)
+
 
 class TestSearchEventsIntegration:
     """Integration tests for search_events."""

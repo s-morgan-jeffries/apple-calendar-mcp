@@ -162,8 +162,15 @@ func eventToDict(_ event: EKEvent) -> [String: Any] {
     }
 
     // Alerts
-    dict["alerts"] = (event.alarms ?? []).map { alarm in
-        ["minutes_before": Int(alarm.relativeOffset / -60)] as [String: Int]
+    dict["alerts"] = (event.alarms ?? []).map { alarm -> [String: Any] in
+        if alarm.absoluteDate != nil {
+            return ["type": "absolute", "date": df.string(from: alarm.absoluteDate!)]
+        } else if alarm.proximity != .none {
+            return ["type": "proximity",
+                    "proximity": alarm.proximity == .leave ? "leave" : "enter"]
+        } else {
+            return ["type": "relative", "minutes_before": Int(alarm.relativeOffset / -60)]
+        }
     }
 
     // Attendees (read-only — EventKit cannot add attendees programmatically)
