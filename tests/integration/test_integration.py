@@ -9,10 +9,18 @@ Run with: make test-integration
 import os
 import re
 import uuid
+from datetime import date
 
 import pytest
 
 from apple_calendar_mcp.calendar_connector import CalendarConnector, CalendarSafetyError, run_applescript, run_swift_helper
+
+
+def _future_date(year_offset: int, month: int, day: int, time: str = "") -> str:
+    """Generate a future date string relative to the current year."""
+    year = date.today().year + year_offset
+    base = f"{year}-{month:02d}-{day:02d}"
+    return f"{base}T{time}" if time else base
 
 
 # Skip entire module if not in test mode
@@ -185,8 +193,8 @@ class TestCreateEventsIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Integration Test Event",
-            start_date="2026-06-15T10:00:00",
-            end_date="2026-06-15T11:00:00",
+            start_date=_future_date(3, 6, 15, "10:00:00"),
+            end_date=_future_date(3, 6, 15, "11:00:00"),
         )
         try:
             assert isinstance(uid, str)
@@ -200,8 +208,8 @@ class TestCreateEventsIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Verify Summary Test",
-            start_date="2026-06-15T14:00:00",
-            end_date="2026-06-15T15:00:00",
+            start_date=_future_date(3, 6, 15, "14:00:00"),
+            end_date=_future_date(3, 6, 15, "15:00:00"),
         )
         try:
             script = f'''tell application "Calendar"
@@ -220,8 +228,8 @@ end tell'''
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Full Event Test",
-            start_date="2026-06-15T09:00:00",
-            end_date="2026-06-15T10:00:00",
+            start_date=_future_date(3, 6, 15, "09:00:00"),
+            end_date=_future_date(3, 6, 15, "10:00:00"),
             location="Conference Room B",
             notes="Test description with details",
             url="https://example.com/test",
@@ -245,8 +253,8 @@ end tell'''
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="All Day Test",
-            start_date="2026-06-15",
-            end_date="2026-06-15",
+            start_date=_future_date(3, 6, 15),
+            end_date=_future_date(3, 6, 15),
             allday_event=True,
         )
         try:
@@ -265,8 +273,8 @@ end tell'''
     def test_batch_creates_multiple_events(self, connector):
         """Batch create should handle multiple events in one call."""
         events = [
-            {"summary": "Batch Event 1", "start_date": "2026-06-20T10:00:00", "end_date": "2026-06-20T11:00:00"},
-            {"summary": "Batch Event 2", "start_date": "2026-06-20T14:00:00", "end_date": "2026-06-20T15:00:00"},
+            {"summary": "Batch Event 1", "start_date": _future_date(3, 6, 20, "10:00:00"), "end_date": _future_date(3, 6, 20, "11:00:00")},
+            {"summary": "Batch Event 2", "start_date": _future_date(3, 6, 20, "14:00:00"), "end_date": _future_date(3, 6, 20, "15:00:00")},
         ]
         result = connector.create_events(TEST_CALENDAR, events)
         uids = [c["uid"] for c in result["created"]]
@@ -288,14 +296,14 @@ class TestGetEventsIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="GetEvents Test",
-            start_date="2026-07-01T10:00:00",
-            end_date="2026-07-01T11:00:00",
+            start_date=_future_date(3, 7, 1, "10:00:00"),
+            end_date=_future_date(3, 7, 1, "11:00:00"),
         )
         try:
             events = connector.get_events(
                 calendar_name=TEST_CALENDAR,
-                start_date="2026-07-01T00:00:00",
-                end_date="2026-07-02T00:00:00",
+                start_date=_future_date(3, 7, 1, "00:00:00"),
+                end_date=_future_date(3, 7, 2, "00:00:00"),
             )
             summaries = [e["summary"] for e in events]
             assert "GetEvents Test" in summaries
@@ -307,14 +315,14 @@ class TestGetEventsIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Outside Range Test",
-            start_date="2026-08-01T10:00:00",
-            end_date="2026-08-01T11:00:00",
+            start_date=_future_date(3, 8, 1, "10:00:00"),
+            end_date=_future_date(3, 8, 1, "11:00:00"),
         )
         try:
             events = connector.get_events(
                 calendar_name=TEST_CALENDAR,
-                start_date="2026-07-01T00:00:00",
-                end_date="2026-07-02T00:00:00",
+                start_date=_future_date(3, 7, 1, "00:00:00"),
+                end_date=_future_date(3, 7, 2, "00:00:00"),
             )
             summaries = [e["summary"] for e in events]
             assert "Outside Range Test" not in summaries
@@ -326,15 +334,15 @@ class TestGetEventsIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Keys Test Event",
-            start_date="2026-07-02T10:00:00",
-            end_date="2026-07-02T11:00:00",
+            start_date=_future_date(3, 7, 2, "10:00:00"),
+            end_date=_future_date(3, 7, 2, "11:00:00"),
             location="Test Location",
         )
         try:
             events = connector.get_events(
                 calendar_name=TEST_CALENDAR,
-                start_date="2026-07-02T00:00:00",
-                end_date="2026-07-03T00:00:00",
+                start_date=_future_date(3, 7, 2, "00:00:00"),
+                end_date=_future_date(3, 7, 3, "00:00:00"),
             )
             test_events = [e for e in events if e["summary"] == "Keys Test Event"]
             assert len(test_events) == 1
@@ -392,12 +400,12 @@ class TestUpdateEventIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Original Summary",
-            start_date="2026-09-01T10:00:00",
-            end_date="2026-09-01T11:00:00",
+            start_date=_future_date(3, 9, 1, "10:00:00"),
+            end_date=_future_date(3, 9, 1, "11:00:00"),
         )
         try:
             _update_single_event(connector, TEST_CALENDAR, uid, summary="Updated Summary")
-            events = connector.get_events(TEST_CALENDAR, "2026-09-01T00:00:00", "2026-09-02T00:00:00")
+            events = connector.get_events(TEST_CALENDAR, _future_date(3, 9, 1, "00:00:00"), _future_date(3, 9, 2, "00:00:00"))
             test_events = [e for e in events if e["uid"] == uid]
             assert len(test_events) == 1
             assert test_events[0]["summary"] == "Updated Summary"
@@ -409,13 +417,13 @@ class TestUpdateEventIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Location Update Test",
-            start_date="2026-09-02T10:00:00",
-            end_date="2026-09-02T11:00:00",
+            start_date=_future_date(3, 9, 2, "10:00:00"),
+            end_date=_future_date(3, 9, 2, "11:00:00"),
             location="Room A",
         )
         try:
             _update_single_event(connector, TEST_CALENDAR, uid, location="Room B")
-            events = connector.get_events(TEST_CALENDAR, "2026-09-02T00:00:00", "2026-09-03T00:00:00")
+            events = connector.get_events(TEST_CALENDAR, _future_date(3, 9, 2, "00:00:00"), _future_date(3, 9, 3, "00:00:00"))
             test_events = [e for e in events if e["uid"] == uid]
             assert len(test_events) == 1
             assert test_events[0]["location"] == "Room B"
@@ -427,18 +435,18 @@ class TestUpdateEventIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Date Update Test",
-            start_date="2026-09-03T10:00:00",
-            end_date="2026-09-03T11:00:00",
+            start_date=_future_date(3, 9, 3, "10:00:00"),
+            end_date=_future_date(3, 9, 3, "11:00:00"),
         )
         try:
             _update_single_event(connector, TEST_CALENDAR, uid,
-                start_date="2026-09-03T14:00:00",
-                end_date="2026-09-03T15:00:00",
+                start_date=_future_date(3, 9, 3, "14:00:00"),
+                end_date=_future_date(3, 9, 3, "15:00:00"),
             )
-            events = connector.get_events(TEST_CALENDAR, "2026-09-03T13:00:00", "2026-09-03T16:00:00")
+            events = connector.get_events(TEST_CALENDAR, _future_date(3, 9, 3, "13:00:00"), _future_date(3, 9, 3, "16:00:00"))
             test_events = [e for e in events if e["uid"] == uid]
             assert len(test_events) == 1
-            assert "2026-09-03" in test_events[0]["start_date"]
+            assert _future_date(3, 9, 3) in test_events[0]["start_date"]
         finally:
             _delete_event_by_uid(uid)
 
@@ -447,8 +455,8 @@ class TestUpdateEventIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Multi Update Test",
-            start_date="2026-09-04T10:00:00",
-            end_date="2026-09-04T11:00:00",
+            start_date=_future_date(3, 9, 4, "10:00:00"),
+            end_date=_future_date(3, 9, 4, "11:00:00"),
             location="Old Place",
         )
         try:
@@ -458,7 +466,7 @@ class TestUpdateEventIntegration:
             )
             assert "summary" in result.get("updated_fields", [])
             assert "location" in result.get("updated_fields", [])
-            events = connector.get_events(TEST_CALENDAR, "2026-09-04T00:00:00", "2026-09-05T00:00:00")
+            events = connector.get_events(TEST_CALENDAR, _future_date(3, 9, 4, "00:00:00"), _future_date(3, 9, 5, "00:00:00"))
             test_events = [e for e in events if e["uid"] == uid]
             assert test_events[0]["summary"] == "New Multi Title"
             assert test_events[0]["location"] == "New Place"
@@ -475,13 +483,13 @@ class TestUpdateEventIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Clear Location Test",
-            start_date="2026-09-05T10:00:00",
-            end_date="2026-09-05T11:00:00",
+            start_date=_future_date(3, 9, 5, "10:00:00"),
+            end_date=_future_date(3, 9, 5, "11:00:00"),
             location="Will Be Cleared",
         )
         try:
             _update_single_event(connector, TEST_CALENDAR, uid, location="")
-            events = connector.get_events(TEST_CALENDAR, "2026-09-05T00:00:00", "2026-09-06T00:00:00")
+            events = connector.get_events(TEST_CALENDAR, _future_date(3, 9, 5, "00:00:00"), _future_date(3, 9, 6, "00:00:00"))
             test_events = [e for e in events if e["uid"] == uid]
             assert len(test_events) == 1
             assert test_events[0]["location"] == ""
@@ -493,14 +501,14 @@ class TestUpdateEventIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Original Title",
-            start_date="2027-09-10T10:00:00",
-            end_date="2027-09-10T11:00:00",
+            start_date=_future_date(4, 9, 10, "10:00:00"),
+            end_date=_future_date(4, 9, 10, "11:00:00"),
             location="Keep This Location",
             notes="Keep these notes",
         )
         try:
             _update_single_event(connector, TEST_CALENDAR, uid, summary="New Title")
-            events = connector.get_events(TEST_CALENDAR, "2027-09-10", "2027-09-11")
+            events = connector.get_events(TEST_CALENDAR, _future_date(4, 9, 10), _future_date(4, 9, 11))
             matches = [e for e in events if e["uid"] == uid]
             assert len(matches) == 1
             assert matches[0]["summary"] == "New Title"
@@ -514,15 +522,15 @@ class TestUpdateEventIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="All Day Update Test",
-            start_date="2027-09-15",
-            end_date="2027-09-15",
+            start_date=_future_date(4, 9, 15),
+            end_date=_future_date(4, 9, 15),
             allday_event=True,
             location="Conference Room",
             notes="Original notes",
         )
         try:
             _update_single_event(connector, TEST_CALENDAR, uid, notes="Updated notes")
-            events = connector.get_events(TEST_CALENDAR, "2027-09-15", "2027-09-17")
+            events = connector.get_events(TEST_CALENDAR, _future_date(4, 9, 15), _future_date(4, 9, 17))
             matches = [e for e in events if e["uid"] == uid]
             assert len(matches) == 1
             assert matches[0]["notes"] == "Updated notes"
@@ -536,27 +544,27 @@ class TestUpdateEventIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Reschedule Day Test",
-            start_date="2027-09-20T10:00:00",
-            end_date="2027-09-20T11:00:00",
+            start_date=_future_date(4, 9, 20, "10:00:00"),
+            end_date=_future_date(4, 9, 20, "11:00:00"),
             location="Room B",
             notes="Important meeting",
         )
         try:
             _update_single_event(connector, TEST_CALENDAR, uid,
-                start_date="2027-09-25T14:00:00",
-                end_date="2027-09-25T15:00:00",
+                start_date=_future_date(4, 9, 25, "14:00:00"),
+                end_date=_future_date(4, 9, 25, "15:00:00"),
             )
             # Query the new date range
-            events = connector.get_events(TEST_CALENDAR, "2027-09-25", "2027-09-26")
+            events = connector.get_events(TEST_CALENDAR, _future_date(4, 9, 25), _future_date(4, 9, 26))
             matches = [e for e in events if e["uid"] == uid]
             assert len(matches) == 1
-            assert "2027-09-25" in matches[0]["start_date"]
+            assert _future_date(4, 9, 25) in matches[0]["start_date"]
             assert "14:00" in matches[0]["start_date"]
             assert matches[0]["location"] == "Room B"
             assert matches[0]["notes"] == "Important meeting"
 
             # Verify not at original date
-            old_events = connector.get_events(TEST_CALENDAR, "2027-09-20", "2027-09-21")
+            old_events = connector.get_events(TEST_CALENDAR, _future_date(4, 9, 20), _future_date(4, 9, 21))
             assert not any(e["uid"] == uid for e in old_events)
         finally:
             _delete_event_by_uid(uid)
@@ -566,13 +574,13 @@ class TestUpdateEventIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Clear Notes Test",
-            start_date="2028-04-10T10:00:00",
-            end_date="2028-04-10T11:00:00",
+            start_date=_future_date(5, 4, 10, "10:00:00"),
+            end_date=_future_date(5, 4, 10, "11:00:00"),
             notes="These notes will be cleared",
         )
         try:
             connector.update_events(TEST_CALENDAR, [{"uid": uid, "clear_notes": True}])
-            events = connector.get_events(TEST_CALENDAR, "2028-04-10T00:00:00", "2028-04-11T00:00:00")
+            events = connector.get_events(TEST_CALENDAR, _future_date(5, 4, 10, "00:00:00"), _future_date(5, 4, 11, "00:00:00"))
             matches = [e for e in events if e["uid"] == uid]
             assert len(matches) == 1
             assert matches[0].get("notes", "") == ""
@@ -584,13 +592,13 @@ class TestUpdateEventIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Clear URL Test",
-            start_date="2028-04-11T10:00:00",
-            end_date="2028-04-11T11:00:00",
+            start_date=_future_date(5, 4, 11, "10:00:00"),
+            end_date=_future_date(5, 4, 11, "11:00:00"),
             url="https://example.com/will-be-cleared",
         )
         try:
             connector.update_events(TEST_CALENDAR, [{"uid": uid, "clear_url": True}])
-            events = connector.get_events(TEST_CALENDAR, "2028-04-11T00:00:00", "2028-04-12T00:00:00")
+            events = connector.get_events(TEST_CALENDAR, _future_date(5, 4, 11, "00:00:00"), _future_date(5, 4, 12, "00:00:00"))
             matches = [e for e in events if e["uid"] == uid]
             assert len(matches) == 1
             assert matches[0].get("url", "") == ""
@@ -602,13 +610,13 @@ class TestUpdateEventIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Clear Alerts Test",
-            start_date="2028-04-12T10:00:00",
-            end_date="2028-04-12T11:00:00",
+            start_date=_future_date(5, 4, 12, "10:00:00"),
+            end_date=_future_date(5, 4, 12, "11:00:00"),
             alert_minutes=[15, 60],
         )
         try:
             _update_single_event(connector, TEST_CALENDAR, uid, alert_minutes=[])
-            events = connector.get_events(TEST_CALENDAR, "2028-04-12T00:00:00", "2028-04-13T00:00:00")
+            events = connector.get_events(TEST_CALENDAR, _future_date(5, 4, 12, "00:00:00"), _future_date(5, 4, 13, "00:00:00"))
             matches = [e for e in events if e["uid"] == uid]
             assert len(matches) == 1
             assert matches[0].get("alerts", []) == []
@@ -620,12 +628,12 @@ class TestUpdateEventIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Availability Update Test",
-            start_date="2028-04-13T10:00:00",
-            end_date="2028-04-13T11:00:00",
+            start_date=_future_date(5, 4, 13, "10:00:00"),
+            end_date=_future_date(5, 4, 13, "11:00:00"),
         )
         try:
             _update_single_event(connector, TEST_CALENDAR, uid, availability="free")
-            events = connector.get_events(TEST_CALENDAR, "2028-04-13T00:00:00", "2028-04-14T00:00:00")
+            events = connector.get_events(TEST_CALENDAR, _future_date(5, 4, 13, "00:00:00"), _future_date(5, 4, 14, "00:00:00"))
             matches = [e for e in events if e["uid"] == uid]
             assert len(matches) == 1
             assert matches[0].get("availability") == "free"
@@ -641,12 +649,12 @@ class TestDeleteEventsIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Delete Single Test",
-            start_date="2026-10-01T10:00:00",
-            end_date="2026-10-01T11:00:00",
+            start_date=_future_date(3, 10, 1, "10:00:00"),
+            end_date=_future_date(3, 10, 1, "11:00:00"),
         )
         try:
             # Verify event exists
-            events = connector.get_events(TEST_CALENDAR, "2026-10-01T00:00:00", "2026-10-02T00:00:00")
+            events = connector.get_events(TEST_CALENDAR, _future_date(3, 10, 1, "00:00:00"), _future_date(3, 10, 2, "00:00:00"))
             assert any(e["uid"] == uid for e in events)
 
             # Delete it
@@ -655,7 +663,7 @@ class TestDeleteEventsIntegration:
             assert result["not_found_uids"] == []
 
             # Verify it's gone
-            events = connector.get_events(TEST_CALENDAR, "2026-10-01T00:00:00", "2026-10-02T00:00:00")
+            events = connector.get_events(TEST_CALENDAR, _future_date(3, 10, 1, "00:00:00"), _future_date(3, 10, 2, "00:00:00"))
             assert not any(e["uid"] == uid for e in events)
         finally:
             _delete_event_by_uid(uid)
@@ -667,8 +675,8 @@ class TestDeleteEventsIntegration:
             uid = _create_single_event(connector,
                 calendar_name=TEST_CALENDAR,
                 summary=f"Batch Delete Test {i}",
-                start_date="2026-10-02T10:00:00",
-                end_date="2026-10-02T11:00:00",
+                start_date=_future_date(3, 10, 2, "10:00:00"),
+                end_date=_future_date(3, 10, 2, "11:00:00"),
             )
             uids.append(uid)
         try:
@@ -676,7 +684,7 @@ class TestDeleteEventsIntegration:
             assert len(result["deleted_uids"]) == 3
             assert result["not_found_uids"] == []
 
-            events = connector.get_events(TEST_CALENDAR, "2026-10-02T00:00:00", "2026-10-03T00:00:00")
+            events = connector.get_events(TEST_CALENDAR, _future_date(3, 10, 2, "00:00:00"), _future_date(3, 10, 3, "00:00:00"))
             for uid in uids:
                 assert not any(e["uid"] == uid for e in events)
         finally:
@@ -694,8 +702,8 @@ class TestDeleteEventsIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Double Delete Test",
-            start_date="2026-10-03T10:00:00",
-            end_date="2026-10-03T11:00:00",
+            start_date=_future_date(3, 10, 3, "10:00:00"),
+            end_date=_future_date(3, 10, 3, "11:00:00"),
         )
         try:
             result1 = connector.delete_events(TEST_CALENDAR, uid)
@@ -712,12 +720,12 @@ class TestDeleteEventsIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Delete Occurrence Test",
-            start_date="2028-08-07T10:00:00",
-            end_date="2028-08-07T11:00:00",
+            start_date=_future_date(5, 8, 7, "10:00:00"),
+            end_date=_future_date(5, 8, 7, "11:00:00"),
             recurrence_rule="FREQ=WEEKLY;COUNT=3",
         )
         # Verify 3 occurrences: Aug 7, 14, 21
-        events = connector.get_events(TEST_CALENDAR, "2028-08-01", "2028-08-31")
+        events = connector.get_events(TEST_CALENDAR, _future_date(5, 8, 1), _future_date(5, 8, 31))
         series = [e for e in events if e["uid"] == uid]
         assert len(series) == 3
 
@@ -725,27 +733,27 @@ class TestDeleteEventsIntegration:
         result = connector.delete_events(
             TEST_CALENDAR, uid,
             span="this_event",
-            occurrence_date="2028-08-14T10:00:00",
+            occurrence_date=_future_date(5, 8, 14, "10:00:00"),
         )
         assert uid in result["deleted_uids"]
 
         # Verify 2 remaining occurrences (Aug 7 and 21)
-        events = connector.get_events(TEST_CALENDAR, "2028-08-01", "2028-08-31")
+        events = connector.get_events(TEST_CALENDAR, _future_date(5, 8, 1), _future_date(5, 8, 31))
         remaining = [e for e in events if e["uid"] == uid]
         assert len(remaining) == 2, f"Expected 2 occurrences after deleting one, got {len(remaining)}"
         dates = sorted([e["start_date"][:10] for e in remaining])
-        assert "2028-08-14" not in dates, "Deleted occurrence should be gone"
+        assert _future_date(5, 8, 14) not in dates, "Deleted occurrence should be gone"
 
     def test_delete_non_recurring_event_then_verify_absent(self, connector):
         """Delete a non-recurring event and verify it's absent via re-query (round-trip)."""
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Delete Verify Test",
-            start_date="2027-10-10T10:00:00",
-            end_date="2027-10-10T11:00:00",
+            start_date=_future_date(4, 10, 10, "10:00:00"),
+            end_date=_future_date(4, 10, 10, "11:00:00"),
         )
         # Verify it exists
-        events = connector.get_events(TEST_CALENDAR, "2027-10-10", "2027-10-11")
+        events = connector.get_events(TEST_CALENDAR, _future_date(4, 10, 10), _future_date(4, 10, 11))
         assert any(e["uid"] == uid for e in events), "Event should exist before deletion"
 
         # Delete it
@@ -753,7 +761,7 @@ class TestDeleteEventsIntegration:
         assert uid in result["deleted_uids"]
 
         # Verify absent via re-query
-        events = connector.get_events(TEST_CALENDAR, "2027-10-10", "2027-10-11")
+        events = connector.get_events(TEST_CALENDAR, _future_date(4, 10, 10), _future_date(4, 10, 11))
         assert not any(e["uid"] == uid for e in events), "Event should be absent after deletion"
 
     def test_delete_recurring_series_with_future_events(self, connector, fresh_calendar):
@@ -761,11 +769,11 @@ class TestDeleteEventsIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Delete Series Test",
-            start_date="2028-09-02T10:00:00",
-            end_date="2028-09-02T11:00:00",
+            start_date=_future_date(5, 9, 2, "10:00:00"),
+            end_date=_future_date(5, 9, 2, "11:00:00"),
             recurrence_rule="FREQ=WEEKLY;COUNT=4",
         )
-        events = connector.get_events(TEST_CALENDAR, "2028-09-01", "2028-09-30")
+        events = connector.get_events(TEST_CALENDAR, _future_date(5, 9, 1), _future_date(5, 9, 30))
         series = [e for e in events if e["uid"] == uid]
         assert len(series) == 4
 
@@ -774,7 +782,7 @@ class TestDeleteEventsIntegration:
         assert uid in result["deleted_uids"]
 
         # Verify all gone
-        events = connector.get_events(TEST_CALENDAR, "2028-09-01", "2028-09-30")
+        events = connector.get_events(TEST_CALENDAR, _future_date(5, 9, 1), _future_date(5, 9, 30))
         remaining = [e for e in events if e["uid"] == uid]
         assert len(remaining) == 0, f"Expected 0 occurrences after deleting series, got {len(remaining)}"
 
@@ -787,18 +795,18 @@ class TestGetAvailabilityIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Availability Test",
-            start_date="2026-11-01T10:00:00",
-            end_date="2026-11-01T11:00:00",
+            start_date=_future_date(3, 11, 1, "10:00:00"),
+            end_date=_future_date(3, 11, 1, "11:00:00"),
         )
         try:
             slots = connector.get_availability(
                 calendar_names=[TEST_CALENDAR],
-                start_date="2026-11-01T09:00:00",
-                end_date="2026-11-01T12:00:00",
+                start_date=_future_date(3, 11, 1, "09:00:00"),
+                end_date=_future_date(3, 11, 1, "12:00:00"),
             )
             assert len(slots) == 2
-            assert slots[0]["end_date"] == "2026-11-01T10:00:00"
-            assert slots[1]["start_date"] == "2026-11-01T11:00:00"
+            assert slots[0]["end_date"] == _future_date(3, 11, 1, "10:00:00")
+            assert slots[1]["start_date"] == _future_date(3, 11, 1, "11:00:00")
         finally:
             _delete_event_by_uid(uid)
 
@@ -865,14 +873,14 @@ class TestRecurringEventsIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Recurring Test",
-            start_date="2027-01-05T10:00:00",
-            end_date="2027-01-05T11:00:00",
+            start_date=_future_date(4, 1, 5, "10:00:00"),
+            end_date=_future_date(4, 1, 5, "11:00:00"),
             recurrence_rule="FREQ=WEEKLY;COUNT=3",
         )
         events = connector.get_events(
             calendar_name=TEST_CALENDAR,
-            start_date="2027-01-01",
-            end_date="2027-01-31",
+            start_date=_future_date(4, 1, 1),
+            end_date=_future_date(4, 1, 31),
         )
         recurring = [e for e in events if e["uid"] == uid]
         assert len(recurring) == 3
@@ -896,37 +904,37 @@ class TestRecurringEventsIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="4th Monday Test",
-            start_date="2028-01-26T10:00:00",
-            end_date="2028-01-26T11:00:00",
+            start_date=_future_date(5, 1, 26, "10:00:00"),
+            end_date=_future_date(5, 1, 26, "11:00:00"),
             recurrence_rule="FREQ=MONTHLY;BYDAY=4MO;COUNT=3",
         )
         events = connector.get_events(
             calendar_name=TEST_CALENDAR,
-            start_date="2028-01-01",
-            end_date="2028-04-30",
+            start_date=_future_date(5, 1, 1),
+            end_date=_future_date(5, 4, 30),
         )
         recurring = [e for e in events if e["uid"] == uid]
         assert len(recurring) == 3, f"Expected 3 occurrences, got {len(recurring)}"
 
         # Verify dates are all 4th Mondays
         dates = sorted([e["start_date"][:10] for e in recurring])
-        assert dates[0] == "2028-01-26"  # 4th Monday of Jan
-        assert dates[1] == "2028-02-28"  # 4th Monday of Feb
-        assert dates[2] == "2028-03-27"  # 4th Monday of Mar
+        assert dates[0] == _future_date(5, 1, 26)  # 4th Monday of Jan
+        assert dates[1] == _future_date(5, 2, 28)  # 4th Monday of Feb
+        assert dates[2] == _future_date(5, 3, 27)  # 4th Monday of Mar
 
     def test_recurrence_with_until_end_date(self, connector, fresh_calendar):
         """Create weekly event with UNTIL — verify recurrence stops (#81)."""
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Until Test",
-            start_date="2028-03-01T10:00:00",
-            end_date="2028-03-01T11:00:00",
-            recurrence_rule="FREQ=WEEKLY;UNTIL=20280322T000000",
+            start_date=_future_date(5, 3, 1, "10:00:00"),
+            end_date=_future_date(5, 3, 1, "11:00:00"),
+            recurrence_rule=f"FREQ=WEEKLY;UNTIL={date.today().year + 5}0322T000000",
         )
         events = connector.get_events(
             calendar_name=TEST_CALENDAR,
-            start_date="2028-03-01",
-            end_date="2028-04-30",
+            start_date=_future_date(5, 3, 1),
+            end_date=_future_date(5, 4, 30),
         )
         recurring = [e for e in events if e["uid"] == uid]
         # Should have ~3 occurrences (Mar 1, 8, 15) — Mar 22 is the UNTIL date
@@ -935,8 +943,8 @@ class TestRecurringEventsIntegration:
 
         # No occurrence should be on or after March 22
         for e in recurring:
-            assert e["start_date"][:10] < "2028-03-22", (
-                f"Occurrence {e['start_date']} should be before UNTIL date 2028-03-22"
+            assert e["start_date"][:10] < _future_date(5, 3, 22), (
+                f"Occurrence {e['start_date']} should be before UNTIL date {_future_date(5, 3, 22)}"
             )
 
     def test_last_friday_recurrence(self, connector, fresh_calendar):
@@ -945,33 +953,33 @@ class TestRecurringEventsIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Last Friday Test",
-            start_date="2028-01-28T10:00:00",
-            end_date="2028-01-28T11:00:00",
+            start_date=_future_date(5, 1, 28, "10:00:00"),
+            end_date=_future_date(5, 1, 28, "11:00:00"),
             recurrence_rule="FREQ=MONTHLY;BYDAY=-1FR;COUNT=3",
         )
         events = connector.get_events(
             calendar_name=TEST_CALENDAR,
-            start_date="2028-01-01",
-            end_date="2028-04-30",
+            start_date=_future_date(5, 1, 1),
+            end_date=_future_date(5, 4, 30),
         )
         recurring = [e for e in events if e["uid"] == uid]
         assert len(recurring) == 3, f"Expected 3 occurrences, got {len(recurring)}"
 
         dates = sorted([e["start_date"][:10] for e in recurring])
-        assert dates[0] == "2028-01-28"  # Last Friday of Jan
-        assert dates[1] == "2028-02-25"  # Last Friday of Feb
-        assert dates[2] == "2028-03-31"  # Last Friday of Mar
+        assert dates[0] == _future_date(5, 1, 28)  # Last Friday of Jan
+        assert dates[1] == _future_date(5, 2, 25)  # Last Friday of Feb
+        assert dates[2] == _future_date(5, 3, 31)  # Last Friday of Mar
 
     def test_add_recurrence_to_existing_event(self, connector, fresh_calendar):
         """Create non-recurring event, add recurrence via update (#80)."""
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Add Recurrence Test",
-            start_date="2028-04-03T10:00:00",
-            end_date="2028-04-03T11:00:00",
+            start_date=_future_date(5, 4, 3, "10:00:00"),
+            end_date=_future_date(5, 4, 3, "11:00:00"),
         )
         # Verify starts as non-recurring
-        events = connector.get_events(TEST_CALENDAR, "2028-04-01", "2028-04-30")
+        events = connector.get_events(TEST_CALENDAR, _future_date(5, 4, 1), _future_date(5, 4, 30))
         matches = [e for e in events if e["uid"] == uid]
         assert len(matches) == 1
         assert matches[0]["is_recurring"] is False
@@ -980,7 +988,7 @@ class TestRecurringEventsIntegration:
         _update_single_event(connector, TEST_CALENDAR, uid, recurrence_rule="FREQ=WEEKLY;COUNT=3")
 
         # Verify now has 3 occurrences
-        events = connector.get_events(TEST_CALENDAR, "2028-04-01", "2028-04-30")
+        events = connector.get_events(TEST_CALENDAR, _future_date(5, 4, 1), _future_date(5, 4, 30))
         matches = [e for e in events if e["uid"] == uid]
         assert len(matches) == 3, f"Expected 3 occurrences, got {len(matches)}"
         assert all(e["is_recurring"] for e in matches)
@@ -990,12 +998,12 @@ class TestRecurringEventsIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Remove Recurrence Test",
-            start_date="2028-05-01T10:00:00",
-            end_date="2028-05-01T11:00:00",
+            start_date=_future_date(5, 5, 1, "10:00:00"),
+            end_date=_future_date(5, 5, 1, "11:00:00"),
             recurrence_rule="FREQ=WEEKLY;COUNT=4",
         )
         # Verify starts with 4 occurrences
-        events = connector.get_events(TEST_CALENDAR, "2028-05-01", "2028-05-31")
+        events = connector.get_events(TEST_CALENDAR, _future_date(5, 5, 1), _future_date(5, 5, 31))
         matches = [e for e in events if e["uid"] == uid]
         assert len(matches) == 4
 
@@ -1003,7 +1011,7 @@ class TestRecurringEventsIntegration:
         _update_single_event(connector, TEST_CALENDAR, uid, recurrence_rule="")
 
         # Verify now has 1 occurrence
-        events = connector.get_events(TEST_CALENDAR, "2028-05-01", "2028-05-31")
+        events = connector.get_events(TEST_CALENDAR, _future_date(5, 5, 1), _future_date(5, 5, 31))
         matches = [e for e in events if e["uid"] == uid]
         assert len(matches) == 1, f"Expected 1 occurrence after removing recurrence, got {len(matches)}"
         assert matches[0]["is_recurring"] is False
@@ -1013,26 +1021,26 @@ class TestRecurringEventsIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Reschedule Test",
-            start_date="2028-06-05T10:00:00",
-            end_date="2028-06-05T11:00:00",
+            start_date=_future_date(5, 6, 5, "10:00:00"),
+            end_date=_future_date(5, 6, 5, "11:00:00"),
             recurrence_rule="FREQ=WEEKLY;COUNT=3",
             location="Room A",
         )
         # Verify 3 occurrences: Jun 5, 12, 19
-        events = connector.get_events(TEST_CALENDAR, "2028-06-01", "2028-06-30")
+        events = connector.get_events(TEST_CALENDAR, _future_date(5, 6, 1), _future_date(5, 6, 30))
         series = [e for e in events if e["uid"] == uid]
         assert len(series) == 3
 
         # Reschedule the Jun 12 occurrence to 2pm
         _update_single_event(connector, TEST_CALENDAR, uid,
-            start_date="2028-06-12T14:00:00",
-            end_date="2028-06-12T15:00:00",
-            occurrence_date="2028-06-12T10:00:00",
+            start_date=_future_date(5, 6, 12, "14:00:00"),
+            end_date=_future_date(5, 6, 12, "15:00:00"),
+            occurrence_date=_future_date(5, 6, 12, "10:00:00"),
             span="this_event",
         )
 
         # Check results
-        events = connector.get_events(TEST_CALENDAR, "2028-06-01", "2028-06-30")
+        events = connector.get_events(TEST_CALENDAR, _future_date(5, 6, 1), _future_date(5, 6, 30))
 
         # Series should still have occurrences (Jun 5 and Jun 19 at 10am)
         remaining_series = [e for e in events if e["uid"] == uid]
@@ -1041,7 +1049,7 @@ class TestRecurringEventsIntegration:
         )
 
         # A standalone event should exist at 2pm on Jun 12 with same summary and location
-        jun12_events = [e for e in events if "2028-06-12" in e["start_date"]]
+        jun12_events = [e for e in events if _future_date(5, 6, 12) in e["start_date"]]
         assert len(jun12_events) >= 1, "Should have an event on Jun 12 at the new time"
         rescheduled = [e for e in jun12_events if "14:00" in e["start_date"]]
         assert len(rescheduled) == 1, f"Should have one event at 2pm on Jun 12, got {len(rescheduled)}"
@@ -1057,14 +1065,14 @@ class TestRoundTripIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Round Trip Test",
-            start_date="2027-03-01T14:00:00",
-            end_date="2027-03-01T15:00:00",
+            start_date=_future_date(4, 3, 1, "14:00:00"),
+            end_date=_future_date(4, 3, 1, "15:00:00"),
             location="Conference Room",
             notes="Testing round-trip",
             url="https://example.com/test",
         )
         try:
-            events = connector.get_events(TEST_CALENDAR, "2027-03-01", "2027-03-02")
+            events = connector.get_events(TEST_CALENDAR, _future_date(4, 3, 1), _future_date(4, 3, 2))
             matches = [e for e in events if e["uid"] == uid]
             assert len(matches) == 1
             event = matches[0]
@@ -1081,12 +1089,12 @@ class TestRoundTripIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Timestamp Round Trip",
-            start_date="2027-03-15T10:00:00",
-            end_date="2027-03-15T11:00:00",
+            start_date=_future_date(4, 3, 15, "10:00:00"),
+            end_date=_future_date(4, 3, 15, "11:00:00"),
         )
         try:
             # First query: wide range
-            events = connector.get_events(TEST_CALENDAR, "2027-03-15", "2027-03-16")
+            events = connector.get_events(TEST_CALENDAR, _future_date(4, 3, 15), _future_date(4, 3, 16))
             matches = [e for e in events if e["uid"] == uid]
             assert len(matches) == 1
 
@@ -1106,11 +1114,11 @@ class TestRoundTripIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Stripped Z Test",
-            start_date="2027-03-20T14:00:00",
-            end_date="2027-03-20T15:00:00",
+            start_date=_future_date(4, 3, 20, "14:00:00"),
+            end_date=_future_date(4, 3, 20, "15:00:00"),
         )
         try:
-            events = connector.get_events(TEST_CALENDAR, "2027-03-20", "2027-03-21")
+            events = connector.get_events(TEST_CALENDAR, _future_date(4, 3, 20), _future_date(4, 3, 21))
             matches = [e for e in events if e["uid"] == uid]
             assert len(matches) == 1
 
@@ -1132,13 +1140,13 @@ class TestRoundTripIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Before Update",
-            start_date="2027-04-01T09:00:00",
-            end_date="2027-04-01T10:00:00",
+            start_date=_future_date(4, 4, 1, "09:00:00"),
+            end_date=_future_date(4, 4, 1, "10:00:00"),
             location="Room A",
         )
         try:
             _update_single_event(connector, TEST_CALENDAR, uid, summary="After Update")
-            events = connector.get_events(TEST_CALENDAR, "2027-04-01", "2027-04-02")
+            events = connector.get_events(TEST_CALENDAR, _future_date(4, 4, 1), _future_date(4, 4, 2))
             matches = [e for e in events if e["uid"] == uid]
             assert len(matches) == 1
             assert matches[0]["summary"] == "After Update"
@@ -1155,15 +1163,15 @@ class TestWorkflowIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Lifecycle Test",
-            start_date="2027-05-01T10:00:00",
-            end_date="2027-05-01T11:00:00",
+            start_date=_future_date(4, 5, 1, "10:00:00"),
+            end_date=_future_date(4, 5, 1, "11:00:00"),
         )
         try:
             # Update
             _update_single_event(connector, TEST_CALENDAR, uid, summary="Updated Lifecycle")
 
             # Verify update
-            events = connector.get_events(TEST_CALENDAR, "2027-05-01", "2027-05-02")
+            events = connector.get_events(TEST_CALENDAR, _future_date(4, 5, 1), _future_date(4, 5, 2))
             assert any(e["uid"] == uid and e["summary"] == "Updated Lifecycle" for e in events)
 
             # Delete
@@ -1171,7 +1179,7 @@ class TestWorkflowIntegration:
             assert uid in result["deleted_uids"]
 
             # Verify gone
-            events = connector.get_events(TEST_CALENDAR, "2027-05-01", "2027-05-02")
+            events = connector.get_events(TEST_CALENDAR, _future_date(4, 5, 1), _future_date(4, 5, 2))
             assert not any(e["uid"] == uid for e in events)
         finally:
             _delete_event_by_uid(uid)
@@ -1180,24 +1188,24 @@ class TestWorkflowIntegration:
         """Check availability → create event → re-check → verify slot blocked."""
         # Check initial availability
         slots_before = connector.get_availability(
-            [TEST_CALENDAR], "2027-06-01T09:00:00", "2027-06-01T12:00:00"
+            [TEST_CALENDAR], _future_date(4, 6, 1, "09:00:00"), _future_date(4, 6, 1, "12:00:00")
         )
         assert len(slots_before) == 1  # entirely free
 
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Block This Slot",
-            start_date="2027-06-01T10:00:00",
-            end_date="2027-06-01T11:00:00",
+            start_date=_future_date(4, 6, 1, "10:00:00"),
+            end_date=_future_date(4, 6, 1, "11:00:00"),
         )
         try:
             # Re-check availability
             slots_after = connector.get_availability(
-                [TEST_CALENDAR], "2027-06-01T09:00:00", "2027-06-01T12:00:00"
+                [TEST_CALENDAR], _future_date(4, 6, 1, "09:00:00"), _future_date(4, 6, 1, "12:00:00")
             )
             assert len(slots_after) == 2  # split into two free slots
-            assert slots_after[0]["end_date"] == "2027-06-01T10:00:00"
-            assert slots_after[1]["start_date"] == "2027-06-01T11:00:00"
+            assert slots_after[0]["end_date"] == _future_date(4, 6, 1, "10:00:00")
+            assert slots_after[1]["start_date"] == _future_date(4, 6, 1, "11:00:00")
         finally:
             _delete_event_by_uid(uid)
 
@@ -1210,11 +1218,11 @@ class TestTimezoneIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Late Night Event",
-            start_date="2027-07-01T23:30:00",
-            end_date="2027-07-02T00:30:00",
+            start_date=_future_date(4, 7, 1, "23:30:00"),
+            end_date=_future_date(4, 7, 2, "00:30:00"),
         )
         try:
-            events = connector.get_events(TEST_CALENDAR, "2027-07-01T23:00:00", "2027-07-02T01:00:00")
+            events = connector.get_events(TEST_CALENDAR, _future_date(4, 7, 1, "23:00:00"), _future_date(4, 7, 2, "01:00:00"))
             matches = [e for e in events if e["uid"] == uid]
             assert len(matches) == 1
         finally:
@@ -1225,16 +1233,16 @@ class TestTimezoneIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="All Day Test",
-            start_date="2027-08-01",
-            end_date="2027-08-01",
+            start_date=_future_date(4, 8, 1),
+            end_date=_future_date(4, 8, 1),
             allday_event=True,
         )
         try:
-            events = connector.get_events(TEST_CALENDAR, "2027-08-01", "2027-08-03")
+            events = connector.get_events(TEST_CALENDAR, _future_date(4, 8, 1), _future_date(4, 8, 3))
             matches = [e for e in events if e["uid"] == uid]
             assert len(matches) == 1
             assert matches[0]["allday_event"] is True
-            assert "2027-08-01" in matches[0]["end_date"]
+            assert _future_date(4, 8, 1) in matches[0]["end_date"]
         finally:
             _delete_event_by_uid(uid)
 
@@ -1243,20 +1251,20 @@ class TestTimezoneIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Timezone Round Trip Test",
-            start_date="2028-05-15T09:00:00",
-            end_date="2028-05-15T10:00:00",
+            start_date=_future_date(5, 5, 15, "09:00:00"),
+            end_date=_future_date(5, 5, 15, "10:00:00"),
             timezone="America/New_York",
         )
         try:
             # Read back the event
-            events = connector.get_events(TEST_CALENDAR, "2028-05-15T00:00:00", "2028-05-16T00:00:00")
+            events = connector.get_events(TEST_CALENDAR, _future_date(5, 5, 15, "00:00:00"), _future_date(5, 5, 16, "00:00:00"))
             matches = [e for e in events if e["uid"] == uid]
             assert len(matches) == 1
             returned_start = matches[0]["start_date"]
 
             # Use the returned timestamp to re-query — this is the round-trip that
             # caught the timezone bug in issue #37
-            events2 = connector.get_events(TEST_CALENDAR, returned_start, "2028-05-16T00:00:00")
+            events2 = connector.get_events(TEST_CALENDAR, returned_start, _future_date(5, 5, 16, "00:00:00"))
             matches2 = [e for e in events2 if e["uid"] == uid]
             assert len(matches2) == 1, f"Event not found when re-querying with returned start_date '{returned_start}'"
         finally:
@@ -1269,7 +1277,7 @@ class TestErrorHandlingIntegration:
     def test_get_events_nonexistent_calendar(self, connector):
         """Querying a non-existent calendar should raise ValueError."""
         with pytest.raises(ValueError, match="not found"):
-            connector.get_events("Calendar-That-Does-Not-Exist", "2027-01-01", "2027-01-02")
+            connector.get_events("Calendar-That-Does-Not-Exist", _future_date(4, 1, 1), _future_date(4, 1, 2))
 
     def test_delete_nonexistent_uid_reports_not_found(self, connector):
         """Deleting a non-existent UID should report it, not crash."""
@@ -1287,11 +1295,11 @@ class TestSpecialCharactersIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary=title,
-            start_date="2027-11-01T12:00:00",
-            end_date="2027-11-01T13:00:00",
+            start_date=_future_date(4, 11, 1, "12:00:00"),
+            end_date=_future_date(4, 11, 1, "13:00:00"),
         )
         try:
-            events = connector.get_events(TEST_CALENDAR, "2027-11-01", "2027-11-02")
+            events = connector.get_events(TEST_CALENDAR, _future_date(4, 11, 1), _future_date(4, 11, 2))
             matches = [e for e in events if e["uid"] == uid]
             assert len(matches) == 1
             assert matches[0]["summary"] == title
@@ -1307,12 +1315,12 @@ class TestAlertsIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Multi Alert Test",
-            start_date="2027-11-05T10:00:00",
-            end_date="2027-11-05T11:00:00",
+            start_date=_future_date(4, 11, 5, "10:00:00"),
+            end_date=_future_date(4, 11, 5, "11:00:00"),
             alert_minutes=[0, 15, 30, 60],
         )
         try:
-            events = connector.get_events(TEST_CALENDAR, "2027-11-05", "2027-11-06")
+            events = connector.get_events(TEST_CALENDAR, _future_date(4, 11, 5), _future_date(4, 11, 6))
             matches = [e for e in events if e["uid"] == uid]
             assert len(matches) == 1
             alerts = matches[0].get("alerts", [])
@@ -1328,12 +1336,12 @@ class TestAlertsIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Zero Alert Test",
-            start_date="2027-11-06T10:00:00",
-            end_date="2027-11-06T11:00:00",
+            start_date=_future_date(4, 11, 6, "10:00:00"),
+            end_date=_future_date(4, 11, 6, "11:00:00"),
             alert_minutes=[0],
         )
         try:
-            events = connector.get_events(TEST_CALENDAR, "2027-11-06", "2027-11-07")
+            events = connector.get_events(TEST_CALENDAR, _future_date(4, 11, 6), _future_date(4, 11, 7))
             matches = [e for e in events if e["uid"] == uid]
             assert len(matches) == 1
             alerts = matches[0].get("alerts", [])
@@ -1352,15 +1360,15 @@ class TestSearchEventsIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary=f"Meeting about {keyword}",
-            start_date="2027-12-15T10:00:00",
-            end_date="2027-12-15T11:00:00",
+            start_date=_future_date(4, 12, 15, "10:00:00"),
+            end_date=_future_date(4, 12, 15, "11:00:00"),
         )
         try:
             results = connector.search_events(
                 query=keyword,
                 calendar_names=[TEST_CALENDAR],
-                start_date="2027-10-01",
-                end_date="2028-04-01",
+                start_date=_future_date(4, 10, 1),
+                end_date=_future_date(5, 4, 1),
             )
             assert len(results) >= 1, f"Expected to find event with keyword '{keyword}'"
             assert any(keyword in e["summary"] for e in results)
@@ -1373,16 +1381,16 @@ class TestSearchEventsIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Generic Meeting",
-            start_date="2028-01-20T10:00:00",
-            end_date="2028-01-20T11:00:00",
+            start_date=_future_date(5, 1, 20, "10:00:00"),
+            end_date=_future_date(5, 1, 20, "11:00:00"),
             notes=f"Remember to discuss {keyword} topic",
         )
         try:
             results = connector.search_events(
                 query=keyword,
                 calendar_names=[TEST_CALENDAR],
-                start_date="2028-01-01",
-                end_date="2028-02-01",
+                start_date=_future_date(5, 1, 1),
+                end_date=_future_date(5, 2, 1),
             )
             assert len(results) >= 1, f"Expected to find event with notes keyword '{keyword}'"
         finally:
@@ -1394,16 +1402,16 @@ class TestSearchEventsIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Office Meeting",
-            start_date="2028-02-20T10:00:00",
-            end_date="2028-02-20T11:00:00",
+            start_date=_future_date(5, 2, 20, "10:00:00"),
+            end_date=_future_date(5, 2, 20, "11:00:00"),
             location=f"Building {keyword}",
         )
         try:
             results = connector.search_events(
                 query=keyword,
                 calendar_names=[TEST_CALENDAR],
-                start_date="2028-02-01",
-                end_date="2028-03-01",
+                start_date=_future_date(5, 2, 1),
+                end_date=_future_date(5, 3, 1),
             )
             assert len(results) >= 1, f"Expected to find event with location keyword '{keyword}'"
         finally:
@@ -1415,8 +1423,8 @@ class TestSearchEventsIntegration:
         results = connector.search_events(
             query=nonsense,
             calendar_names=[TEST_CALENDAR],
-            start_date="2028-01-01",
-            end_date="2028-12-31",
+            start_date=_future_date(5, 1, 1),
+            end_date=_future_date(5, 12, 31),
         )
         assert results == []
 
@@ -1426,14 +1434,14 @@ class TestSearchEventsIntegration:
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary=f"Findme {keyword}",
-            start_date="2028-03-20T10:00:00",
-            end_date="2028-03-20T11:00:00",
+            start_date=_future_date(5, 3, 20, "10:00:00"),
+            end_date=_future_date(5, 3, 20, "11:00:00"),
         )
         try:
             results = connector.search_events(
                 query=keyword,
-                start_date="2028-03-01",
-                end_date="2028-04-01",
+                start_date=_future_date(5, 3, 1),
+                end_date=_future_date(5, 4, 1),
             )
             assert len(results) >= 1, f"Expected to find event across all calendars"
         finally:
@@ -1463,7 +1471,7 @@ class TestAmbiguousCalendarIntegration:
             assert len(sources) >= 2, f"Expected duplicates, got sources: {sources}"
 
             # create_events without source should fail with ambiguous_calendar
-            events = [{"summary": "Ambiguity Test", "start_date": "2026-06-01T10:00:00", "end_date": "2026-06-01T11:00:00"}]
+            events = [{"summary": "Ambiguity Test", "start_date": _future_date(3, 6, 1, "10:00:00"), "end_date": _future_date(3, 6, 1, "11:00:00")}]
             with pytest.raises(ValueError, match="Multiple calendars"):
                 connector.create_events(
                     calendar_name=self.DUPLICATE_NAME,
@@ -1504,15 +1512,15 @@ class TestGetConflictsIntegration:
         tag = uuid.uuid4().hex[:8]
         uid1 = _create_single_event(
             connector, TEST_CALENDAR, f"Conflict-A-{tag}",
-            "2028-09-15T10:00:00", "2028-09-15T11:00:00",
+            _future_date(5, 9, 15, "10:00:00"), _future_date(5, 9, 15, "11:00:00"),
         )
         uid2 = _create_single_event(
             connector, TEST_CALENDAR, f"Conflict-B-{tag}",
-            "2028-09-15T10:30:00", "2028-09-15T11:30:00",
+            _future_date(5, 9, 15, "10:30:00"), _future_date(5, 9, 15, "11:30:00"),
         )
         try:
             conflicts = connector.get_conflicts(
-                [TEST_CALENDAR], "2028-09-15T00:00:00", "2028-09-16T00:00:00"
+                [TEST_CALENDAR], _future_date(5, 9, 15, "00:00:00"), _future_date(5, 9, 16, "00:00:00")
             )
             # Find the conflict involving our events
             our_conflict = [
@@ -1531,15 +1539,15 @@ class TestGetConflictsIntegration:
         tag = uuid.uuid4().hex[:8]
         uid1 = _create_single_event(
             connector, TEST_CALENDAR, f"Adjacent-A-{tag}",
-            "2028-09-16T10:00:00", "2028-09-16T11:00:00",
+            _future_date(5, 9, 16, "10:00:00"), _future_date(5, 9, 16, "11:00:00"),
         )
         uid2 = _create_single_event(
             connector, TEST_CALENDAR, f"Adjacent-B-{tag}",
-            "2028-09-16T11:00:00", "2028-09-16T12:00:00",
+            _future_date(5, 9, 16, "11:00:00"), _future_date(5, 9, 16, "12:00:00"),
         )
         try:
             conflicts = connector.get_conflicts(
-                [TEST_CALENDAR], "2028-09-16T00:00:00", "2028-09-17T00:00:00"
+                [TEST_CALENDAR], _future_date(5, 9, 16, "00:00:00"), _future_date(5, 9, 17, "00:00:00")
             )
             our_conflicts = [
                 c for c in conflicts
@@ -1556,16 +1564,16 @@ class TestGetConflictsIntegration:
         tag = uuid.uuid4().hex[:8]
         uid1 = _create_single_event(
             connector, TEST_CALENDAR, f"Busy-{tag}",
-            "2028-09-17T10:00:00", "2028-09-17T11:00:00",
+            _future_date(5, 9, 17, "10:00:00"), _future_date(5, 9, 17, "11:00:00"),
         )
         uid2 = _create_single_event(
             connector, TEST_CALENDAR, f"Free-{tag}",
-            "2028-09-17T10:30:00", "2028-09-17T11:30:00",
+            _future_date(5, 9, 17, "10:30:00"), _future_date(5, 9, 17, "11:30:00"),
             availability="free",
         )
         try:
             conflicts = connector.get_conflicts(
-                [TEST_CALENDAR], "2028-09-17T00:00:00", "2028-09-18T00:00:00"
+                [TEST_CALENDAR], _future_date(5, 9, 17, "00:00:00"), _future_date(5, 9, 18, "00:00:00")
             )
             our_conflicts = [
                 c for c in conflicts
@@ -1585,8 +1593,8 @@ class TestBatchLimitsIntegration:
     """Integration tests for per-call batch size limits."""
 
     def test_create_events_exceeds_batch_limit(self, connector):
-        events = [{"summary": f"Event {i}", "start_date": "2026-06-15T10:00:00",
-                    "end_date": "2026-06-15T11:00:00"} for i in range(51)]
+        events = [{"summary": f"Event {i}", "start_date": _future_date(3, 6, 15, "10:00:00"),
+                    "end_date": _future_date(3, 6, 15, "11:00:00")} for i in range(51)]
         with pytest.raises(ValueError, match="exceeds limit of 50"):
             connector.create_events(TEST_CALENDAR, events)
 
