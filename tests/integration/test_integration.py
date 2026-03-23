@@ -12,7 +12,7 @@ import uuid
 
 import pytest
 
-from apple_calendar_mcp.calendar_connector import CalendarConnector, run_applescript
+from apple_calendar_mcp.calendar_connector import CalendarConnector, run_applescript, run_swift_helper
 
 
 # Skip entire module if not in test mode
@@ -1324,3 +1324,26 @@ class TestAmbiguousCalendarIntegration:
                             break
                         except Exception:
                             pass
+
+
+# ── batch size limits ──────────────────────────────────────────────────────
+
+
+class TestBatchLimitsIntegration:
+    """Integration tests for per-call batch size limits."""
+
+    def test_create_events_exceeds_batch_limit(self, connector):
+        events = [{"summary": f"Event {i}", "start_date": "2026-06-15T10:00:00",
+                    "end_date": "2026-06-15T11:00:00"} for i in range(51)]
+        with pytest.raises(ValueError, match="exceeds limit of 50"):
+            connector.create_events(TEST_CALENDAR, events)
+
+    def test_update_events_exceeds_batch_limit(self, connector):
+        updates = [{"uid": f"UID-{i}", "summary": f"Event {i}"} for i in range(51)]
+        with pytest.raises(ValueError, match="exceeds limit of 50"):
+            connector.update_events(TEST_CALENDAR, updates)
+
+    def test_delete_events_exceeds_batch_limit(self, connector):
+        uids = [f"UID-{i}" for i in range(51)]
+        with pytest.raises(ValueError, match="exceeds limit of 50"):
+            connector.delete_events(TEST_CALENDAR, uids)

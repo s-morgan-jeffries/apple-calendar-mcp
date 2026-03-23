@@ -1043,6 +1043,14 @@ class TestDeleteEvents:
             self.connector.delete_events("MCP-Test-Calendar", uids)
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_batch_limit_boundary_succeeds(self, mock_swift):
+        """Exactly 50 UIDs should succeed (boundary of MAX_BATCH_SIZE)."""
+        uids = [f"UID-{i}" for i in range(50)]
+        mock_swift.return_value = json.dumps({"deleted_uids": uids, "not_found_uids": []})
+        result = self.connector.delete_events("MCP-Test-Calendar", uids)
+        assert len(result["deleted_uids"]) == 50
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_passes_occurrence_date_to_swift(self, mock_swift):
         mock_swift.return_value = json.dumps({"deleted_uids": ["REC-123"], "not_found_uids": []})
         self.connector.delete_events(
@@ -1170,6 +1178,15 @@ class TestCreateEvents:
             self.connector.create_events("MCP-Test-Calendar", events)
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_batch_limit_boundary_succeeds(self, mock_swift):
+        """Exactly 50 events should succeed (boundary of MAX_BATCH_SIZE)."""
+        created = [{"uid": f"UID-{i}", "summary": f"Event {i}", "calendar_name": "MCP-Test-Calendar"} for i in range(50)]
+        mock_swift.return_value = json.dumps({"created": created, "errors": []})
+        events = [{"summary": f"Event {i}", "start_date": "2026-03-15T10:00:00", "end_date": "2026-03-15T11:00:00"} for i in range(50)]
+        result = self.connector.create_events("MCP-Test-Calendar", events)
+        assert len(result["created"]) == 50
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_passes_calendar_source_to_swift(self, mock_swift):
         mock_swift.return_value = json.dumps({
             "created": [{"uid": "UID-1", "summary": "Event 1", "calendar_name": "MCP-Test-Calendar"}],
@@ -1244,6 +1261,15 @@ class TestUpdateEvents:
         updates = [{"uid": f"UID-{i}", "summary": f"Event {i}"} for i in range(51)]
         with pytest.raises(ValueError, match="exceeds limit of 50"):
             self.connector.update_events("MCP-Test-Calendar", updates)
+
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_batch_limit_boundary_succeeds(self, mock_swift):
+        """Exactly 50 updates should succeed (boundary of MAX_BATCH_SIZE)."""
+        updated = [{"uid": f"UID-{i}", "summary": f"Event {i}", "updated_fields": ["summary"]} for i in range(50)]
+        mock_swift.return_value = json.dumps({"updated": updated, "errors": []})
+        updates = [{"uid": f"UID-{i}", "summary": f"Event {i}"} for i in range(50)]
+        result = self.connector.update_events("MCP-Test-Calendar", updates)
+        assert len(result["updated"]) == 50
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_passes_calendar_source_to_swift(self, mock_swift):
