@@ -864,6 +864,52 @@ class TestGetAvailabilityIntegration:
         assert slots[0]["end_date"] == "2099-08-01T17:00:00"
         assert slots[0]["duration_minutes"] == 480
 
+    def test_multi_calendar_availability(self, connector):
+        """Events on different calendars should both block availability when queried together."""
+        from tests.helpers.calendar_setup import create_test_calendar, delete_test_calendar
+
+        cal2 = "MCP-Test-Calendar-2"
+        create_test_calendar(cal2)
+        uid1 = None
+        uid2 = None
+        try:
+            # Event on primary calendar at 10:00-11:00
+            uid1 = _create_single_event(connector,
+                calendar_name=TEST_CALENDAR,
+                summary="Multi-Cal Avail A",
+                start_date="2099-09-01T10:00:00",
+                end_date="2099-09-01T11:00:00",
+            )
+            # Event on second calendar at 14:00-15:00
+            connector_no_safety = CalendarConnector(enable_safety_checks=False)
+            result = connector_no_safety.create_events(cal2, [
+                {"summary": "Multi-Cal Avail B", "start_date": "2099-09-01T14:00:00", "end_date": "2099-09-01T15:00:00"},
+            ])
+            uid2 = result["created"][0]["uid"]
+
+            # Query availability across both calendars
+            slots = connector.get_availability(
+                calendar_names=[TEST_CALENDAR, cal2],
+                start_date="2099-09-01T09:00:00",
+                end_date="2099-09-01T17:00:00",
+            )
+            # Both events should block, leaving 3 free slots:
+            # 09:00-10:00, 11:00-14:00, 15:00-17:00
+            assert len(slots) == 3
+            assert slots[0]["start_date"] == "2099-09-01T09:00:00"
+            assert slots[0]["end_date"] == "2099-09-01T10:00:00"
+            assert slots[1]["start_date"] == "2099-09-01T11:00:00"
+            assert slots[1]["end_date"] == "2099-09-01T14:00:00"
+            assert slots[2]["start_date"] == "2099-09-01T15:00:00"
+            assert slots[2]["end_date"] == "2099-09-01T17:00:00"
+        finally:
+            if uid1:
+                _delete_event_by_uid(uid1)
+            try:
+                delete_test_calendar(cal2)
+            except Exception:
+                pass
+
 
 class TestRecurringEventsIntegration:
     """Integration tests for recurring event handling."""

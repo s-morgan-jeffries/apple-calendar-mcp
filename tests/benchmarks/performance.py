@@ -133,6 +133,14 @@ def run_benchmarks(read_calendar: str, test_calendar: str):
         section="get_availability",
     )
 
+    if read_calendar != test_calendar:
+        benchmark(
+            lambda: connector.get_availability([read_calendar, test_calendar], f"{read_year}-03-01", f"{read_year}-03-31"),
+            "1-month range (2 calendars)",
+            iterations=3,
+            section="get_availability",
+        )
+
     # --- get_conflicts ---
     print(f"\n[get_conflicts] (calendar: {read_calendar})")
 
