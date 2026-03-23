@@ -198,8 +198,8 @@ class CalendarConnector:
             calendar_name: Name of the calendar containing the events
             updates: List of update dicts, each with 'uid' (required) and optional fields
                      to update: summary, start, end, location, notes, url, allday,
-                     alerts, availability, timezone, recurrence, clear_location,
-                     clear_notes, clear_url, clear_alerts, clear_recurrence.
+                     alerts, availability, timezone, recurrence.
+                     To clear a field, pass an empty value (e.g., location="", alerts=[]).
                      For recurring events: occurrence_date (ISO 8601) to target a specific
                      occurrence, span ("this_event" or "future_events", default "this_event").
             calendar_source: Source/account name to disambiguate calendars with

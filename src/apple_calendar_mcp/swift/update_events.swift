@@ -249,13 +249,12 @@ for (index, updateData) in updatesJson.enumerated() {
         let eventTitle = (updateData["summary"] as? String) ?? event.title ?? ""
         let eventStart = newStart ?? event.startDate!
         let eventEnd = newEnd ?? event.endDate!
-        let clearLocation = updateData["clear_location"] as? Bool == true
-        let clearNotes = updateData["clear_notes"] as? Bool == true
-        let clearUrl = updateData["clear_url"] as? Bool == true
-        let eventLocation = clearLocation ? nil : ((updateData["location"] as? String) ?? event.location)
-        let eventNotes = clearNotes ? nil : ((updateData["notes"] as? String) ?? event.notes)
-        let eventUrlStr = updateData["url"] as? String
-        let eventUrl = clearUrl ? nil : (eventUrlStr.flatMap { URL(string: $0) } ?? event.url)
+        let locationStr = updateData["location"] as? String
+        let eventLocation = locationStr != nil ? (locationStr!.isEmpty ? nil : locationStr) : event.location
+        let notesStr = updateData["notes"] as? String
+        let eventNotes = notesStr != nil ? (notesStr!.isEmpty ? nil : notesStr) : event.notes
+        let urlStr = updateData["url"] as? String
+        let eventUrl = urlStr != nil ? (urlStr!.isEmpty ? nil : URL(string: urlStr!)) : event.url
         let eventAllDay = (updateData["allday"] as? Bool) ?? event.isAllDay
         let eventAlarms = event.alarms
 
@@ -263,12 +262,12 @@ for (index, updateData) in updatesJson.enumerated() {
         if updateData["summary"] != nil { updatedFields.append("summary") }
         if newStart != nil { updatedFields.append("start_date") }
         if newEnd != nil { updatedFields.append("end_date") }
-        if updateData["location"] != nil || clearLocation { updatedFields.append("location") }
-        if updateData["notes"] != nil || clearNotes { updatedFields.append("notes") }
-        if updateData["url"] != nil || clearUrl { updatedFields.append("url") }
+        if updateData["location"] != nil { updatedFields.append("location") }
+        if updateData["notes"] != nil { updatedFields.append("notes") }
+        if updateData["url"] != nil { updatedFields.append("url") }
         if updateData["allday"] != nil { updatedFields.append("allday_event") }
         if updateData["availability"] != nil { updatedFields.append("availability") }
-        if updateData["clear_alerts"] as? Bool == true || updateData["alerts"] != nil { updatedFields.append("alerts") }
+        if updateData["alerts"] != nil { updatedFields.append("alerts") }
 
         // Remove the occurrence from the series
         do {
@@ -304,7 +303,7 @@ for (index, updateData) in updatesJson.enumerated() {
             for alarm in alarms { newEvent.addAlarm(EKAlarm(relativeOffset: alarm.relativeOffset)) }
         }
         // Apply new alerts if provided
-        if updateData["clear_alerts"] as? Bool == true || updateData["alerts"] != nil {
+        if updateData["alerts"] != nil {
             newEvent.alarms = nil
             if let alerts = updateData["alerts"] as? [Any] {
                 for alert in alerts {
@@ -354,9 +353,8 @@ for (index, updateData) in updatesJson.enumerated() {
         event.endDate = endDate; updatedFields.append("end_date")
     }
     if let location = updateData["location"] as? String {
-        event.location = location; updatedFields.append("location")
-    } else if updateData["clear_location"] as? Bool == true {
-        event.location = nil; updatedFields.append("location")
+        event.location = location.isEmpty ? nil : location
+        updatedFields.append("location")
     }
     if let slData = updateData["structured_location"] as? [String: Any] {
         let sl = EKStructuredLocation(title: slData["title"] as? String ?? "")
@@ -369,14 +367,12 @@ for (index, updateData) in updatesJson.enumerated() {
         updatedFields.append("structured_location")
     }
     if let notes = updateData["notes"] as? String {
-        event.notes = notes; updatedFields.append("notes")
-    } else if updateData["clear_notes"] as? Bool == true {
-        event.notes = nil; updatedFields.append("notes")
+        event.notes = notes.isEmpty ? nil : notes
+        updatedFields.append("notes")
     }
-    if let urlStr = updateData["url"] as? String, let url = URL(string: urlStr) {
-        event.url = url; updatedFields.append("url")
-    } else if updateData["clear_url"] as? Bool == true {
-        event.url = nil; updatedFields.append("url")
+    if let urlStr = updateData["url"] as? String {
+        event.url = urlStr.isEmpty ? nil : URL(string: urlStr)
+        updatedFields.append("url")
     }
     if let allday = updateData["allday"] as? Bool {
         event.isAllDay = allday; updatedFields.append("allday_event")
@@ -384,7 +380,7 @@ for (index, updateData) in updatesJson.enumerated() {
     if let avail = updateData["availability"] as? String {
         event.availability = parseAvailability(avail); updatedFields.append("availability")
     }
-    if updateData["clear_alerts"] as? Bool == true || updateData["alerts"] != nil {
+    if updateData["alerts"] != nil {
         event.alarms = nil
         if let alerts = updateData["alerts"] as? [Any] {
             for alert in alerts {
@@ -410,16 +406,18 @@ for (index, updateData) in updatesJson.enumerated() {
         }
         updatedFields.append("alerts")
     }
-    if updateData["clear_recurrence"] as? Bool == true {
-        if let rules = event.recurrenceRules {
-            for rule in rules { event.removeRecurrenceRule(rule) }
+    if let rruleStr = updateData["recurrence"] as? String {
+        if rruleStr.isEmpty {
+            // Empty string clears recurrence
+            if let rules = event.recurrenceRules {
+                for rule in rules { event.removeRecurrenceRule(rule) }
+            }
+        } else if let rule = parseRecurrenceRule(rruleStr) {
+            if let rules = event.recurrenceRules {
+                for r in rules { event.removeRecurrenceRule(r) }
+            }
+            event.addRecurrenceRule(rule)
         }
-        updatedFields.append("recurrence_rule")
-    } else if let rruleStr = updateData["recurrence"] as? String, let rule = parseRecurrenceRule(rruleStr) {
-        if let rules = event.recurrenceRules {
-            for r in rules { event.removeRecurrenceRule(r) }
-        }
-        event.addRecurrenceRule(rule)
         updatedFields.append("recurrence_rule")
     } else if let recDict = updateData["recurrence"] as? [String: Any], let rule = parseStructuredRecurrence(recDict) {
         if let rules = event.recurrenceRules {
@@ -435,7 +433,7 @@ for (index, updateData) in updatesJson.enumerated() {
     }
 
     // Determine save span: force futureEvents for recurrence changes
-    let isRecurrenceChange = updateData["recurrence"] != nil || updateData["clear_recurrence"] as? Bool == true
+    let isRecurrenceChange = updateData["recurrence"] != nil
     let saveSpan: EKSpan = isRecurrenceChange ? .futureEvents : span
 
     do {
