@@ -433,6 +433,8 @@ class CalendarConnector:
         self._validate_date(start_date)
         self._validate_date(end_date)
 
+        self._validate_cli_arg(query, "query")
+
         args = []
         for name in calendar_names:
             args += ["--calendar", name]
