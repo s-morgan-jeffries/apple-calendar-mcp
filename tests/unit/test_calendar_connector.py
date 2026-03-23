@@ -986,6 +986,11 @@ class TestDeleteEvents:
         args = mock_swift.call_args[0][1]
         assert "--span" not in args
 
+    def test_exceeds_batch_limit(self):
+        uids = [f"UID-{i}" for i in range(51)]
+        with pytest.raises(ValueError, match="exceeds limit of 50"):
+            self.connector.delete_events("MCP-Test-Calendar", uids)
+
 
 # ── _run_swift_helper_json error handling ─────────────────────────────────
 
@@ -1071,6 +1076,11 @@ class TestCreateEvents:
         with pytest.raises(CalendarSafetyError, match="calendar_name is required"):
             connector.create_events("", [{"summary": "Test"}])
 
+    def test_exceeds_batch_limit(self):
+        events = [{"summary": f"Event {i}"} for i in range(51)]
+        with pytest.raises(ValueError, match="exceeds limit of 50"):
+            self.connector.create_events("MCP-Test-Calendar", events)
+
 
 # ── update_events (batch) ─────────────────────────────────────────────────
 
@@ -1118,6 +1128,11 @@ class TestUpdateEvents:
         connector = CalendarConnector(enable_safety_checks=True)
         with pytest.raises(CalendarSafetyError):
             connector.update_events("Personal", [{"uid": "UID-1", "summary": "Test"}])
+
+    def test_exceeds_batch_limit(self):
+        updates = [{"uid": f"UID-{i}", "summary": f"Event {i}"} for i in range(51)]
+        with pytest.raises(ValueError, match="exceeds limit of 50"):
+            self.connector.update_events("MCP-Test-Calendar", updates)
 
 
 # ── search_events ─────────────────────────────────────────────────────────
