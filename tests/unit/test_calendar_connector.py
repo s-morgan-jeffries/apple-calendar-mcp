@@ -266,6 +266,17 @@ class TestGetCalendars:
         with pytest.raises(PermissionError, match="Access denied"):
             self.connector.get_calendars()
 
+    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
+    def test_returns_exact_data_from_swift_helper(self, mock_swift):
+        """get_calendars() should return the exact list from the Swift helper unmodified."""
+        expected = [
+            {"name": "Work", "writable": True, "description": "Work cal", "color": "#FF0000", "source": "iCloud", "type": "caldav", "is_default": True},
+            {"name": "Personal", "writable": False, "description": "", "color": "#00FF00", "source": "Google", "type": "caldav", "is_default": False},
+        ]
+        mock_swift.return_value = json.dumps(expected)
+        result = self.connector.get_calendars()
+        assert result == expected
+
 
 # ── create_calendar ─────────────────────────────────────────────────────────
 
