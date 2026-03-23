@@ -46,6 +46,12 @@ Mitigations:
 - Do not auto-approve destructive tools (see above)
 - LLM providers train models to resist prompt injection, but no defense is complete
 
+### Architecture Security Properties
+
+**stdio transport:** The server communicates via stdin/stdout only. There is no HTTP listener, no network port, and no way to reach the server from another machine or process. Only the MCP client that launched the server can interact with it.
+
+**No data caching:** Calendar data is queried from EventKit on each call and returned directly to the client. The server does not write calendar data to disk, maintain a database, or cache responses. When the process exits, no calendar data remains.
+
 ## Supported Versions
 
 Only the latest release receives security updates.
