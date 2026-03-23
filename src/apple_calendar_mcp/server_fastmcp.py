@@ -141,7 +141,10 @@ def create_events(
         calendar_name: Name of the target calendar. If omitted, uses the system default calendar.
         events: JSON array of event objects. Each object has keys: summary (required),
                 start_date (required, ISO 8601), end_date (required, ISO 8601), and optional:
-                location, notes, url, allday (bool), recurrence (RRULE string),
+                location, notes, url, allday (bool),
+                recurrence (RRULE string like "FREQ=WEEKLY;INTERVAL=2;BYDAY=MO;COUNT=10"
+                OR structured object like {"frequency": "weekly", "interval": 2,
+                "days_of_week": ["MO"], "count": 10}),
                 alerts (list of minutes, e.g. [15, 60]), availability ("free"/"busy"/"tentative"),
                 timezone (IANA identifier, e.g. "America/Los_Angeles" — use this to schedule
                 in a remote timezone rather than converting times manually),
@@ -209,7 +212,8 @@ def update_events(
                  location, notes, url, allday (bool), alerts (list of minutes),
                  availability ("free"/"busy"/"tentative"), timezone (IANA identifier —
                  use to schedule in a remote timezone rather than converting manually),
-                 recurrence (RRULE string), structured_location (object with title,
+                 recurrence (RRULE string OR structured object — see create_events),
+                 structured_location (object with title,
                  latitude, longitude, radius), clear_location (bool), clear_notes (bool),
                  clear_url (bool), clear_alerts (bool), clear_recurrence (bool).
                  For recurring events: occurrence_date (ISO 8601) to target specific occurrence,

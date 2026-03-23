@@ -1136,6 +1136,48 @@ class TestRecurringEventsIntegration:
         # in Calendar.app — EventKit may return nil for occurrence-level location.
         # We verify the reschedule itself worked (summary, time) but don't assert location.
 
+    def test_create_event_with_structured_recurrence(self, connector, fresh_calendar):
+        """Create a recurring event using structured recurrence object instead of RRULE string."""
+        result = connector.create_events(TEST_CALENDAR, [{
+            "summary": "Structured Recurrence Test",
+            "start_date": _future_date(5, 7, 7, "10:00:00"),
+            "end_date": _future_date(5, 7, 7, "11:00:00"),
+            "recurrence": {
+                "frequency": "weekly",
+                "interval": 1,
+                "count": 3,
+            },
+        }])
+        uid = result["created"][0]["uid"]
+        events = connector.get_events(TEST_CALENDAR, _future_date(5, 7, 1), _future_date(5, 7, 31))
+        recurring = [e for e in events if e["uid"] == uid]
+        assert len(recurring) == 3, f"Expected 3 occurrences, got {len(recurring)}"
+        # Verify recurrence_parsed is returned
+        assert recurring[0].get("recurrence_parsed") is not None
+        parsed = recurring[0]["recurrence_parsed"]
+        assert parsed["frequency"] == "weekly"
+        assert parsed["interval"] == 1
+        assert parsed["count"] == 3
+
+    def test_structured_recurrence_with_days_of_week(self, connector, fresh_calendar):
+        """Structured recurrence with days_of_week should create occurrences on specified days."""
+        # Find next Monday in year+5
+        mon = _nth_weekday(5, 8, 0, 1)  # 1st Monday of Aug
+        result = connector.create_events(TEST_CALENDAR, [{
+            "summary": "MWF Structured Test",
+            "start_date": f"{mon.isoformat()}T09:00:00",
+            "end_date": f"{mon.isoformat()}T10:00:00",
+            "recurrence": {
+                "frequency": "weekly",
+                "days_of_week": ["MO", "WE", "FR"],
+                "count": 6,
+            },
+        }])
+        uid = result["created"][0]["uid"]
+        events = connector.get_events(TEST_CALENDAR, _future_date(5, 8, 1), _future_date(5, 8, 31))
+        recurring = [e for e in events if e["uid"] == uid]
+        assert len(recurring) == 6, f"Expected 6 occurrences (MWF x 2 weeks), got {len(recurring)}"
+
 
 class TestRoundTripIntegration:
     """Round-trip tests: create → read → use returned data to query again."""

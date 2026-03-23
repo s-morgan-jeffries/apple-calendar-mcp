@@ -69,6 +69,37 @@ func parseUntilDate(_ value: String) -> Date? {
     return parseISO8601(value)
 }
 
+func parseStructuredRecurrence(_ dict: [String: Any]) -> EKRecurrenceRule? {
+    guard let freqStr = dict["frequency"] as? String else { return nil }
+
+    var frequency: EKRecurrenceFrequency
+    switch freqStr.lowercased() {
+    case "daily": frequency = .daily
+    case "weekly": frequency = .weekly
+    case "monthly": frequency = .monthly
+    case "yearly": frequency = .yearly
+    default: return nil
+    }
+
+    let interval = dict["interval"] as? Int ?? 1
+
+    var daysOfWeek: [EKRecurrenceDayOfWeek]?
+    if let days = dict["days_of_week"] as? [String] {
+        daysOfWeek = days.compactMap { parseDayOfWeek($0) }
+    }
+
+    var end: EKRecurrenceEnd?
+    if let count = dict["count"] as? Int {
+        end = EKRecurrenceEnd(occurrenceCount: count)
+    } else if let untilStr = dict["until"] as? String, let untilDate = parseISO8601(untilStr) ?? parseUntilDate(untilStr) {
+        end = EKRecurrenceEnd(end: untilDate)
+    }
+
+    return EKRecurrenceRule(recurrenceWith: frequency, interval: interval,
+        daysOfTheWeek: daysOfWeek, daysOfTheMonth: nil, monthsOfTheYear: nil,
+        weeksOfTheYear: nil, daysOfTheYear: nil, setPositions: nil, end: end)
+}
+
 func parseRecurrenceRule(_ rrule: String) -> EKRecurrenceRule? {
     var frequency: EKRecurrenceFrequency = .daily
     var interval = 1
@@ -347,6 +378,12 @@ for (index, updateData) in updatesJson.enumerated() {
         }
         updatedFields.append("recurrence_rule")
     } else if let rruleStr = updateData["recurrence"] as? String, let rule = parseRecurrenceRule(rruleStr) {
+        if let rules = event.recurrenceRules {
+            for r in rules { event.removeRecurrenceRule(r) }
+        }
+        event.addRecurrenceRule(rule)
+        updatedFields.append("recurrence_rule")
+    } else if let recDict = updateData["recurrence"] as? [String: Any], let rule = parseStructuredRecurrence(recDict) {
         if let rules = event.recurrenceRules {
             for r in rules { event.removeRecurrenceRule(r) }
         }
