@@ -73,22 +73,12 @@ def _update_single_event(connector, calendar_name, event_uid, **kwargs):
     for py_key, json_key in field_map.items():
         if py_key in kwargs and kwargs[py_key] is not None:
             value = kwargs[py_key]
-            # Handle special cases
-            if py_key == "location" and value == "":
-                update["clear_location"] = True
-                continue
-            if py_key == "recurrence_rule" and value == "":
-                update["clear_recurrence"] = True
-                continue
             if py_key == "allday_event":
                 update[json_key] = value  # already bool
                 continue
             update[json_key] = value
     if "alert_minutes" in kwargs:
-        if kwargs["alert_minutes"] == []:
-            update["clear_alerts"] = True
-        else:
-            update["alerts"] = kwargs["alert_minutes"]
+        update["alerts"] = kwargs["alert_minutes"]
     result = connector.update_events(calendar_name, [update])
     if result.get("errors"):
         raise ValueError(result["errors"][0].get("error", "Unknown error"))
@@ -592,7 +582,7 @@ class TestUpdateEventIntegration:
             _delete_event_by_uid(uid)
 
     def test_clear_notes(self, connector):
-        """Clearing notes via clear_notes=True should empty the notes field."""
+        """Passing notes='' should empty the notes field."""
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Clear Notes Test",
@@ -601,7 +591,7 @@ class TestUpdateEventIntegration:
             notes="These notes will be cleared",
         )
         try:
-            connector.update_events(TEST_CALENDAR, [{"uid": uid, "clear_notes": True}])
+            connector.update_events(TEST_CALENDAR, [{"uid": uid, "notes": ""}])
             events = connector.get_events(TEST_CALENDAR, _future_date(5, 4, 10, "00:00:00"), _future_date(5, 4, 11, "00:00:00"))
             matches = [e for e in events if e["uid"] == uid]
             assert len(matches) == 1
@@ -610,7 +600,7 @@ class TestUpdateEventIntegration:
             _delete_event_by_uid(uid)
 
     def test_clear_url(self, connector):
-        """Clearing url via clear_url=True should empty the url field."""
+        """Passing url='' should empty the url field."""
         uid = _create_single_event(connector,
             calendar_name=TEST_CALENDAR,
             summary="Clear URL Test",
@@ -619,7 +609,7 @@ class TestUpdateEventIntegration:
             url="https://example.com/will-be-cleared",
         )
         try:
-            connector.update_events(TEST_CALENDAR, [{"uid": uid, "clear_url": True}])
+            connector.update_events(TEST_CALENDAR, [{"uid": uid, "url": ""}])
             events = connector.get_events(TEST_CALENDAR, _future_date(5, 4, 11, "00:00:00"), _future_date(5, 4, 12, "00:00:00"))
             matches = [e for e in events if e["uid"] == uid]
             assert len(matches) == 1

@@ -217,9 +217,9 @@ def update_events(
                  availability ("free"/"busy"/"tentative"/"unavailable"), timezone (IANA identifier —
                  use to schedule in a remote timezone rather than converting manually),
                  recurrence (RRULE string OR structured object — see create_events),
-                 structured_location (object with title,
-                 latitude, longitude, radius), clear_location (bool), clear_notes (bool),
-                 clear_url (bool), clear_alerts (bool), clear_recurrence (bool).
+                 structured_location (object with title, latitude, longitude, radius).
+                 To clear a field, pass an empty value: location="", notes="", url="",
+                 alerts=[], recurrence="".
                  For recurring events: occurrence_date (ISO 8601) to target specific occurrence,
                  span ("this_event" or "future_events", default "this_event").
                  When updating dates on an all-day event, include allday=true to ensure

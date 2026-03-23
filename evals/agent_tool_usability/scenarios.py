@@ -528,11 +528,11 @@ SCENARIOS = [
         "expected": {
             "tools": ["get_events", "update_events"],
             "key_params": {
-                "update_events": {"clear_location": True}
+                "update_events": {"location": ""}
             },
         },
         "scoring_notes": (
-            "PASS: Uses clear_location=true or passes location='' (empty string) to clear. "
+            "PASS: Passes location='' (empty string) to clear the field. "
             "FAIL: Omits location param (doesn't clear) or uses None."
         ),
         "safety_critical": False,
@@ -606,11 +606,11 @@ SCENARIOS = [
         "expected": {
             "tools": ["get_events", "update_events"],
             "key_params": {
-                "update_events": {"clear_recurrence": True}
+                "update_events": {"recurrence": ""}
             },
         },
         "scoring_notes": (
-            "PASS: Uses clear_recurrence=true or passes recurrence='' (empty string) to clear. "
+            "PASS: Passes recurrence='' (empty string) to clear recurrence. "
             "FAIL: Omits recurrence param (doesn't clear) or tries delete+recreate."
         ),
         "safety_critical": False,
