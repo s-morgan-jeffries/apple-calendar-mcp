@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-03-23
+
+### Added
+
+- Structured recurrence input as alternative to RRULE strings (#168) — accept `{"frequency": "weekly", "interval": 2, "days_of_week": ["MO"], "count": 10}` alongside RRULE strings
+- `recurrence_parsed` field in get_events return — structured representation of recurrence rules for easier model consumption
+- Absolute date alarms: `{"type": "absolute", "date": "ISO 8601"}` fires at a fixed time (#167)
+- Proximity-based alarms: `{"type": "proximity", "proximity": "enter"|"leave"}` geofence alerts requiring structured_location (#167)
+- Typed alert objects in get_events return with `type` field (relative/absolute/proximity)
+- Rule-based automated eval scoring in `run_eval.py` — no model self-scoring bias (#266)
+- Server instructions for finding events ("Use get_events or search_events") and missing information ("ask for clarification") (#270)
+- 48 blind eval scenarios (was 38), all 10 tools now covered (#266, #271)
+
+### Changed
+
+- **Breaking:** Removed `clear_location`, `clear_notes`, `clear_url`, `clear_alerts`, `clear_recurrence` flags from update_events (#269) — pass empty values instead (e.g., `location=""`, `alerts=[]`, `recurrence=""`)
+- Tool descriptions accept `search_events` as valid alternative to `get_events` for UID lookup (#270)
+- Stronger allday event guidance with concrete examples in tool descriptions (#270)
+- `"unavailable"` added to documented availability values (#265)
+- `is_editable` and `is_organizer` fields documented in get_events return (#265)
+
+### Fixed
+
+- Flaky `test_reschedule_single_occurrence`: use `occurrence_date` field (not `start_date`) for occurrence lookup, add EventKit sync delay (#260)
+- Auto-scorer false positives: accept `search_events` as valid for UID lookup (~15 false PARTIALs fixed) (#270)
+- f-string syntax error in `run_eval.py` print_summary (#266)
+
 ## [0.8.3] - 2026-03-23
 
 ### Added
