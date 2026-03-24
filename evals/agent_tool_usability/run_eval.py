@@ -38,12 +38,17 @@ from scenarios import SCENARIOS
 
 SCRIPT_DIR = Path(__file__).parent
 TOOL_DESCRIPTIONS_PATH = SCRIPT_DIR / "tool_descriptions.md"
+SERVER_INSTRUCTIONS_PATH = SCRIPT_DIR / "server_instructions.md"
 
-SYSTEM_PROMPT = """You are a blind eval agent. You have access ONLY to the tool descriptions below. \
+SYSTEM_PROMPT = """You are a calendar assistant. You have access to the tools described below. \
 You have NO access to any codebase, documentation, or external knowledge. \
-Based solely on the tool descriptions, plan your response to the user's request.
+Based on the server instructions and tool descriptions, plan your response to the user's request.
 
 List the exact tool calls you would make, in order, with all parameters. Explain your reasoning briefly.
+
+## Server Instructions
+
+{server_instructions}
 
 ## Tool Descriptions
 
@@ -163,9 +168,9 @@ def score_response(response_text: str, scenario: dict) -> str:
         return "PARTIAL"
 
 
-def run_scenario(client: OpenAI, model: str, scenario: dict, tool_descriptions: str) -> dict:
+def run_scenario(client: OpenAI, model: str, scenario: dict, tool_descriptions: str, server_instructions: str = "") -> dict:
     """Run a single scenario and return the result."""
-    system = SYSTEM_PROMPT.format(tool_descriptions=tool_descriptions)
+    system = SYSTEM_PROMPT.format(tool_descriptions=tool_descriptions, server_instructions=server_instructions)
 
     response = client.chat.completions.create(
         model=model,
@@ -197,7 +202,7 @@ def run_scenario(client: OpenAI, model: str, scenario: dict, tool_descriptions: 
 
 
 def run_model(client: OpenAI, model: str, scenarios: list, tool_descriptions: str,
-              output_dir: Path, runs: int = 1) -> dict:
+              output_dir: Path, runs: int = 1, server_instructions: str = "") -> dict:
     """Run all scenarios for a single model. Returns summary dict."""
     model_short = model.split("/")[-1]
     all_results = []
@@ -209,7 +214,7 @@ def run_model(client: OpenAI, model: str, scenarios: list, tool_descriptions: st
         for i, scenario in enumerate(scenarios, 1):
             print(f"  [{model_short}]{run_label} [{i}/{len(scenarios)}] {scenario['name']}...", end=" ", flush=True)
             try:
-                result = run_scenario(client, model, scenario, tool_descriptions)
+                result = run_scenario(client, model, scenario, tool_descriptions, server_instructions)
                 result["run"] = run_num
                 all_results.append(result)
                 if result["input_tokens"]:
@@ -304,6 +309,7 @@ def main():
     )
 
     tool_descriptions = TOOL_DESCRIPTIONS_PATH.read_text()
+    server_instructions = SERVER_INSTRUCTIONS_PATH.read_text() if SERVER_INSTRUCTIONS_PATH.exists() else ""
 
     scenarios = SCENARIOS
     if args.scenarios:
@@ -325,12 +331,12 @@ def main():
 
     summaries = []
     if len(models) == 1:
-        summary = run_model(client, models[0], scenarios, tool_descriptions, output_dir, args.runs)
+        summary = run_model(client, models[0], scenarios, tool_descriptions, output_dir, args.runs, server_instructions)
         summaries.append(summary)
     else:
         with ThreadPoolExecutor(max_workers=len(models)) as executor:
             futures = {
-                executor.submit(run_model, client, model, scenarios, tool_descriptions, output_dir, args.runs): model
+                executor.submit(run_model, client, model, scenarios, tool_descriptions, output_dir, args.runs, server_instructions): model
                 for model in models
             }
             for future in as_completed(futures):
