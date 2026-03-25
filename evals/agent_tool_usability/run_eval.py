@@ -106,7 +106,7 @@ def get_api_key() -> str:
     return ""
 
 
-def score_response(response_text: str, scenario: dict) -> str:
+def score_response_regex(response_text: str, scenario: dict) -> str:
     """Rule-based automated scoring of a model response.
 
     Returns: "PASS", "PARTIAL", "FAIL", or "MANUAL"
@@ -168,7 +168,76 @@ def score_response(response_text: str, scenario: dict) -> str:
         return "PARTIAL"
 
 
-def run_scenario(client: OpenAI, model: str, scenario: dict, tool_descriptions: str, server_instructions: str = "") -> dict:
+SCORER_SYSTEM_PROMPT = """You are an evaluator scoring an AI calendar assistant's tool-call planning.
+
+You will receive a user request, expected tools and parameters, a scoring rubric, and the assistant's response.
+Score the response strictly according to the rubric.
+
+Return ONLY a JSON object with exactly two fields:
+{"score": "PASS", "justification": "one sentence"}
+
+The score MUST be one of: "PASS", "PARTIAL", or "FAIL".
+Do not wrap the JSON in markdown code fences. Do not include any other text."""
+
+
+def score_response_llm(client: OpenAI, scorer_model: str, response_text: str, scenario: dict) -> dict:
+    """LLM-based scoring of a model response.
+
+    Uses an LLM to evaluate the response against the scenario's scoring rubric,
+    providing semantic understanding instead of regex pattern matching.
+
+    Returns: {"score": "PASS"|"PARTIAL"|"FAIL"|"MANUAL"|"ERROR", "justification": str}
+    """
+    expected = scenario["expected"]
+    expected_tools = expected.get("tools", [])
+
+    if not expected_tools:
+        return {"score": "MANUAL", "justification": "Under-specified scenario requires human judgment"}
+
+    key_params = expected.get("key_params", {})
+    user_prompt = (
+        f"## User Request\n{scenario['prompt']}\n\n"
+        f"## Expected Tools\n{json.dumps(expected_tools)}\n\n"
+        f"## Expected Key Parameters\n{json.dumps(key_params, indent=2)}\n\n"
+        f"## Scoring Rubric\n{scenario['scoring_notes']}\n\n"
+        f"## Assistant Response to Score\n{response_text}"
+    )
+
+    max_retries = 1
+    for attempt in range(max_retries + 1):
+        try:
+            response = client.chat.completions.create(
+                model=scorer_model,
+                messages=[
+                    {"role": "system", "content": SCORER_SYSTEM_PROMPT},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0,
+                max_tokens=150,
+            )
+            content = response.choices[0].message.content.strip()
+            # Strip markdown fences if present
+            if content.startswith("```"):
+                content = content.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+            parsed = json.loads(content)
+            score = parsed.get("score", "").upper()
+            if score in ("PASS", "PARTIAL", "FAIL"):
+                return {"score": score, "justification": parsed.get("justification", "")}
+            # Invalid score label — retry
+        except json.JSONDecodeError:
+            if attempt < max_retries:
+                continue
+        except Exception as e:
+            if attempt < max_retries:
+                time.sleep(1)
+                continue
+            return {"score": "ERROR", "justification": f"Scorer error: {e}"}
+
+    return {"score": "ERROR", "justification": "Failed to parse scorer response"}
+
+
+def run_scenario(client: OpenAI, model: str, scenario: dict, tool_descriptions: str,
+                 server_instructions: str = "", scorer_model: str | None = None) -> dict:
     """Run a single scenario and return the result."""
     system = SYSTEM_PROMPT.format(tool_descriptions=tool_descriptions, server_instructions=server_instructions)
 
@@ -184,9 +253,15 @@ def run_scenario(client: OpenAI, model: str, scenario: dict, tool_descriptions: 
 
     content = response.choices[0].message.content
     usage = response.usage
-    auto_score = score_response(content, scenario)
 
-    return {
+    if scorer_model:
+        score_result = score_response_llm(client, scorer_model, content, scenario)
+        auto_score = score_result["score"]
+    else:
+        auto_score = score_response_regex(content, scenario)
+        score_result = None
+
+    result = {
         "id": scenario["id"],
         "name": scenario["name"],
         "category": scenario["category"],
@@ -200,9 +275,16 @@ def run_scenario(client: OpenAI, model: str, scenario: dict, tool_descriptions: 
         "output_tokens": usage.completion_tokens if usage else None,
     }
 
+    if score_result:
+        result["score_justification"] = score_result["justification"]
+        result["scorer_model"] = scorer_model
+
+    return result
+
 
 def run_model(client: OpenAI, model: str, scenarios: list, tool_descriptions: str,
-              output_dir: Path, runs: int = 1, server_instructions: str = "") -> dict:
+              output_dir: Path, runs: int = 1, server_instructions: str = "",
+              scorer_model: str | None = None) -> dict:
     """Run all scenarios for a single model. Returns summary dict."""
     model_short = model.split("/")[-1]
     all_results = []
@@ -214,7 +296,7 @@ def run_model(client: OpenAI, model: str, scenarios: list, tool_descriptions: st
         for i, scenario in enumerate(scenarios, 1):
             print(f"  [{model_short}]{run_label} [{i}/{len(scenarios)}] {scenario['name']}...", end=" ", flush=True)
             try:
-                result = run_scenario(client, model, scenario, tool_descriptions, server_instructions)
+                result = run_scenario(client, model, scenario, tool_descriptions, server_instructions, scorer_model)
                 result["run"] = run_num
                 all_results.append(result)
                 if result["input_tokens"]:
@@ -262,10 +344,14 @@ def run_model(client: OpenAI, model: str, scenarios: list, tool_descriptions: st
     }
 
 
-def print_summary(summaries: list, scenarios: list, runs: int):
+def print_summary(summaries: list, scenarios: list, runs: int, scorer_model: str | None = None):
     """Print a formatted summary table."""
     print(f"\n{'='*70}")
-    print("Auto-Scoring Summary (rule-based, not model-scored)")
+    if scorer_model:
+        scorer_short = scorer_model.split("/")[-1]
+        print(f"Auto-Scoring Summary (LLM-scored by {scorer_short})")
+    else:
+        print("Auto-Scoring Summary (rule-based, not model-scored)")
     print(f"{'='*70}")
     for s in sorted(summaries, key=lambda x: x["model"]):
         model_short = s["model"].split("/")[-1]
@@ -291,6 +377,9 @@ def main():
                         help="Comma-separated scenario IDs (default: all)")
     parser.add_argument("--runs", type=int, default=1,
                         help="Number of runs per scenario for variance analysis (default: 1)")
+    parser.add_argument("--scorer-model", default=None,
+                        help="Model for LLM-based scoring (default: regex scorer). "
+                             "Example: anthropic/claude-3.5-haiku")
     parser.add_argument("--output", default=str(SCRIPT_DIR / "results"),
                         help="Output directory")
     args = parser.parse_args()
@@ -320,10 +409,16 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
     models = args.model
 
+    scorer_model = args.scorer_model
+
     print(f"Models: {', '.join(models)}")
     print(f"Scenarios: {len(scenarios)}")
     if args.runs > 1:
         print(f"Runs per scenario: {args.runs}")
+    if scorer_model:
+        print(f"Scorer: {scorer_model} (LLM)")
+    else:
+        print("Scorer: regex (rule-based)")
     print(f"Output: {args.output}")
     if len(models) > 1:
         print(f"Running {len(models)} models in parallel")
@@ -331,12 +426,12 @@ def main():
 
     summaries = []
     if len(models) == 1:
-        summary = run_model(client, models[0], scenarios, tool_descriptions, output_dir, args.runs, server_instructions)
+        summary = run_model(client, models[0], scenarios, tool_descriptions, output_dir, args.runs, server_instructions, scorer_model)
         summaries.append(summary)
     else:
         with ThreadPoolExecutor(max_workers=len(models)) as executor:
             futures = {
-                executor.submit(run_model, client, model, scenarios, tool_descriptions, output_dir, args.runs, server_instructions): model
+                executor.submit(run_model, client, model, scenarios, tool_descriptions, output_dir, args.runs, server_instructions, scorer_model): model
                 for model in models
             }
             for future in as_completed(futures):
@@ -347,7 +442,7 @@ def main():
                 except Exception as e:
                     print(f"\n{model} FAILED: {e}")
 
-    print_summary(summaries, scenarios, args.runs)
+    print_summary(summaries, scenarios, args.runs, scorer_model)
 
 
 if __name__ == "__main__":
