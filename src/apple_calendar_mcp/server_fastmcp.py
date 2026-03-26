@@ -143,23 +143,26 @@ def create_events(
 
     Args:
         calendar_name: Name of the target calendar. If omitted, uses the system default calendar.
-        events: JSON array of event objects. Each object has keys: summary (required),
-                start_date (required, ISO 8601), end_date (required, ISO 8601), and optional:
-                location, notes, url, allday (bool),
-                recurrence (RRULE string like "FREQ=WEEKLY;INTERVAL=2;BYDAY=MO;COUNT=10"
-                OR structured object like {"frequency": "weekly", "interval": 2,
-                "days_of_week": ["MO"], "count": 10}),
-                alerts (list — each element is either an integer (minutes before, e.g. 15)
-                or an object: {"type": "absolute", "date": "ISO 8601"} for a fixed-time alert,
-                or {"type": "proximity", "proximity": "enter"|"leave"} for a location-based
-                alert that requires structured_location on the event),
-                availability ("free"/"busy"/"tentative"/"unavailable"),
-                timezone (IANA identifier, e.g. "America/Los_Angeles" — use this to schedule
-                in a remote timezone rather than converting times manually),
-                structured_location (object with title, latitude, longitude, radius — adds
-                map pin and geo coordinates to the event).
-                For all-day events, set allday=true and use date-only format.
-                end is inclusive for all-day events.
+        events: JSON array of event objects. Each object supports:
+            - summary (str, required): Event title.
+            - start_date (str, required): ISO 8601 datetime or date.
+            - end_date (str, required): ISO 8601 datetime or date.
+            - location (str): Free-text location.
+            - notes (str): Event description/body.
+            - url (str): Associated URL.
+            - allday (bool): All-day event. Use date-only format (e.g. "2026-03-27").
+                end_date is inclusive for all-day events.
+            - recurrence: RRULE string (e.g. "FREQ=WEEKLY;INTERVAL=2;BYDAY=MO;COUNT=10")
+                or structured object with: frequency (required: daily/weekly/monthly/yearly),
+                interval (default 1), days_of_week (e.g. ["MO","WE"]), count, until.
+            - alerts (list): Each element is minutes-before (int, e.g. 15), or object:
+                {"type": "absolute", "date": "ISO 8601"} for fixed-time alert, or
+                {"type": "proximity", "proximity": "enter"|"leave"} (requires structured_location).
+            - availability: "free", "busy", "tentative", or "unavailable".
+            - timezone (str): IANA identifier (e.g. "America/Los_Angeles"). Use to schedule
+                in a remote timezone rather than converting times manually.
+            - structured_location: Object with title, latitude, longitude, radius.
+                Adds map pin and geo coordinates to the event.
         calendar_source: Source/account name to disambiguate calendars with the same name
                         (e.g., "iCloud", "Google"). Use get_calendars to see source values.
 
@@ -215,19 +218,25 @@ def update_events(
     Args:
         calendar_name: Exact name of the calendar containing the events.
                       If a UID exists in a different calendar, use search_events to find the correct calendar_name.
-        updates: JSON array of update objects. Each object must have "uid" (required)
-                 and at least one field to update: summary, start_date (ISO 8601), end_date (ISO 8601),
-                 location, notes, url, allday (bool), alerts (list of minutes),
-                 availability ("free"/"busy"/"tentative"/"unavailable"), timezone (IANA identifier —
-                 use to schedule in a remote timezone rather than converting manually),
-                 recurrence (RRULE string OR structured object — see create_events),
-                 structured_location (object with title, latitude, longitude, radius).
-                 To clear a field, pass an empty value: location="", notes="", url="",
-                 alerts=[], recurrence="".
-                 For recurring events: occurrence_date (ISO 8601) to target specific occurrence,
-                 span ("this_event" or "future_events", default "this_event").
-                 When updating dates on an all-day event, include allday=true to ensure
-                 dates are interpreted correctly.
+        updates: JSON array of update objects. Each object must have "uid" and at least
+            one field to update:
+            - uid (str, required): Event identifier from get_events or search_events.
+            - summary (str): New event title.
+            - start_date (str): ISO 8601 datetime or date.
+            - end_date (str): ISO 8601 datetime or date.
+            - location (str): Free-text location. Pass "" to clear.
+            - notes (str): Event description/body. Pass "" to clear.
+            - url (str): Associated URL. Pass "" to clear.
+            - allday (bool): All-day event. Include when updating dates on all-day events
+                to ensure dates are interpreted correctly.
+            - recurrence: RRULE string or structured object (see create_events). Pass "" to clear.
+            - alerts (list): Minutes-before (int) or typed objects (see create_events). Pass [] to clear.
+            - availability: "free", "busy", "tentative", or "unavailable".
+            - timezone (str): IANA identifier. Use to schedule in a remote timezone
+                rather than converting manually.
+            - structured_location: Object with title, latitude, longitude, radius.
+            - occurrence_date (str): ISO 8601 date to target a specific recurring occurrence.
+            - span: "this_event" (default) or "future_events" for recurring events.
         calendar_source: Source/account name to disambiguate calendars with the same name
                         (e.g., "iCloud", "Google"). Use get_calendars to see source values.
 

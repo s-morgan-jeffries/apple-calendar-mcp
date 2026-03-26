@@ -69,7 +69,19 @@ For a single event, pass an array with one element. All events go to the same ca
 
 **Parameters:**
 - `calendar_name` (str, optional, default: ""): Name of the target calendar. If omitted, uses the system default calendar.
-- `events` (str, required): JSON array of event objects. Each object has keys: summary (required), start_date (required, ISO 8601), end_date (required, ISO 8601), and optional: location, notes, url, allday (bool), recurrence (RRULE string like "FREQ=WEEKLY;INTERVAL=2;BYDAY=MO;COUNT=10" OR structured object like {"frequency": "weekly", "interval": 2, "days_of_week": ["MO"], "count": 10} — structured format fields: frequency (required: daily/weekly/monthly/yearly), interval (default 1), days_of_week (e.g. ["MO","WE"] or ["4MO","-1FR"]), count (number of occurrences), until (end date)), alerts (list — each element is an integer for minutes-before like 15, or an object: {"type": "absolute", "date": "ISO 8601"} for fixed-time alert, or {"type": "proximity", "proximity": "enter"|"leave"} for location-based alert requiring structured_location), availability ("free"/"busy"/"tentative"/"unavailable"), timezone (IANA identifier, e.g. "America/Los_Angeles" — use to schedule in a remote timezone rather than converting times manually), structured_location (object with title, latitude, longitude, radius — adds map pin and geo coordinates). For all-day events: set allday=true with date-only format (e.g., start_date="2026-03-27", end_date="2026-03-27" — no time component). end_date is inclusive for all-day events.
+- `events` (str, required): JSON array of event objects. Each object supports:
+  - `summary` (str, required): Event title.
+  - `start_date` (str, required): ISO 8601 datetime or date.
+  - `end_date` (str, required): ISO 8601 datetime or date.
+  - `location` (str): Free-text location.
+  - `notes` (str): Event description/body.
+  - `url` (str): Associated URL.
+  - `allday` (bool): All-day event. Use date-only format (e.g. "2026-03-27"). end_date is inclusive.
+  - `recurrence`: RRULE string (e.g. "FREQ=WEEKLY;INTERVAL=2;BYDAY=MO;COUNT=10") or structured object with: frequency (required: daily/weekly/monthly/yearly), interval (default 1), days_of_week (e.g. ["MO","WE"] or ["4MO","-1FR"]), count (number of occurrences), until (end date).
+  - `alerts` (list): Each element is minutes-before (int, e.g. 15), or object: {"type": "absolute", "date": "ISO 8601"} for fixed-time alert, or {"type": "proximity", "proximity": "enter"|"leave"} for location-based alert (requires structured_location).
+  - `availability`: "free", "busy", "tentative", or "unavailable".
+  - `timezone` (str): IANA identifier (e.g. "America/Los_Angeles"). Use to schedule in a remote timezone rather than converting times manually.
+  - `structured_location`: Object with title, latitude, longitude, radius. Adds map pin and geo coordinates.
 - `calendar_source` (str, optional, default: ""): Source/account name to disambiguate calendars with the same name (e.g., "iCloud", "Google"). Use get_calendars to see source values.
 
 **Returns:** Each created event with title and UID. Use these UIDs with update_events or delete_events. Any per-event errors are listed separately. Partial success is possible — some events may be created while others fail.
@@ -88,7 +100,22 @@ For recurring events: use occurrence_date to target a specific occurrence, and s
 
 **Parameters:**
 - `calendar_name` (str, required): Exact name of the calendar containing the events. If a UID exists in a different calendar, use search_events to find the correct calendar_name.
-- `updates` (str, required): JSON array of update objects. Each object must have "uid" (required) and at least one field to update: summary, start_date (ISO 8601), end_date (ISO 8601), location, notes, url, allday (bool), alerts (list of minutes), availability ("free"/"busy"/"tentative"/"unavailable"), timezone (IANA identifier), recurrence (RRULE string OR structured object — see create_events). To clear a field, pass an empty value: location="", notes="", url="", alerts=[], recurrence="". For recurring events: occurrence_date (ISO 8601) to target specific occurrence, span ("this_event" or "future_events", default "this_event"). When updating dates on an all-day event, include allday=true to ensure dates are interpreted correctly.
+- `updates` (str, required): JSON array of update objects. Each object must have "uid" and at least one field to update:
+  - `uid` (str, required): Event identifier from get_events or search_events.
+  - `summary` (str): New event title.
+  - `start_date` (str): ISO 8601 datetime or date.
+  - `end_date` (str): ISO 8601 datetime or date.
+  - `location` (str): Free-text location. Pass "" to clear.
+  - `notes` (str): Event description/body. Pass "" to clear.
+  - `url` (str): Associated URL. Pass "" to clear.
+  - `allday` (bool): All-day event. Include when updating dates on all-day events to ensure correct interpretation.
+  - `recurrence`: RRULE string or structured object (see create_events). Pass "" to clear.
+  - `alerts` (list): Minutes-before (int) or typed objects (see create_events). Pass [] to clear.
+  - `availability`: "free", "busy", "tentative", or "unavailable".
+  - `timezone` (str): IANA identifier. Use to schedule in a remote timezone rather than converting manually.
+  - `structured_location`: Object with title, latitude, longitude, radius.
+  - `occurrence_date` (str): ISO 8601 date to target a specific recurring occurrence.
+  - `span`: "this_event" (default) or "future_events" for recurring events.
 - `calendar_source` (str, optional, default: ""): Source/account name to disambiguate calendars with the same name (e.g., "iCloud", "Google"). Use get_calendars to see source values.
 
 **Returns:** Summary of updated events, each with title and list of changed fields. Any per-event errors are listed separately. Partial success is possible. Note: when rescheduling a recurring event occurrence (changing dates with span="this_event"), a new standalone event is created — the returned UID may differ.
