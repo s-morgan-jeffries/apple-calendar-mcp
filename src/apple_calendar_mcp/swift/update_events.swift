@@ -281,9 +281,9 @@ for (index, updateData) in updatesJson.enumerated() {
         let newEvent = EKEvent(eventStore: store)
         newEvent.calendar = calendar
         newEvent.title = eventTitle
+        newEvent.isAllDay = eventAllDay
         newEvent.startDate = eventStart
         newEvent.endDate = eventEnd
-        newEvent.isAllDay = eventAllDay
         newEvent.location = eventLocation
         // Copy or set structured location
         if let slData = updateData["structured_location"] as? [String: Any] {
@@ -346,6 +346,9 @@ for (index, updateData) in updatesJson.enumerated() {
     if let summary = updateData["summary"] as? String {
         event.title = summary; updatedFields.append("summary")
     }
+    if let allday = updateData["allday"] as? Bool {
+        event.isAllDay = allday; updatedFields.append("allday_event")
+    }
     if let startDate = newStart {
         event.startDate = startDate; updatedFields.append("start_date")
     }
@@ -373,9 +376,6 @@ for (index, updateData) in updatesJson.enumerated() {
     if let urlStr = updateData["url"] as? String {
         event.url = urlStr.isEmpty ? nil : URL(string: urlStr)
         updatedFields.append("url")
-    }
-    if let allday = updateData["allday"] as? Bool {
-        event.isAllDay = allday; updatedFields.append("allday_event")
     }
     if let avail = updateData["availability"] as? String {
         event.availability = parseAvailability(avail); updatedFields.append("availability")
