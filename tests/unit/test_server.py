@@ -103,7 +103,7 @@ class TestCreateCalendarTool:
         mock_get_client.return_value = mock_client
 
         from apple_calendar_mcp.server_fastmcp import create_calendar
-        result = create_calendar(name="New Calendar")
+        result = create_calendar(calendar_name="New Calendar")
         assert "Created calendar" in result
         assert "New Calendar" in result
 
@@ -114,7 +114,7 @@ class TestCreateCalendarTool:
         mock_get_client.return_value = mock_client
 
         from apple_calendar_mcp.server_fastmcp import create_calendar
-        result = create_calendar(name="Bad Calendar")
+        result = create_calendar(calendar_name="Bad Calendar")
         assert "Error" in result
         assert isinstance(result, str)
 
@@ -129,7 +129,7 @@ class TestDeleteCalendarTool:
         mock_get_client.return_value = mock_client
 
         from apple_calendar_mcp.server_fastmcp import delete_calendar
-        result = delete_calendar(name="Old Calendar")
+        result = delete_calendar(calendar_name="Old Calendar")
         assert "Deleted calendar" in result
         assert "Old Calendar" in result
 
@@ -140,7 +140,7 @@ class TestDeleteCalendarTool:
         mock_get_client.return_value = mock_client
 
         from apple_calendar_mcp.server_fastmcp import delete_calendar
-        result = delete_calendar(name="X")
+        result = delete_calendar(calendar_name="X")
         assert "Error" in result
         assert isinstance(result, str)
 
@@ -171,7 +171,7 @@ class TestGetEventsTool:
             {"uid": "REC-123", "summary": "Weekly Standup", "start_date": "2026-07-01T09:00:00",
              "end_date": "2026-07-01T09:30:00", "allday_event": False, "location": "",
              "notes": "", "url": "", "status": "confirmed", "calendar_name": "Work",
-             "is_recurring": True, "recurrence_rule": "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE,FR",
+             "is_recurring": True, "recurrence": "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE,FR",
              "is_detached": False, "occurrence_date": "2026-07-01T09:00:00"},
         ]
         mock_get_client.return_value = mock_client
@@ -550,7 +550,7 @@ class TestFormatEventDetails:
 
     def test_format_recurrence_detached(self):
         from apple_calendar_mcp.server_fastmcp import _format_recurrence
-        event = {"is_recurring": True, "recurrence_rule": "FREQ=DAILY", "is_detached": True}
+        event = {"is_recurring": True, "recurrence": "FREQ=DAILY", "is_detached": True}
         lines = _format_recurrence(event)
         assert any("detached" in line.lower() for line in lines)
 

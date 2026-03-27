@@ -949,7 +949,7 @@ class TestRecurringEventsIntegration:
         # All have recurrence fields
         for evt in recurring:
             assert evt["is_recurring"] is True
-            assert "FREQ=WEEKLY" in evt["recurrence_rule"]
+            assert "FREQ=WEEKLY" in evt["recurrence"]
             assert evt["is_detached"] is False
 
         # Each has a different occurrence_date

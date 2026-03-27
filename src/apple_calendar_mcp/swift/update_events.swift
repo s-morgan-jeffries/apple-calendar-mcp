@@ -418,13 +418,13 @@ for (index, updateData) in updatesJson.enumerated() {
             }
             event.addRecurrenceRule(rule)
         }
-        updatedFields.append("recurrence_rule")
+        updatedFields.append("recurrence")
     } else if let recDict = updateData["recurrence"] as? [String: Any], let rule = parseStructuredRecurrence(recDict) {
         if let rules = event.recurrenceRules {
             for r in rules { event.removeRecurrenceRule(r) }
         }
         event.addRecurrenceRule(rule)
-        updatedFields.append("recurrence_rule")
+        updatedFields.append("recurrence")
     }
 
     if updatedFields.isEmpty {

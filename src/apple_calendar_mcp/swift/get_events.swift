@@ -124,9 +124,9 @@ func eventToDict(_ event: EKEvent) -> [String: Any] {
         // Extract RRULE string from EKRecurrenceRule description
         let ruleStr = "\(rule)"
         if let range = ruleStr.range(of: "RRULE ") {
-            dict["recurrence_rule"] = String(ruleStr[range.upperBound...])
+            dict["recurrence"] = String(ruleStr[range.upperBound...])
         } else {
-            dict["recurrence_rule"] = ruleStr
+            dict["recurrence"] = ruleStr
         }
 
         // Structured recurrence output
@@ -158,7 +158,7 @@ func eventToDict(_ event: EKEvent) -> [String: Any] {
         }
         dict["recurrence_parsed"] = parsed
     } else {
-        dict["recurrence_rule"] = NSNull()
+        dict["recurrence"] = NSNull()
     }
 
     // Alerts

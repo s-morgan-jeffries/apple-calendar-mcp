@@ -12,7 +12,7 @@ CALENDAR IDENTIFICATION: Calendars are identified by name (not UID — UIDs are 
 
 EVENTS: Events have summary (title), start/end dates, location, notes, URL, status, recurrence, attendees, and editability info. Events are identified by their UID (UUID format). The is_editable field indicates whether the event can be modified — events on read-only calendars or events where you are not the organizer (invited events) are not editable. Attendees are read-only — they cannot be added via this server (use Calendar.app or email invitations).
 
-RECURRING EVENTS: Recurring events share the same UID across all occurrences. Each occurrence has a unique occurrence_date. The is_recurring field indicates if an event is part of a series. The recurrence_rule field contains the iCalendar RRULE (e.g., "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE,FR"). To modify or delete a specific occurrence, pass occurrence_date and span="this_event". To modify or delete the series from a point onward, use span="future_events". Before deleting, always check is_recurring — deleting without occurrence_date removes the entire series.
+RECURRING EVENTS: Recurring events share the same UID across all occurrences. Each occurrence has a unique occurrence_date. The is_recurring field indicates if an event is part of a series. The recurrence field contains the iCalendar RRULE (e.g., "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE,FR"). To modify or delete a specific occurrence, pass occurrence_date and span="this_event". To modify or delete the series from a point onward, use span="future_events". Before deleting, always check is_recurring — deleting without occurrence_date removes the entire series.
 
 DATES: All dates use ISO 8601 format in local time, without timezone suffix (e.g., "2026-03-15" or "2026-03-15T14:30:00"). Returned event timestamps are also in local time. Do NOT append "Z" to dates — they are not UTC. Date ranges in get_events are inclusive on start, exclusive on end — to include all events on March 29, use end_date="2026-03-30". When scheduling in another timezone, use the timezone field per event rather than converting times manually.
 
@@ -41,7 +41,7 @@ Note: Calendar names may not be unique across accounts. Use the source field (e.
 Create a new calendar in Apple Calendar.
 
 **Parameters:**
-- `name` (str, required): Name for the new calendar
+- `calendar_name` (str, required): Name for the new calendar
 
 **Returns:** Confirmation with the calendar name.
 
@@ -54,7 +54,7 @@ Delete a calendar from Apple Calendar.
 This permanently removes the calendar and all its events. Use with caution.
 
 **Parameters:**
-- `name` (str, required): Exact name of the calendar to delete (use get_calendars to find available names)
+- `calendar_name` (str, required): Exact name of the calendar to delete (use get_calendars to find available names)
 - `calendar_source` (str, optional): Account source to disambiguate calendars with the same name (e.g., "iCloud", "Google"). Use when get_calendars shows multiple calendars with the same name from different accounts.
 
 **Returns:** Confirmation with the deleted calendar name.
@@ -110,7 +110,7 @@ For recurring events: use occurrence_date to target a specific occurrence, and s
   - `url` (str): Associated URL. Pass "" to clear.
   - `allday` (bool): All-day event. Include when updating dates on all-day events to ensure correct interpretation.
   - `recurrence`: RRULE string or structured object (see create_events). Pass "" to clear.
-  - `alerts` (list): Minutes-before (int) or typed objects (see create_events). Pass [] to clear.
+  - `alerts` (list): Each element is minutes-before (int, e.g. 15), or object: {"type": "absolute", "date": "ISO 8601"} for fixed-time alert, or {"type": "proximity", "proximity": "enter"|"leave"} (requires structured_location). Pass [] to clear.
   - `availability`: "free", "busy", "tentative", or "unavailable".
   - `timezone` (str): IANA identifier. Use to schedule in a remote timezone rather than converting manually.
   - `structured_location`: Object with title, latitude, longitude, radius.
@@ -133,7 +133,7 @@ Returns all events in the specified calendar(s) that overlap with the given date
 - `start_date` (str, required): Start of date range in ISO 8601 format (e.g., "2026-03-15" or "2026-03-15T00:00:00")
 - `end_date` (str, required): End of date range in ISO 8601 format (exclusive — to include March 29, use "2026-03-30")
 
-**Returns:** Each event includes: uid, summary, start_date, end_date, allday_event, location, notes, url, status, calendar_name, availability, is_editable, is_organizer, created_date, modified_date. If created in a specific timezone: timezone (IANA identifier, e.g. "Asia/Tokyo"). If location has geo data: structured_location (title, latitude, longitude, radius). For all-day events, end_date is the last day of the event (inclusive). For recurring events: is_recurring, recurrence_rule, recurrence_parsed (structured object with frequency, interval, days_of_week, count/until), occurrence_date, is_detached. Alerts: list of typed objects — {"type": "relative", "minutes_before": N}, {"type": "absolute", "date": "ISO 8601"}, or {"type": "proximity", "proximity": "enter"|"leave"}. If attendees exist: attendees (list with name, email, role, status for each). If organized by someone else: organizer_name, organizer_email, organizer_status. `uid` and `calendar_name` identify the event for update_events and delete_events. For recurring events, also use `occurrence_date` to target a specific occurrence.
+**Returns:** Each event includes: uid, summary, start_date, end_date, allday_event, location, notes, url, status, calendar_name, availability, is_editable, is_organizer, created_date, modified_date. If created in a specific timezone: timezone (IANA identifier, e.g. "Asia/Tokyo"). If location has geo data: structured_location (title, latitude, longitude, radius). For all-day events, end_date is the last day of the event (inclusive). For recurring events: is_recurring, recurrence, recurrence_parsed (structured object with frequency, interval, days_of_week, count/until), occurrence_date, is_detached. Alerts: list of typed objects — {"type": "relative", "minutes_before": N}, {"type": "absolute", "date": "ISO 8601"}, or {"type": "proximity", "proximity": "enter"|"leave"}. If attendees exist: attendees (list with name, email, role, status for each). If organized by someone else: organizer_name, organizer_email, organizer_status. `uid` and `calendar_name` identify the event for update_events and delete_events. For recurring events, also use `occurrence_date` to target a specific occurrence.
 
 ---
 
