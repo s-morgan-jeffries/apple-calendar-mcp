@@ -262,9 +262,14 @@ guard let startDate = parseISO8601(parsed.start) else {
     exit(1)
 }
 
-guard let endDate = parseISO8601(parsed.end) else {
+guard var endDate = parseISO8601(parsed.end) else {
     outputError("invalid_date", "Cannot parse end date: \(parsed.end)")
     exit(1)
+}
+
+// Date-only end_date is inclusive: "2026-03-29" means through end of March 29
+if !parsed.end.contains("T") {
+    endDate = Calendar.current.date(byAdding: .day, value: 1, to: endDate)!
 }
 
 let store = EKEventStore()

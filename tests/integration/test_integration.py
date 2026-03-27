@@ -1408,6 +1408,23 @@ class TestTimezoneIntegration:
         finally:
             _delete_event_by_uid(uid)
 
+    def test_get_events_inclusive_end_date(self, connector):
+        """Date-only end_date should be inclusive — events on end_date are returned."""
+        date = _future_date(4, 10, 15)
+        uid = _create_single_event(connector,
+            calendar_name=TEST_CALENDAR,
+            summary="Inclusive End Test",
+            start_date=date + "T14:00:00",
+            end_date=date + "T15:00:00",
+        )
+        try:
+            # Query with date-only end_date matching the event's date
+            events = connector.get_events(TEST_CALENDAR, date, date)
+            matches = [e for e in events if e["uid"] == uid]
+            assert len(matches) == 1
+        finally:
+            _delete_event_by_uid(uid)
+
     def test_explicit_timezone_round_trip(self, connector):
         """Event with explicit timezone should round-trip: create → read → requery."""
         uid = _create_single_event(connector,
