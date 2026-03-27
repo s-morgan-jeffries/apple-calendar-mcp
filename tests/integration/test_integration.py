@@ -1358,6 +1358,56 @@ class TestTimezoneIntegration:
         finally:
             _delete_event_by_uid(uid)
 
+    def test_allday_multiday_end_date_inclusive(self, connector):
+        """Multi-day all-day event end_date should be inclusive: create and read back."""
+        start = _future_date(4, 8, 17)
+        end = _future_date(4, 8, 23)
+        uid = _create_single_event(connector,
+            calendar_name=TEST_CALENDAR,
+            summary="Week All Day",
+            start_date=start,
+            end_date=end,
+            allday_event=True,
+        )
+        try:
+            events = connector.get_events(TEST_CALENDAR, start, _future_date(4, 8, 25))
+            matches = [e for e in events if e["uid"] == uid]
+            assert len(matches) == 1
+            assert matches[0]["end_date"] == end
+        finally:
+            _delete_event_by_uid(uid)
+
+    def test_allday_end_date_round_trip(self, connector):
+        """All-day end_date should survive create → get → update → get round-trip."""
+        start = _future_date(4, 9, 1)
+        end = _future_date(4, 9, 5)
+        uid = _create_single_event(connector,
+            calendar_name=TEST_CALENDAR,
+            summary="Round Trip All Day",
+            start_date=start,
+            end_date=end,
+            allday_event=True,
+        )
+        try:
+            # Read back
+            events = connector.get_events(TEST_CALENDAR, start, _future_date(4, 9, 7))
+            matches = [e for e in events if e["uid"] == uid]
+            assert len(matches) == 1
+            assert matches[0]["end_date"] == end
+
+            # Update end_date to extend by one day
+            new_end = _future_date(4, 9, 6)
+            _update_single_event(connector, TEST_CALENDAR, uid,
+                end_date=new_end, allday_event=True)
+
+            # Read back again
+            events = connector.get_events(TEST_CALENDAR, start, _future_date(4, 9, 8))
+            matches = [e for e in events if e["uid"] == uid]
+            assert len(matches) == 1
+            assert matches[0]["end_date"] == new_end
+        finally:
+            _delete_event_by_uid(uid)
+
     def test_explicit_timezone_round_trip(self, connector):
         """Event with explicit timezone should round-trip: create → read → requery."""
         uid = _create_single_event(connector,

@@ -226,9 +226,9 @@ for (index, eventData) in eventsJson.enumerated() {
     let event = EKEvent(eventStore: store)
     event.calendar = calendar
     event.title = summary
+    event.isAllDay = eventData["allday"] as? Bool ?? false
     event.startDate = startDate
     event.endDate = endDate
-    event.isAllDay = eventData["allday"] as? Bool ?? false
 
     if let location = eventData["location"] as? String { event.location = location }
     if let slData = eventData["structured_location"] as? [String: Any] {
