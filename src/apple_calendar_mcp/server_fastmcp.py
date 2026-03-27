@@ -158,6 +158,7 @@ def create_events(
             - alerts (list): Each element is minutes-before (int, e.g. 15), or object:
                 {"type": "absolute", "date": "ISO 8601"} for fixed-time alert, or
                 {"type": "proximity", "proximity": "enter"|"leave"} (requires structured_location).
+                Omit to inherit calendar defaults. Pass [] to suppress defaults (no alerts).
             - availability: "free", "busy", "tentative", or "unavailable".
             - timezone (str): IANA identifier (e.g. "America/Los_Angeles"). Use to schedule
                 in a remote timezone rather than converting times manually.
@@ -374,6 +375,9 @@ def get_events(
         object with frequency, interval, days_of_week, count/until), occurrence_date, is_detached.
         Alerts: list of typed objects — {"type": "relative", "minutes_before": N},
         {"type": "absolute", "date": "ISO 8601"}, or {"type": "proximity", "proximity": "enter"|"leave"}.
+        Alerts may include calendar-level defaults (auto-applied by macOS). To create
+        an event with only default alerts, omit the alerts field. To suppress defaults,
+        pass alerts=[].
         If attendees exist: attendees (list with name, email, role, status for each).
         If organized by someone else: organizer_name, organizer_email, organizer_status.
         `uid` and `calendar_name` identify the event for update_events and delete_events.
