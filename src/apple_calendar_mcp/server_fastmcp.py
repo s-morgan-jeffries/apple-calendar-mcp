@@ -16,7 +16,7 @@ CALENDAR IDENTIFICATION: Calendars are identified by name (not UID — UIDs are 
 
 EVENTS: Events have summary (title), start/end dates, location, notes, URL, status, recurrence, attendees, and editability info. Events are identified by their UID (UUID format). The is_editable field indicates whether the event can be modified — events on read-only calendars or events where you are not the organizer (invited events) are not editable. Attendees are read-only — they cannot be added via this server (use Calendar.app or email invitations).
 
-RECURRING EVENTS: Recurring events share the same UID across all occurrences. Each occurrence has a unique occurrence_date. The is_recurring field indicates if an event is part of a series. The recurrence_rule field contains the iCalendar RRULE (e.g., "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE,FR"). To modify or delete a specific occurrence, pass occurrence_date and span="this_event". To modify or delete the series from a point onward, use span="future_events". Before deleting, always check is_recurring — deleting without occurrence_date removes the entire series.
+RECURRING EVENTS: Recurring events share the same UID across all occurrences. Each occurrence has a unique occurrence_date. The is_recurring field indicates if an event is part of a series. The recurrence field contains the iCalendar RRULE (e.g., "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE,FR"). To modify or delete a specific occurrence, pass occurrence_date and span="this_event". To modify or delete the series from a point onward, use span="future_events". Before deleting, always check is_recurring — deleting without occurrence_date removes the entire series.
 
 DATES: All dates use ISO 8601 format in local time, without timezone suffix (e.g., "2026-03-15" or "2026-03-15T14:30:00"). Returned event timestamps are also in local time. Do NOT append "Z" to dates — they are not UTC. Date ranges in get_events are inclusive on start, exclusive on end — to include all events on March 29, use end_date="2026-03-30". When scheduling in another timezone, use the timezone field per event rather than converting times manually.
 
@@ -91,31 +91,31 @@ def get_calendars() -> str:
 
 
 @mcp.tool()
-def create_calendar(name: str) -> str:
+def create_calendar(calendar_name: str) -> str:
     """Create a new calendar in Apple Calendar.
 
     Args:
-        name: Name for the new calendar
+        calendar_name: Name for the new calendar
 
     Returns:
         Confirmation with the calendar name.
     """
     client = get_client()
     try:
-        result = client.create_calendar(name=name)
+        result = client.create_calendar(name=calendar_name)
     except Exception as e:
         return f"Error creating calendar: {e}"
     return f"Created calendar '{result['name']}'"
 
 
 @mcp.tool()
-def delete_calendar(name: str, calendar_source: str = "") -> str:
+def delete_calendar(calendar_name: str, calendar_source: str = "") -> str:
     """Delete a calendar from Apple Calendar.
 
     This permanently removes the calendar and all its events. Use with caution.
 
     Args:
-        name: Exact name of the calendar to delete (use get_calendars to find available names)
+        calendar_name: Exact name of the calendar to delete (use get_calendars to find available names)
         calendar_source: Source/account name to disambiguate calendars with the same name
             (e.g., "iCloud", "Google"). Use get_calendars to see source values.
 
@@ -124,7 +124,7 @@ def delete_calendar(name: str, calendar_source: str = "") -> str:
     """
     client = get_client()
     try:
-        result = client.delete_calendar(name=name, calendar_source=calendar_source)
+        result = client.delete_calendar(name=calendar_name, calendar_source=calendar_source)
     except Exception as e:
         return f"Error deleting calendar: {e}"
     return f"Deleted calendar '{result['name']}'"
@@ -230,7 +230,10 @@ def update_events(
             - allday (bool): All-day event. Include when updating dates on all-day events
                 to ensure dates are interpreted correctly.
             - recurrence: RRULE string or structured object (see create_events). Pass "" to clear.
-            - alerts (list): Minutes-before (int) or typed objects (see create_events). Pass [] to clear.
+            - alerts (list): Each element is minutes-before (int, e.g. 15), or object:
+                {"type": "absolute", "date": "ISO 8601"} for fixed-time alert, or
+                {"type": "proximity", "proximity": "enter"|"leave"} (requires structured_location).
+                Pass [] to clear.
             - availability: "free", "busy", "tentative", or "unavailable".
             - timezone (str): IANA identifier. Use to schedule in a remote timezone
                 rather than converting manually.
@@ -299,7 +302,7 @@ def _format_recurrence(event: dict) -> list[str]:
     """Format recurrence info for an event."""
     if not event.get("is_recurring"):
         return []
-    lines = [f"Recurring: {event.get('recurrence_rule', 'yes')}"]
+    lines = [f"Recurring: {event.get('recurrence', 'yes')}"]
     if event.get("is_detached"):
         lines.append("Modified occurrence (detached from series)")
     return lines
@@ -367,7 +370,7 @@ def get_events(
         If created in a specific timezone: timezone (IANA identifier, e.g. "Asia/Tokyo").
         If location has geo data: structured_location (title, latitude, longitude, radius).
         For all-day events, end_date is the last day of the event (inclusive).
-        For recurring events: is_recurring, recurrence_rule, recurrence_parsed (structured
+        For recurring events: is_recurring, recurrence, recurrence_parsed (structured
         object with frequency, interval, days_of_week, count/until), occurrence_date, is_detached.
         Alerts: list of typed objects — {"type": "relative", "minutes_before": N},
         {"type": "absolute", "date": "ISO 8601"}, or {"type": "proximity", "proximity": "enter"|"leave"}.

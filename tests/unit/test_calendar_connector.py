@@ -494,13 +494,13 @@ class TestGetEvents:
             {"uid": "REC-123", "summary": "Weekly Standup", "start_date": "2026-07-01T09:00:00",
              "end_date": "2026-07-01T09:30:00", "allday_event": False, "location": "",
              "notes": "", "url": "", "status": "confirmed", "calendar_name": "Work",
-             "is_recurring": True, "recurrence_rule": "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE,FR",
+             "is_recurring": True, "recurrence": "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE,FR",
              "is_detached": False, "occurrence_date": "2026-07-01T09:00:00"},
         ])
         result = self.connector.get_events("Work", "2026-07-01", "2026-07-02")
         event = result[0]
         assert event["is_recurring"] is True
-        assert "FREQ=WEEKLY" in event["recurrence_rule"]
+        assert "FREQ=WEEKLY" in event["recurrence"]
         assert event["is_detached"] is False
         assert event["occurrence_date"] == "2026-07-01T09:00:00"
 
@@ -511,7 +511,7 @@ class TestGetEvents:
             {"uid": "REC-456", "summary": "Parsed Recurrence", "start_date": "2026-07-01T09:00:00",
              "end_date": "2026-07-01T09:30:00", "allday_event": False, "location": "",
              "notes": "", "url": "", "status": "confirmed", "calendar_name": "Work",
-             "is_recurring": True, "recurrence_rule": "FREQ=WEEKLY;INTERVAL=2;BYDAY=MO",
+             "is_recurring": True, "recurrence": "FREQ=WEEKLY;INTERVAL=2;BYDAY=MO",
              "recurrence_parsed": {"frequency": "weekly", "interval": 2, "days_of_week": ["MO"], "count": 10},
              "is_detached": False, "occurrence_date": "2026-07-01T09:00:00"},
         ])
@@ -528,7 +528,7 @@ class TestGetEvents:
             {"uid": "ATT-123", "summary": "Team Meeting", "start_date": "2026-07-01T14:00:00",
              "end_date": "2026-07-01T15:00:00", "allday_event": False, "location": "",
              "notes": "", "url": "", "status": "confirmed", "calendar_name": "Work",
-             "is_recurring": False, "recurrence_rule": None, "is_detached": False,
+             "is_recurring": False, "recurrence": None, "is_detached": False,
              "occurrence_date": "2026-07-01T14:00:00",
              "attendees": [
                  {"name": "Alice", "email": "alice@example.com", "role": "required", "status": "accepted"},
@@ -548,7 +548,7 @@ class TestGetEvents:
             {"uid": "NO-ATT", "summary": "Solo Event", "start_date": "2026-07-01T10:00:00",
              "end_date": "2026-07-01T11:00:00", "allday_event": False, "location": "",
              "notes": "", "url": "", "status": "confirmed", "calendar_name": "Work",
-             "is_recurring": False, "recurrence_rule": None, "is_detached": False,
+             "is_recurring": False, "recurrence": None, "is_detached": False,
              "occurrence_date": "2026-07-01T10:00:00", "attendees": []},
         ])
         result = self.connector.get_events("Work", "2026-07-01", "2026-07-02")

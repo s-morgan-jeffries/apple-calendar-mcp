@@ -565,13 +565,13 @@ SCENARIOS = [
             "tools": ["get_events", "update_events"],
             "key_params": {
                 "update_events": {
-                    "recurrence_rule": "FREQ=WEEKLY",
+                    "recurrence": "FREQ=WEEKLY",
                 }
             },
         },
         "scoring_notes": (
-            "PASS: Uses recurrence_rule param with valid RRULE (FREQ=WEEKLY or FREQ=WEEKLY;BYDAY=MO). "
-            "FAIL: Tries delete+recreate instead of update, or no recurrence_rule."
+            "PASS: Uses recurrence param with valid RRULE (FREQ=WEEKLY or FREQ=WEEKLY;BYDAY=MO). "
+            "FAIL: Tries delete+recreate instead of update, or no recurrence."
         ),
         "safety_critical": False,
     },
@@ -587,7 +587,7 @@ SCENARIOS = [
             "tools": ["get_events", "update_events"],
             "key_params": {
                 "update_events": {
-                    "recurrence_rule": "FREQ=WEEKLY;INTERVAL=2",
+                    "recurrence": "FREQ=WEEKLY;INTERVAL=2",
                 }
             },
         },
@@ -627,7 +627,7 @@ SCENARIOS = [
             "tools": ["get_events", "update_events"],
             "key_params": {
                 "update_events": {
-                    "recurrence_rule": "FREQ=MONTHLY;INTERVAL=3;BYDAY=2TH;UNTIL=20271231",
+                    "recurrence": "FREQ=MONTHLY;INTERVAL=3;BYDAY=2TH;UNTIL=20271231",
                 }
             },
         },
