@@ -11,6 +11,7 @@ import pytest
 from tests.helpers.calendar_setup import (
     calendar_exists,
     create_test_calendar,
+    delete_all_test_calendars,
     delete_test_calendar,
 )
 
@@ -29,7 +30,7 @@ def ensure_test_calendar():
     yield
 
     if created and calendar_exists(TEST_CALENDAR):
-        delete_test_calendar(TEST_CALENDAR)
+        delete_all_test_calendars(TEST_CALENDAR)
 
 
 @pytest.fixture
@@ -41,11 +42,11 @@ def fresh_calendar():
 
     WARNING: Not compatible with parallel test execution (pytest-xdist).
     """
-    delete_test_calendar(TEST_CALENDAR)
+    delete_all_test_calendars(TEST_CALENDAR)
     create_test_calendar(TEST_CALENDAR)
     yield
     try:
-        delete_test_calendar(TEST_CALENDAR)
+        delete_all_test_calendars(TEST_CALENDAR)
     finally:
         # Always recreate, even if delete failed or was partial
         if not calendar_exists(TEST_CALENDAR):
