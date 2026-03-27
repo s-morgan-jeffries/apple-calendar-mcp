@@ -1,6 +1,6 @@
 Apple Calendar MCP server for macOS.
 
-DATES: ISO 8601 local time, no "Z" suffix — dates are NOT UTC. get_events date range is start-inclusive, end-exclusive.
+DATES: ISO 8601 local time, no "Z" suffix — dates are NOT UTC.
 
 CALENDAR NAMES: Not unique across accounts — use calendar_source to disambiguate when needed.
 

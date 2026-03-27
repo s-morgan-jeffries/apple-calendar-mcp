@@ -6,7 +6,7 @@ This file contains exactly what an MCP-connected agent sees: the server instruct
 
 Apple Calendar MCP server for macOS.
 
-DATES: ISO 8601 local time, no "Z" suffix — dates are NOT UTC. get_events date range is start-inclusive, end-exclusive.
+DATES: ISO 8601 local time, no "Z" suffix — dates are NOT UTC.
 
 CALENDAR NAMES: Not unique across accounts — use calendar_source to disambiguate when needed.
 
@@ -88,7 +88,7 @@ Get events from one or more calendars within a date range.
 **Parameters:**
 - `calendar_names` (list[str], optional, default: []): Calendars to query. If empty, queries all.
 - `start_date` (str, required): ISO 8601 format.
-- `end_date` (str, required): ISO 8601 format (exclusive — to include March 29, use "2026-03-30").
+- `end_date` (str, required): ISO 8601 format (inclusive for date-only, e.g. "2026-03-29" includes March 29).
 
 **Returns:** For all-day events, end_date is inclusive. Alerts may include calendar-level defaults; omit alerts in create_events to inherit defaults, pass [] to suppress. Use uid + calendar_name with update_events/delete_events. For recurring events, also pass occurrence_date to target a specific occurrence.
 

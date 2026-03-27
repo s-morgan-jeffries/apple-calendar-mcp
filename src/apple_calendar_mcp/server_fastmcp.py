@@ -10,7 +10,7 @@ from .calendar_connector import CalendarConnector
 # Create FastMCP server
 mcp = FastMCP("apple-calendar-mcp", instructions="""Apple Calendar MCP server for macOS.
 
-DATES: ISO 8601 local time, no "Z" suffix — dates are NOT UTC. get_events date range is start-inclusive, end-exclusive.
+DATES: ISO 8601 local time, no "Z" suffix — dates are NOT UTC.
 
 CALENDAR NAMES: Not unique across accounts — use calendar_source to disambiguate when needed.
 
@@ -278,7 +278,7 @@ def get_events(
 
     Args:
         calendar_names: Calendars to query. If empty, queries all.
-        end_date: End of range (exclusive — to include March 29, use "2026-03-30").
+        end_date: End of range (inclusive for date-only, e.g. "2026-03-29" includes March 29).
 
     Returns:
         For all-day events, end_date is inclusive. Alerts may include calendar-level
