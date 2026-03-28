@@ -54,18 +54,23 @@ def _format_calendar(cal: dict) -> str:
 
 
 @mcp.tool()
-def get_calendars() -> str:
+def get_calendars(calendar_source: str = "") -> str:
     """List all calendars in Apple Calendar.
 
-    Returns each calendar's name, access level, source (account), description,
-    color, and is_default flag. Use these names when calling other tools.
+    Returns each calendar's calendar_id (UUID), name, access level, source (account),
+    description, color, and is_default flag.
 
     Calendar names are not guaranteed unique — even within the same source.
     Disambiguate by source, then color, then event contents. If all visible
     properties match, ask the user.
+
+    Args:
+        calendar_source: Filter by source/account (e.g., "iCloud"). If empty, returns all.
     """
     client = get_client()
     calendars = client.get_calendars()
+    if calendar_source:
+        calendars = [c for c in calendars if c.get("source") == calendar_source]
 
     if not calendars:
         return "No calendars found."
