@@ -78,11 +78,15 @@ def get_calendars() -> str:
 
 
 @mcp.tool()
-def create_calendar(calendar_name: str) -> str:
-    """Create a new calendar."""
+def create_calendar(calendar_name: str, calendar_source: str = "") -> str:
+    """Create a new calendar.
+
+    Args:
+        calendar_source: Source/account to create in (e.g., "iCloud", "Google"). Defaults to system default.
+    """
     client = get_client()
     try:
-        result = client.create_calendar(name=calendar_name)
+        result = client.create_calendar(name=calendar_name, calendar_source=calendar_source)
     except Exception as e:
         return f"Error creating calendar: {e}"
     return f"Created calendar '{result['name']}'"
