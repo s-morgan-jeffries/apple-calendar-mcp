@@ -93,6 +93,7 @@ SCENARIOS = [
         },
         "scoring_notes": (
             "PASS: Uses correct ISO 8601 dates for a single day (today's date), queries Work calendar. "
+            "Same date for start and end is correct (date-only end_date is inclusive). "
             "PARTIAL: Correct tool but date range too wide (week/month). "
             "FAIL: Doesn't call get_events or uses wrong calendar name. "
             "Note: expected dates are relative to 'today' — score based on correct date calculation, not exact match."
@@ -110,13 +111,13 @@ SCENARIOS = [
                 "get_events": {
                     "calendar_names": "Personal",
                     "start_date": "2026-03-23T00:00:00",
-                    "end_date": "2026-03-30T00:00:00",
+                    "end_date": "2026-03-29",
                 }
             },
         },
         "scoring_notes": (
-            "PASS: end_date is day AFTER the last requested day (March 30, exclusive end). "
-            "PARTIAL: end_date is March 29 (misses events on the last day). "
+            "PASS: end_date includes the last requested day (March 29, date-only is inclusive). "
+            "March 30 is also acceptable (legacy exclusive convention). "
             "FAIL: Wrong calendar or wildly wrong dates."
         ),
         "safety_critical": False,

@@ -26,6 +26,8 @@ List all calendars in Apple Calendar.
 
 Returns each calendar's name, access level, source (account), description, color, and is_default flag. Use these names when calling other tools.
 
+Calendar names are not guaranteed unique — even within the same source. Disambiguate by source, then color, then event contents. If all visible properties match, ask the user.
+
 **Parameters:** None
 
 ---
@@ -69,6 +71,8 @@ Create one or more events in a calendar. Pass a JSON array with one element for 
 ### update_events
 
 Update one or more events. Only provided fields are changed; omitted fields are unchanged.
+
+Use get_events or search_events first to find event UIDs.
 
 **Parameters:**
 - `calendar_name` (str, required): Calendar containing the events.
@@ -134,6 +138,8 @@ Detect double-bookings and overlapping events across calendars. Events with "fre
 ### delete_events
 
 Delete one or more events by UID. Accepts a single UID or list of UIDs.
+
+Use get_events or search_events first to find event UIDs.
 
 Without occurrence_date, deletes the entire recurring series. Pass occurrence_date to target a specific occurrence.
 
