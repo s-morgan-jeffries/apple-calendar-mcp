@@ -28,7 +28,8 @@ Returns each calendar's calendar_id (UUID), name, access level, source (account)
 
 Calendar names are not guaranteed unique — even within the same source. Disambiguate by source, then color, then event contents. If all visible properties match, ask the user.
 
-**Parameters:** None
+**Parameters:**
+- `calendar_source` (str, optional): Filter by source/account (e.g., "iCloud"). If empty, returns all.
 
 ---
 
@@ -38,6 +39,7 @@ Create a new calendar.
 
 **Parameters:**
 - `calendar_name` (str, required)
+- `calendar_source` (str, optional): Source/account to create in (e.g., "iCloud", "Google"). Defaults to system default.
 
 ---
 
@@ -46,7 +48,8 @@ Create a new calendar.
 Permanently delete a calendar and all its events.
 
 **Parameters:**
-- `calendar_name` (str, required)
+- `calendar_name` (str, optional)
+- `calendar_id` (str, optional): Calendar UUID from get_calendars (takes precedence over name).
 - `calendar_source` (str, optional): Source/account to disambiguate calendars with the same name.
 
 ---
@@ -57,6 +60,7 @@ Create one or more events in a calendar. Pass a JSON array with one element for 
 
 **Parameters:**
 - `calendar_name` (str, optional, default: ""): Target calendar. If omitted, uses the system default.
+- `calendar_id` (str, optional): Calendar UUID from get_calendars (takes precedence over name).
 - `events` (str, required): JSON array of event objects. Required fields: summary, start_date, end_date.
   Optional: location, notes, url, availability ("free"/"busy"/"tentative"/"unavailable").
   - `allday` (bool): end_date is inclusive for all-day events.
@@ -75,7 +79,8 @@ Update one or more events. Only provided fields are changed; omitted fields are 
 Use get_events or search_events first to find event UIDs.
 
 **Parameters:**
-- `calendar_name` (str, required): Calendar containing the events.
+- `calendar_name` (str, optional): Calendar containing the events.
+- `calendar_id` (str, optional): Calendar UUID from get_calendars (takes precedence over name).
 - `updates` (str, required): JSON array of update objects. Each must have "uid" plus fields to update. Supports same fields as create_events, plus:
   - Pass "" to clear location, notes, url, or recurrence. Pass [] to clear alerts.
   - `allday` (bool): Include when updating dates on all-day events.
@@ -91,6 +96,7 @@ Get events from one or more calendars within a date range.
 
 **Parameters:**
 - `calendar_names` (list[str], optional, default: []): Calendars to query. If empty, queries all.
+- `calendar_ids` (list[str], optional, default: []): Calendar UUIDs to query (takes precedence over names).
 - `start_date` (str, required): ISO 8601 format.
 - `end_date` (str, required): ISO 8601 format (inclusive for date-only, e.g. "2026-03-29" includes March 29).
 
@@ -105,6 +111,7 @@ Search events by text across calendars. Matches against summary, notes, and loca
 **Parameters:**
 - `query` (str, required)
 - `calendar_names` (list[str], optional, default: [])
+- `calendar_ids` (list[str], optional, default: [])
 - `start_date` (str, optional)
 - `end_date` (str, optional)
 
@@ -115,7 +122,8 @@ Search events by text across calendars. Matches against summary, notes, and loca
 Find free time slots across calendars by merging busy periods.
 
 **Parameters:**
-- `calendar_names` (list[str], required)
+- `calendar_names` (list[str], optional, default: [])
+- `calendar_ids` (list[str], optional, default: [])
 - `start_date` (str, required)
 - `end_date` (str, required)
 - `min_duration_minutes` (int | None, optional): Only return slots of at least this many minutes.
@@ -130,6 +138,7 @@ Detect double-bookings and overlapping events across calendars. Events with "fre
 
 **Parameters:**
 - `calendar_names` (list[str], optional, default: [])
+- `calendar_ids` (list[str], optional, default: [])
 - `start_date` (str, required)
 - `end_date` (str, required)
 
@@ -144,7 +153,8 @@ Use get_events or search_events first to find event UIDs.
 Without occurrence_date, deletes the entire recurring series. Pass occurrence_date to target a specific occurrence.
 
 **Parameters:**
-- `calendar_name` (str, required)
+- `calendar_name` (str, optional)
+- `calendar_id` (str, optional): Calendar UUID from get_calendars (takes precedence over name).
 - `event_uids` (str | list[str], required)
 - `span` (str, optional, default: "this_event"): "this_event" or "future_events" for recurring events.
 - `occurrence_date` (str, optional)
