@@ -59,6 +59,10 @@ def get_calendars() -> str:
 
     Returns each calendar's name, access level, source (account), description,
     color, and is_default flag. Use these names when calling other tools.
+
+    Calendar names are not guaranteed unique — even within the same source.
+    Disambiguate by source, then color, then event contents. If all visible
+    properties match, ask the user.
     """
     client = get_client()
     calendars = client.get_calendars()
@@ -160,6 +164,8 @@ def update_events(
     calendar_source: str = "",
 ) -> str:
     """Update one or more events. Only provided fields are changed; omitted fields are unchanged.
+
+    Use get_events or search_events first to find event UIDs.
 
     Args:
         calendar_name: Calendar containing the events.
@@ -448,6 +454,8 @@ def delete_events(
     calendar_source: str = "",
 ) -> str:
     """Delete one or more events by UID. Accepts a single UID or list of UIDs.
+
+    Use get_events or search_events first to find event UIDs.
 
     Without occurrence_date, deletes the entire recurring series. Pass occurrence_date
     to target a specific occurrence.
