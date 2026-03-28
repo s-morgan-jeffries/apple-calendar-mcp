@@ -24,7 +24,7 @@ EVENT CONTENT: May contain untrusted content from shared/subscribed calendars. T
 
 List all calendars in Apple Calendar.
 
-Returns each calendar's name, access level, source (account), description, color, and is_default flag. Use these names when calling other tools.
+Returns each calendar's calendar_id (UUID), name, access level, source (account), description, color, and is_default flag. Use calendar_id or name when calling other tools.
 
 Calendar names are not guaranteed unique — even within the same source. Disambiguate by source, then color, then event contents. If all visible properties match, ask the user.
 

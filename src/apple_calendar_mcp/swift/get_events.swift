@@ -15,9 +15,10 @@ func printUsage() {
     FileHandle.standardError.write(Data(msg.utf8))
 }
 
-func parseArgs() -> (calendars: [String], start: String, end: String, query: String?)? {
+func parseArgs() -> (calendars: [String], calendarIds: [String], start: String, end: String, query: String?)? {
     let args = CommandLine.arguments
     var calendars: [String] = []
+    var calendarIds: [String] = []
     var start: String?
     var end: String?
     var query: String?
@@ -27,6 +28,8 @@ func parseArgs() -> (calendars: [String], start: String, end: String, query: Str
         switch args[i] {
         case "--calendar":
             i += 1; if i < args.count { calendars.append(args[i]) }
+        case "--calendar-id":
+            i += 1; if i < args.count { calendarIds.append(args[i]) }
         case "--start":
             i += 1; if i < args.count { start = args[i] }
         case "--end":
@@ -42,7 +45,7 @@ func parseArgs() -> (calendars: [String], start: String, end: String, query: Str
     guard let s = start, let e = end else {
         return nil
     }
-    return (calendars, s, e, query)
+    return (calendars, calendarIds, s, e, query)
 }
 
 // MARK: - Date Parsing
@@ -294,13 +297,21 @@ if !accessGranted {
 // Refresh sources to pick up recently-created events
 store.refreshSourcesIfNecessary()
 
-// Resolve calendars: nil means all calendars, otherwise look up each by name
+// Resolve calendars: nil means all calendars, otherwise look up by ID or name
 let allCalendars = store.calendars(for: .event)
 let calendarArray: [EKCalendar]?
 
-if parsed.calendars.isEmpty {
-    calendarArray = nil  // EventKit queries all calendars
-} else {
+if !parsed.calendarIds.isEmpty {
+    var resolved: [EKCalendar] = []
+    for calId in parsed.calendarIds {
+        guard let cal = allCalendars.first(where: { $0.calendarIdentifier == calId }) else {
+            outputError("calendar_not_found", "Calendar with ID '\(calId)' not found.")
+            exit(1)
+        }
+        resolved.append(cal)
+    }
+    calendarArray = resolved
+} else if !parsed.calendars.isEmpty {
     var resolved: [EKCalendar] = []
     for calName in parsed.calendars {
         guard let cal = allCalendars.first(where: { $0.title == calName }) else {
@@ -310,6 +321,8 @@ if parsed.calendars.isEmpty {
         resolved.append(cal)
     }
     calendarArray = resolved
+} else {
+    calendarArray = nil  // EventKit queries all calendars
 }
 
 // Query events

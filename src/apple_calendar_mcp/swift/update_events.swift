@@ -6,6 +6,7 @@ import Foundation
 
 struct UpdateEventsArgs {
     var calendar: String = ""
+    var calendarId: String = ""
     var source: String = ""
 }
 
@@ -17,6 +18,8 @@ func parseArgs() -> UpdateEventsArgs {
         switch args[i] {
         case "--calendar":
             i += 1; if i < args.count { result.calendar = args[i] }
+        case "--calendar-id":
+            i += 1; if i < args.count { result.calendarId = args[i] }
         case "--source":
             i += 1; if i < args.count { result.source = args[i] }
         default:
@@ -153,6 +156,7 @@ func outputError(_ error: String, _ message: String) {
 
 let parsed = parseArgs()
 let calendarName = parsed.calendar
+let calendarId = parsed.calendarId
 let sourceName = parsed.source
 
 guard !calendarName.isEmpty else {
@@ -182,15 +186,25 @@ if !accessGranted {
 
 store.refreshSourcesIfNecessary()
 
-let calMatches = store.calendars(for: .event).filter { $0.title == calendarName && (sourceName.isEmpty || $0.source.title == sourceName) }
-if calMatches.count > 1 && sourceName.isEmpty {
-    outputError("ambiguous_calendar", "Multiple calendars named '\(calendarName)' found. Specify calendar_source to disambiguate.")
-    exit(1)
-}
-guard let calendar = calMatches.first else {
-    let displayName = sourceName.isEmpty ? calendarName : "\(calendarName) (\(sourceName))"
-    outputError("calendar_not_found", "Calendar '\(displayName)' not found. Use get_calendars to see available names.")
-    exit(1)
+let calendar: EKCalendar
+if !calendarId.isEmpty {
+    guard let found = store.calendars(for: .event).first(where: { $0.calendarIdentifier == calendarId }) else {
+        outputError("calendar_not_found", "Calendar with ID '\(calendarId)' not found.")
+        exit(1)
+    }
+    calendar = found
+} else {
+    let calMatches = store.calendars(for: .event).filter { $0.title == calendarName && (sourceName.isEmpty || $0.source.title == sourceName) }
+    if calMatches.count > 1 && sourceName.isEmpty {
+        outputError("ambiguous_calendar", "Multiple calendars named '\(calendarName)' found. Specify calendar_source or calendar_id to disambiguate.")
+        exit(1)
+    }
+    guard let found = calMatches.first else {
+        let displayName = sourceName.isEmpty ? calendarName : "\(calendarName) (\(sourceName))"
+        outputError("calendar_not_found", "Calendar '\(displayName)' not found. Use get_calendars to see available names.")
+        exit(1)
+    }
+    calendar = found
 }
 
 var updated: [[String: Any]] = []

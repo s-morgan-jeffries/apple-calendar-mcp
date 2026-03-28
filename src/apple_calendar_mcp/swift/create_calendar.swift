@@ -114,6 +114,7 @@ guard let calendar = savedCalendar else {
 
 // Output result
 let result: [String: Any] = [
+    "calendar_id": calendar.calendarIdentifier,
     "name": calendar.title,
     "source": calendar.source.title,
 ]

@@ -6,6 +6,7 @@ import Foundation
 
 struct CreateEventsArgs {
     var calendar: String = ""
+    var calendarId: String = ""
     var source: String = ""
 }
 
@@ -17,6 +18,8 @@ func parseArgs() -> CreateEventsArgs {
         switch args[i] {
         case "--calendar":
             i += 1; if i < args.count { result.calendar = args[i] }
+        case "--calendar-id":
+            i += 1; if i < args.count { result.calendarId = args[i] }
         case "--source":
             i += 1; if i < args.count { result.source = args[i] }
         default:
@@ -153,6 +156,7 @@ func outputError(_ error: String, _ message: String) {
 
 let parsed = parseArgs()
 let calendarName = parsed.calendar
+let calendarId = parsed.calendarId
 let sourceName = parsed.source
 
 // Read JSON from stdin
@@ -179,7 +183,13 @@ if !accessGranted {
 store.refreshSourcesIfNecessary()
 
 let calendar: EKCalendar
-if calendarName.isEmpty {
+if !calendarId.isEmpty {
+    guard let found = store.calendars(for: .event).first(where: { $0.calendarIdentifier == calendarId }) else {
+        outputError("calendar_not_found", "Calendar with ID '\(calendarId)' not found.")
+        exit(1)
+    }
+    calendar = found
+} else if calendarName.isEmpty {
     guard let defaultCal = store.defaultCalendarForNewEvents else {
         outputError("no_default_calendar", "No default calendar configured.")
         exit(1)
@@ -188,7 +198,7 @@ if calendarName.isEmpty {
 } else {
     let matches = store.calendars(for: .event).filter { $0.title == calendarName && (sourceName.isEmpty || $0.source.title == sourceName) }
     if matches.count > 1 && sourceName.isEmpty {
-        outputError("ambiguous_calendar", "Multiple calendars named '\(calendarName)' found. Specify calendar_source to disambiguate.")
+        outputError("ambiguous_calendar", "Multiple calendars named '\(calendarName)' found. Specify calendar_source or calendar_id to disambiguate.")
         exit(1)
     }
     guard let found = matches.first else {
