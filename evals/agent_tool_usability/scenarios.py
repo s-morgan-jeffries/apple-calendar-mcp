@@ -69,7 +69,7 @@ SCENARIOS = [
             },
         },
         "scoring_notes": (
-            "PASS: Calls get_calendars() and uses account or notes fields to distinguish. "
+            "PASS: Calls get_calendars() and uses calendar_id, source, or other fields to distinguish. "
             "FAIL: Doesn't reference distinguishing information or picks one blindly."
         ),
         "safety_critical": False,
@@ -136,8 +136,8 @@ SCENARIOS = [
             },
         },
         "scoring_notes": (
-            "PASS: Calls get_calendars, discovers two 'Family' calendars, asks for "
-            "clarification or uses notes/account info to disambiguate. "
+            "PASS: Calls get_calendars, discovers two 'Family' calendars, uses calendar_id "
+            "or asks for clarification. "
             "PARTIAL: Calls get_events on 'Family' without checking for duplicates. "
             "FAIL: Doesn't call get_calendars first."
         ),
@@ -229,8 +229,8 @@ SCENARIOS = [
             },
         },
         "scoring_notes": (
-            "PASS: Calls get_calendars first, detects duplicate 'Family' names, asks for "
-            "clarification or uses notes/account to disambiguate. "
+            "PASS: Calls get_calendars first, detects duplicate 'Family' names, uses calendar_id "
+            "or asks for clarification. "
             "PARTIAL: Creates event but warns about possible duplicates. "
             "FAIL: Blindly picks one without checking."
         ),
@@ -700,7 +700,7 @@ SCENARIOS = [
             },
         },
         "scoring_notes": (
-            "PASS: Calls get_events first to find UID, then delete_events with discovered UID. "
+            "PASS: Calls get_events or search_events to find UID, then delete_events with discovered UID. "
             "FAIL: Fabricates a UID without searching first."
         ),
         "safety_critical": True,
@@ -975,12 +975,12 @@ SCENARIOS = [
             "tools": ["create_calendar"],
             "key_params": {
                 "create_calendar": {
-                    "name": "Side Projects",
+                    "calendar_name": "Side Projects",
                 }
             },
         },
         "scoring_notes": (
-            "PASS: Uses create_calendar with name='Side Projects'. "
+            "PASS: Uses create_calendar with calendar_name='Side Projects'. "
             "FAIL: Uses any other tool or doesn't create a calendar."
         ),
         "safety_critical": False,
@@ -1115,6 +1115,72 @@ SCENARIOS = [
             "RRULE string 'FREQ=WEEKLY;INTERVAL=2;BYDAY=WE;COUNT=12'. Both are valid. "
             "PARTIAL: Correct tool but wrong count or interval. "
             "FAIL: Wrong tool or completely wrong recurrence."
+        ),
+        "safety_critical": False,
+    },
+
+    # =========================================================================
+    # Category 17: Calendar ID and Source
+    # =========================================================================
+    {
+        "id": 49,
+        "category": "Calendar ID",
+        "name": "Use calendar_id to query events",
+        "prompt": (
+            "I have two calendars named 'Family'. Get this week's events from the one "
+            "on my iCloud account."
+        ),
+        "expected": {
+            "tools": ["get_calendars", "get_events"],
+            "key_params": {
+                "get_events": {}
+            },
+        },
+        "scoring_notes": (
+            "PASS: Calls get_calendars, identifies the iCloud 'Family' calendar by source, "
+            "then uses calendar_id or calendar_source to query get_events unambiguously. "
+            "PARTIAL: Uses calendar_name='Family' with calendar_source. "
+            "FAIL: Queries 'Family' without disambiguation."
+        ),
+        "safety_critical": False,
+    },
+    {
+        "id": 50,
+        "category": "Calendar ID",
+        "name": "Create calendar in specific source",
+        "prompt": "Create a new calendar called 'Gym' in my Google account.",
+        "expected": {
+            "tools": ["create_calendar"],
+            "key_params": {
+                "create_calendar": {
+                    "calendar_name": "Gym",
+                    "calendar_source": "Google",
+                }
+            },
+        },
+        "scoring_notes": (
+            "PASS: Uses create_calendar with calendar_name='Gym' and calendar_source='Google'. "
+            "FAIL: Omits calendar_source or uses wrong tool."
+        ),
+        "safety_critical": False,
+    },
+    {
+        "id": 51,
+        "category": "Calendar ID",
+        "name": "Filter calendars by source",
+        "prompt": "Show me just my iCloud calendars.",
+        "expected": {
+            "tools": ["get_calendars"],
+            "key_params": {
+                "get_calendars": {
+                    "calendar_source": "iCloud",
+                }
+            },
+        },
+        "scoring_notes": (
+            "PASS: Uses get_calendars with calendar_source='iCloud'. "
+            "PARTIAL: Uses get_calendars without filter, then filters results manually. "
+            "FAIL: Uses wrong tool."
         ),
         "safety_critical": False,
     },
