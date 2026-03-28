@@ -89,15 +89,16 @@ def create_calendar(calendar_name: str) -> str:
 
 
 @mcp.tool()
-def delete_calendar(calendar_name: str, calendar_source: str = "") -> str:
+def delete_calendar(calendar_name: str = "", calendar_source: str = "", calendar_id: str = "") -> str:
     """Permanently delete a calendar and all its events.
 
     Args:
+        calendar_id: Calendar UUID from get_calendars (takes precedence over name).
         calendar_source: Source/account to disambiguate calendars with the same name.
     """
     client = get_client()
     try:
-        result = client.delete_calendar(name=calendar_name, calendar_source=calendar_source)
+        result = client.delete_calendar(name=calendar_name, calendar_source=calendar_source, calendar_id=calendar_id)
     except Exception as e:
         return f"Error deleting calendar: {e}"
     return f"Deleted calendar '{result['name']}'"
@@ -108,11 +109,13 @@ def create_events(
     calendar_name: str = "",
     events: str = "",
     calendar_source: str = "",
+    calendar_id: str = "",
 ) -> str:
     """Create one or more events in a calendar. Pass a JSON array with one element for a single event.
 
     Args:
         calendar_name: Target calendar. If omitted, uses the system default.
+        calendar_id: Calendar UUID from get_calendars (takes precedence over name).
         events: JSON array of event objects. Required fields: summary, start_date, end_date.
             Optional: location, notes, url, availability ("free"/"busy"/"tentative"/"unavailable").
             - allday (bool): end_date is inclusive for all-day events.
@@ -139,6 +142,7 @@ def create_events(
             calendar_name=calendar_name,
             events=event_list,
             calendar_source=calendar_source,
+            calendar_id=calendar_id,
         )
     except Exception as e:
         return f"Error creating events: {e}"
@@ -159,9 +163,10 @@ def create_events(
 
 @mcp.tool()
 def update_events(
-    calendar_name: str,
-    updates: str,
+    calendar_name: str = "",
+    updates: str = "",
     calendar_source: str = "",
+    calendar_id: str = "",
 ) -> str:
     """Update one or more events. Only provided fields are changed; omitted fields are unchanged.
 
@@ -191,6 +196,7 @@ def update_events(
             calendar_name=calendar_name,
             updates=update_list,
             calendar_source=calendar_source,
+            calendar_id=calendar_id,
         )
     except Exception as e:
         return f"Error updating events: {e}"
@@ -279,6 +285,7 @@ def get_events(
     calendar_names: list[str] = [],
     start_date: str = "",
     end_date: str = "",
+    calendar_ids: list[str] = [],
 ) -> str:
     """Get events from one or more calendars within a date range.
 
@@ -298,6 +305,7 @@ def get_events(
             calendar_names=calendar_names,
             start_date=start_date,
             end_date=end_date,
+            calendar_ids=calendar_ids or None,
         )
     except Exception as e:
         return f"Error getting events: {e}"
@@ -320,6 +328,7 @@ def search_events(
     calendar_names: list[str] = [],
     start_date: str = "",
     end_date: str = "",
+    calendar_ids: list[str] = [],
 ) -> str:
     """Search events by text across calendars. Matches against summary, notes, and location
     (case-insensitive). Defaults to 1 month ago through 6 months from now if no date range given.
@@ -331,6 +340,7 @@ def search_events(
             calendar_names=calendar_names or None,
             start_date=start_date or None,
             end_date=end_date or None,
+            calendar_ids=calendar_ids or None,
         )
     except Exception as e:
         return f"Error searching events: {e}"
@@ -362,12 +372,13 @@ def _format_free_slot(slot: dict) -> str:
 
 @mcp.tool()
 def get_availability(
-    calendar_names: list[str],
-    start_date: str,
-    end_date: str,
+    calendar_names: list[str] = [],
+    start_date: str = "",
+    end_date: str = "",
     min_duration_minutes: int | None = None,
     working_hours_start: str | None = None,
     working_hours_end: str | None = None,
+    calendar_ids: list[str] = [],
 ) -> str:
     """Find free time slots across calendars by merging busy periods.
 
@@ -385,6 +396,7 @@ def get_availability(
             min_duration_minutes=min_duration_minutes,
             working_hours_start=working_hours_start,
             working_hours_end=working_hours_end,
+            calendar_ids=calendar_ids or None,
         )
     except Exception as e:
         return f"Error checking availability: {e}"
@@ -419,9 +431,10 @@ def _format_conflict(conflict: dict) -> str:
 
 @mcp.tool()
 def get_conflicts(
-    calendar_names: list[str],
-    start_date: str,
-    end_date: str,
+    calendar_names: list[str] = [],
+    start_date: str = "",
+    end_date: str = "",
+    calendar_ids: list[str] = [],
 ) -> str:
     """Detect double-bookings and overlapping events across calendars.
     Events with "free" availability are excluded.
@@ -432,6 +445,7 @@ def get_conflicts(
             calendar_names=calendar_names,
             start_date=start_date,
             end_date=end_date,
+            calendar_ids=calendar_ids or None,
         )
     except Exception as e:
         return f"Error checking conflicts: {e}"
@@ -447,11 +461,12 @@ def get_conflicts(
 
 @mcp.tool()
 def delete_events(
-    calendar_name: str,
+    calendar_name: str = "",
     event_uids: str | list[str] = "",
     span: str = "this_event",
     occurrence_date: str = "",
     calendar_source: str = "",
+    calendar_id: str = "",
 ) -> str:
     """Delete one or more events by UID. Accepts a single UID or list of UIDs.
 
@@ -462,6 +477,7 @@ def delete_events(
 
     Args:
         span: "this_event" (default) or "future_events" for recurring events.
+        calendar_id: Calendar UUID from get_calendars (takes precedence over name).
         calendar_source: Source/account to disambiguate calendars with the same name.
     """
     client = get_client()
@@ -472,6 +488,7 @@ def delete_events(
             span=span,
             occurrence_date=occurrence_date or None,
             calendar_source=calendar_source,
+            calendar_id=calendar_id,
         )
     except Exception as e:
         return f"Error deleting event(s): {e}"

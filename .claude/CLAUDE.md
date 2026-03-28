@@ -36,7 +36,7 @@ make test-verbose          # Tests with verbose output
 
 ## AppleScript Gotchas (Calendar-specific)
 
-**Calendar UIDs inaccessible:** `uid of every calendar` and `id of every calendar` both fail with AppleEvent handler error -10000. Calendars must be identified by name. Duplicate names exist (e.g., two "Family" calendars from different accounts).
+**Calendar UIDs inaccessible via AppleScript:** `uid of every calendar` and `id of every calendar` both fail with AppleEvent handler error -10000. However, EventKit's `EKCalendar.calendarIdentifier` works — `get_calendars` returns `calendar_id` (UUID) and all tools accept `calendar_id` for unambiguous identification. Calendar names are not unique, even within the same source.
 
 **Batch vs individual access:** `name of every calendar` works but `properties of calendar "X"` fails. Use batch property access for calendars.
 

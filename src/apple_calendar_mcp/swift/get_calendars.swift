@@ -63,6 +63,7 @@ let defaultCal = store.defaultCalendarForNewEvents
 
 let calendarDicts: [[String: Any]] = calendars.map { cal in
     [
+        "calendar_id": cal.calendarIdentifier,
         "name": cal.title,
         "writable": cal.allowsContentModifications,
         "description": (cal as EKCalendar).value(forKey: "notes") as? String ?? "",

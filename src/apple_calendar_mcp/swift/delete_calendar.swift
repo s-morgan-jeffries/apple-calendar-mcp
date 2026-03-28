@@ -15,6 +15,7 @@ func outputError(_ error: String, _ message: String) {
 
 struct DeleteCalendarArgs {
     var name: String = ""
+    var calendarId: String = ""
     var source: String = ""
 }
 
@@ -26,6 +27,8 @@ func parseArgs() -> DeleteCalendarArgs {
         switch args[i] {
         case "--name":
             i += 1; if i < args.count { result.name = args[i] }
+        case "--calendar-id":
+            i += 1; if i < args.count { result.calendarId = args[i] }
         case "--source":
             i += 1; if i < args.count { result.source = args[i] }
         default:
@@ -40,8 +43,8 @@ func parseArgs() -> DeleteCalendarArgs {
 
 let parsed = parseArgs()
 
-guard !parsed.name.isEmpty else {
-    outputError("invalid_args", "Required: --name <calendar_name>")
+guard !parsed.name.isEmpty || !parsed.calendarId.isEmpty else {
+    outputError("invalid_args", "Required: --name <calendar_name> or --calendar-id <uuid>")
     exit(1)
 }
 
@@ -66,16 +69,27 @@ if !accessGranted {
 
 store.refreshSourcesIfNecessary()
 
-// Find the calendar by name (and optionally source)
-let calendars = store.calendars(for: .event).filter { $0.title == parsed.name && (parsed.source.isEmpty || $0.source.title == parsed.source) }
-if calendars.count > 1 && parsed.source.isEmpty {
-    outputError("ambiguous_calendar", "Multiple calendars named '\(parsed.name)' found. Specify calendar_source to disambiguate.")
-    exit(1)
-}
-guard let calendar = calendars.first else {
-    let displayName = parsed.source.isEmpty ? parsed.name : "\(parsed.name) (\(parsed.source))"
-    outputError("calendar_not_found", "Calendar '\(displayName)' not found. Use get_calendars to see available names.")
-    exit(1)
+// Find the calendar by ID, or by name (and optionally source)
+let allCalendars = store.calendars(for: .event)
+let calendar: EKCalendar
+if !parsed.calendarId.isEmpty {
+    guard let found = allCalendars.first(where: { $0.calendarIdentifier == parsed.calendarId }) else {
+        outputError("calendar_not_found", "Calendar with ID '\(parsed.calendarId)' not found.")
+        exit(1)
+    }
+    calendar = found
+} else {
+    let matches = allCalendars.filter { $0.title == parsed.name && (parsed.source.isEmpty || $0.source.title == parsed.source) }
+    if matches.count > 1 && parsed.source.isEmpty {
+        outputError("ambiguous_calendar", "Multiple calendars named '\(parsed.name)' found. Specify calendar_source or calendar_id to disambiguate.")
+        exit(1)
+    }
+    guard let found = matches.first else {
+        let displayName = parsed.source.isEmpty ? parsed.name : "\(parsed.name) (\(parsed.source))"
+        outputError("calendar_not_found", "Calendar '\(displayName)' not found. Use get_calendars to see available names.")
+        exit(1)
+    }
+    calendar = found
 }
 
 do {

@@ -283,6 +283,7 @@ class TestGetAvailabilityTool:
         get_availability(calendar_names=["Work", "Personal"], start_date="2026-03-15T09:00:00", end_date="2026-03-15T17:00:00")
         mock_client.get_availability.assert_called_once_with(
             calendar_names=["Work", "Personal"],
+            calendar_ids=None,
             start_date="2026-03-15T09:00:00",
             end_date="2026-03-15T17:00:00",
             min_duration_minutes=None,
@@ -331,6 +332,7 @@ class TestGetAvailabilityTool:
         )
         mock_client.get_availability.assert_called_once_with(
             calendar_names=["Work"],
+            calendar_ids=None,
             start_date="2026-03-15T09:00:00",
             end_date="2026-03-15T17:00:00",
             min_duration_minutes=45,
@@ -430,6 +432,7 @@ class TestDeleteEventsTool:
         delete_events(calendar_name="Work", event_uids=["UID-1", "UID-2"])
         mock_client.delete_events.assert_called_once_with(
             calendar_name="Work",
+            calendar_id="",
             event_uids=["UID-1", "UID-2"],
             span="this_event",
             occurrence_date=None,
@@ -799,6 +802,7 @@ class TestSearchEventsTool:
         mock_client.search_events.assert_called_once_with(
             query="test",
             calendar_names=None,
+            calendar_ids=None,
             start_date=None,
             end_date=None,
         )
@@ -889,6 +893,7 @@ class TestDeleteEventsToolBranches:
         # event_uid is passed as-is (string) to event_uids
         mock_client.delete_events.assert_called_once_with(
             calendar_name="Work",
+            calendar_id="",
             event_uids="UID-1",
             span="this_event",
             occurrence_date=None,

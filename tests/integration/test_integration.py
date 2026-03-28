@@ -164,14 +164,35 @@ class TestGetCalendarsIntegration:
         assert "MCP-Test-Calendar" in names
 
     def test_calendar_has_required_keys(self, connector):
-        """Each calendar should have name, writable, description, color, source."""
+        """Each calendar should have calendar_id, name, writable, description, color, source."""
         calendars = connector.get_calendars()
         for cal in calendars:
+            assert "calendar_id" in cal, f"Missing 'calendar_id' in calendar: {cal}"
             assert "name" in cal, f"Missing 'name' in calendar: {cal}"
             assert "writable" in cal, f"Missing 'writable' in calendar: {cal}"
             assert "description" in cal, f"Missing 'description' in calendar: {cal}"
             assert "color" in cal, f"Missing 'color' in calendar: {cal}"
             assert "source" in cal, f"Missing 'source' in calendar: {cal}"
+
+    def test_calendar_id_is_uuid_string(self, connector):
+        """calendar_id should be a non-empty string (UUID format)."""
+        calendars = connector.get_calendars()
+        for cal in calendars:
+            assert isinstance(cal["calendar_id"], str)
+            assert len(cal["calendar_id"]) > 0, f"Empty calendar_id for {cal['name']}"
+
+    def test_get_events_by_calendar_id(self, connector):
+        """Events can be queried by calendar_id instead of name."""
+        calendars = connector.get_calendars()
+        test_cal = next(c for c in calendars if c["name"] == TEST_CALENDAR)
+        cal_id = test_cal["calendar_id"]
+        # Query by ID should work the same as by name
+        events_by_id = connector.get_events(
+            start_date=_future_date(3, 1, 1),
+            end_date=_future_date(3, 12, 31),
+            calendar_ids=[cal_id],
+        )
+        assert isinstance(events_by_id, list)
 
     def test_writable_is_boolean(self, connector):
         """Writable should be a proper boolean."""
