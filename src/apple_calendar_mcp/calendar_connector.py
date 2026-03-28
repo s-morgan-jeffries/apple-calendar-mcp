@@ -786,23 +786,30 @@ class CalendarConnector:
         """
         return self._run_swift_helper_json("get_calendars", [])
 
-    def create_calendar(self, name: str) -> dict[str, str]:
+    def create_calendar(self, name: str, calendar_source: str = "") -> dict[str, str]:
         """Create a new calendar in Apple Calendar.
 
         Uses EventKit via Swift helper for native calendar creation.
 
         Args:
             name: Name for the new calendar
+            calendar_source: Source/account to create the calendar in
+                (e.g., 'iCloud', 'Google'). If empty, uses default account.
 
         Returns:
-            Dict with 'name' and optionally 'source' keys of the created calendar
+            Dict with 'calendar_id', 'name', and 'source' keys of the created calendar
 
         Raises:
             RuntimeError: If Swift helper execution fails
             PermissionError: If EventKit calendar access is denied
         """
         self._validate_cli_arg(name, "name")
-        return self._run_swift_helper_json("create_calendar", ["--name", name])
+        if calendar_source:
+            self._validate_cli_arg(calendar_source, "calendar_source")
+        args = ["--name", name]
+        if calendar_source:
+            args += ["--source", calendar_source]
+        return self._run_swift_helper_json("create_calendar", args)
 
     def delete_calendar(
         self, name: str, calendar_source: str = "", calendar_id: str = ""
