@@ -5,9 +5,7 @@ import Foundation
 // MARK: - Argument Parsing
 
 struct UpdateEventsArgs {
-    var calendar: String = ""
     var calendarId: String = ""
-    var source: String = ""
 }
 
 func parseArgs() -> UpdateEventsArgs {
@@ -16,12 +14,8 @@ func parseArgs() -> UpdateEventsArgs {
     var i = 1
     while i < args.count {
         switch args[i] {
-        case "--calendar":
-            i += 1; if i < args.count { result.calendar = args[i] }
         case "--calendar-id":
             i += 1; if i < args.count { result.calendarId = args[i] }
-        case "--source":
-            i += 1; if i < args.count { result.source = args[i] }
         default:
             break
         }
@@ -155,12 +149,10 @@ func outputError(_ error: String, _ message: String) {
 // MARK: - Main
 
 let parsed = parseArgs()
-let calendarName = parsed.calendar
 let calendarId = parsed.calendarId
-let sourceName = parsed.source
 
-guard !calendarName.isEmpty else {
-    outputError("invalid_args", "Required: --calendar <name>. Update data is read from stdin as JSON array.")
+guard !calendarId.isEmpty else {
+    outputError("invalid_args", "Required: --calendar-id <uuid>. Update data is read from stdin as JSON array.")
     exit(1)
 }
 
@@ -186,25 +178,9 @@ if !accessGranted {
 
 store.refreshSourcesIfNecessary()
 
-let calendar: EKCalendar
-if !calendarId.isEmpty {
-    guard let found = store.calendars(for: .event).first(where: { $0.calendarIdentifier == calendarId }) else {
-        outputError("calendar_not_found", "Calendar with ID '\(calendarId)' not found.")
-        exit(1)
-    }
-    calendar = found
-} else {
-    let calMatches = store.calendars(for: .event).filter { $0.title == calendarName && (sourceName.isEmpty || $0.source.title == sourceName) }
-    if calMatches.count > 1 && sourceName.isEmpty {
-        outputError("ambiguous_calendar", "Multiple calendars named '\(calendarName)' found. Specify calendar_source or calendar_id to disambiguate.")
-        exit(1)
-    }
-    guard let found = calMatches.first else {
-        let displayName = sourceName.isEmpty ? calendarName : "\(calendarName) (\(sourceName))"
-        outputError("calendar_not_found", "Calendar '\(displayName)' not found. Use get_calendars to see available names.")
-        exit(1)
-    }
-    calendar = found
+guard let calendar = store.calendars(for: .event).first(where: { $0.calendarIdentifier == calendarId }) else {
+    outputError("calendar_not_found", "Calendar with ID '\(calendarId)' not found.")
+    exit(1)
 }
 
 var updated: [[String: Any]] = []
@@ -236,7 +212,7 @@ for (index, updateData) in updatesJson.enumerated() {
     } else {
         // Standard lookup
         let items = store.calendarItems(withExternalIdentifier: uid)
-        event = items.compactMap { $0 as? EKEvent }.first { $0.calendar.title == calendarName }
+        event = items.compactMap { $0 as? EKEvent }.first { $0.calendar.calendarIdentifier == calendarId }
     }
 
     guard let event = event else {

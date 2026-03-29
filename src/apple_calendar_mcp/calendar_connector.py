@@ -113,6 +113,26 @@ class CalendarConnector:
                 f"Allowed: {self.ALLOWED_TEST_CALENDARS}"
             )
 
+    def _verify_calendar_safety_by_id(self, calendar_id: str) -> None:
+        """Verify that a calendar ID targets an allowed test calendar.
+
+        Resolves the ID to a name via get_calendars and checks against
+        the allowed test calendar list.
+        """
+        if not self.enable_safety_checks:
+            return
+        calendars = self.get_calendars()
+        cal = next((c for c in calendars if c["calendar_id"] == calendar_id), None)
+        if cal is None:
+            raise CalendarSafetyError(
+                f"Calendar with ID '{calendar_id}' not found during safety check."
+            )
+        if cal["name"] not in self.ALLOWED_TEST_CALENDARS:
+            raise CalendarSafetyError(
+                f"Calendar '{cal['name']}' (ID: {calendar_id}) is not an allowed test calendar. "
+                f"Allowed: {self.ALLOWED_TEST_CALENDARS}"
+            )
+
     def _run_swift_helper_json(
         self, script_name: str, args: list[str], stdin_data: Optional[str] = None
     ) -> dict:
@@ -138,33 +158,27 @@ class CalendarConnector:
 
     def create_events(
         self,
-        calendar_name: str = "",
         events: list[dict[str, Any]] | None = None,
-        calendar_source: str = "",
         calendar_id: str = "",
     ) -> dict[str, Any]:
         """Create one or more events in a calendar.
 
         Args:
-            calendar_name: Name of the target calendar. If empty, uses the system
-                          default calendar.
             events: List of event dicts, each with keys: summary, start, end,
                     and optional: location, notes, url, allday, recurrence,
                     alerts (list of int), availability, timezone
-            calendar_source: Source/account name to disambiguate calendars with
-                           the same name (e.g., 'iCloud', 'Google').
-            calendar_id: Calendar UUID (takes precedence over name).
+            calendar_id: Calendar UUID. If empty, uses the system default calendar.
 
         Returns:
             Dict with 'created' (list of {uid, summary}) and 'errors' (list of {index, summary, error})
         """
-        if self.enable_safety_checks and not calendar_name and not calendar_id:
+        if self.enable_safety_checks and not calendar_id:
             raise CalendarSafetyError(
-                "calendar_name or calendar_id is required when safety checks are enabled "
-                "(empty name would target the default calendar)"
+                "calendar_id is required when safety checks are enabled "
+                "(empty ID would target the default calendar)"
             )
-        if calendar_name:
-            self._verify_calendar_safety(calendar_name)
+        if calendar_id:
+            self._verify_calendar_safety_by_id(calendar_id)
 
         if not events:
             raise ValueError("At least one event must be provided")
@@ -174,16 +188,9 @@ class CalendarConnector:
                 f"Split into multiple calls."
             )
 
-        if calendar_name:
-            self._validate_cli_arg(calendar_name, "calendar_name")
-        if calendar_source:
-            self._validate_cli_arg(calendar_source, "calendar_source")
-
-        args = ["--calendar", calendar_name]
+        args = []
         if calendar_id:
             args += ["--calendar-id", calendar_id]
-        if calendar_source:
-            args += ["--source", calendar_source]
 
         stdin_data = json.dumps(events)
         return self._run_swift_helper_json(
@@ -192,24 +199,19 @@ class CalendarConnector:
 
     def update_events(
         self,
-        calendar_name: str,
+        calendar_id: str,
         updates: list[dict[str, Any]],
-        calendar_source: str = "",
-        calendar_id: str = "",
     ) -> dict[str, Any]:
         """Update one or more events in a single batch operation.
 
         Args:
-            calendar_name: Name of the calendar containing the events
+            calendar_id: Calendar UUID containing the events.
             updates: List of update dicts, each with 'uid' (required) and optional fields
                      to update: summary, start, end, location, notes, url, allday,
                      alerts, availability, timezone, recurrence.
                      To clear a field, pass an empty value (e.g., location="", alerts=[]).
                      For recurring events: occurrence_date (ISO 8601) to target a specific
                      occurrence, span ("this_event" or "future_events", default "this_event").
-            calendar_source: Source/account name to disambiguate calendars with
-                           the same name (e.g., 'iCloud', 'Google').
-            calendar_id: Calendar UUID (takes precedence over name).
 
         Returns:
             Dict with 'updated' (list of {uid, summary, updated_fields}) and 'errors'.
@@ -217,10 +219,7 @@ class CalendarConnector:
             span="this_event"), a new standalone event is created — the returned UID
             may differ, and 'rescheduled': true is included.
         """
-        self._verify_calendar_safety(calendar_name)
-        self._validate_cli_arg(calendar_name, "calendar_name")
-        if calendar_source:
-            self._validate_cli_arg(calendar_source, "calendar_source")
+        self._verify_calendar_safety_by_id(calendar_id)
 
         if not updates:
             raise ValueError("At least one update must be provided")
@@ -230,11 +229,7 @@ class CalendarConnector:
                 f"Split into multiple calls."
             )
 
-        args = ["--calendar", calendar_name]
-        if calendar_id:
-            args += ["--calendar-id", calendar_id]
-        if calendar_source:
-            args += ["--source", calendar_source]
+        args = ["--calendar-id", calendar_id]
 
         stdin_data = json.dumps(updates)
         return self._run_swift_helper_json(
@@ -371,11 +366,8 @@ class CalendarConnector:
 
     def get_events(
         self,
-        calendar_names: list[str] | str | None = None,
         start_date: str = "",
         end_date: str = "",
-        *,
-        calendar_name: str | None = None,  # backward compat alias
         calendar_ids: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         """Get events from one or more calendars within a date range.
@@ -383,11 +375,9 @@ class CalendarConnector:
         Uses EventKit via Swift helper for fast native date-range queries.
 
         Args:
-            calendar_names: Calendar name(s) to query. Accepts a list of names,
-                a single name string, or None/empty list to query all calendars.
             start_date: Start of date range in ISO 8601 format
             end_date: End of date range in ISO 8601 format
-            calendar_ids: Calendar UUID(s) to query (takes precedence over names).
+            calendar_ids: Calendar UUID(s) to query. None/empty queries all.
 
         Returns:
             List of event dicts with keys: uid, summary, start_date, end_date,
@@ -397,10 +387,6 @@ class CalendarConnector:
             ValueError: If date format is invalid or calendar not found
             PermissionError: If EventKit calendar access is denied
         """
-        calendar_names = self._normalize_calendar_names(calendar_names, calendar_name)
-        for name in calendar_names:
-            self._validate_cli_arg(name, "calendar_name")
-
         self._validate_date(start_date)
         self._validate_date(end_date)
 
@@ -408,9 +394,6 @@ class CalendarConnector:
         if calendar_ids:
             for cid in calendar_ids:
                 args += ["--calendar-id", cid]
-        else:
-            for name in calendar_names:
-                args += ["--calendar", name]
         args += ["--start", start_date, "--end", end_date]
         events = self._run_swift_helper_json("get_events", args)
         return self._process_allday_events(events)
@@ -418,11 +401,8 @@ class CalendarConnector:
     def search_events(
         self,
         query: str,
-        calendar_names: list[str] | str | None = None,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
-        *,
-        calendar_name: str | None = None,  # backward compat alias
         calendar_ids: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         """Search events by text across one or more calendars.
@@ -432,18 +412,13 @@ class CalendarConnector:
 
         Args:
             query: Text to search for
-            calendar_names: Calendar name(s) to search. Accepts a list of names,
-                a single name string, or None/empty list to search all calendars.
             start_date: Start of date range (optional — defaults to 1 month ago)
             end_date: End of date range (optional — defaults to 6 months from now)
-            calendar_ids: Calendar UUID(s) to search (takes precedence over names).
+            calendar_ids: Calendar UUID(s) to search. None/empty searches all.
 
         Returns:
             List of matching event dicts.
         """
-        calendar_names = self._normalize_calendar_names(calendar_names, calendar_name)
-        for name in calendar_names:
-            self._validate_cli_arg(name, "calendar_name")
         start_date, end_date = self._apply_search_date_defaults(start_date, end_date)
 
         self._validate_date(start_date)
@@ -455,9 +430,6 @@ class CalendarConnector:
         if calendar_ids:
             for cid in calendar_ids:
                 args += ["--calendar-id", cid]
-        else:
-            for name in calendar_names:
-                args += ["--calendar", name]
         args += ["--start", start_date, "--end", end_date, "--query", query]
         events = self._run_swift_helper_json("get_events", args)
         if isinstance(events, list):
@@ -466,23 +438,18 @@ class CalendarConnector:
 
     def delete_events(
         self,
-        calendar_name: str,
+        calendar_id: str,
         event_uids: str | list[str],
         span: str = "this_event",
         occurrence_date: Optional[str] = None,
-        calendar_source: str = "",
-        calendar_id: str = "",
     ) -> dict[str, Any]:
         """Delete one or more events by UID.
 
         Args:
-            calendar_name: Name of the calendar containing the events
+            calendar_id: Calendar UUID containing the events.
             event_uids: Single UID string or list of UIDs to delete
             span: "this_event" to delete one occurrence, "future_events" to delete series from this point (default: "this_event")
             occurrence_date: For recurring events, the date of the specific occurrence to delete (optional)
-            calendar_source: Source/account name to disambiguate calendars with
-                           the same name (e.g., 'iCloud', 'Google').
-            calendar_id: Calendar UUID (takes precedence over name).
 
         Returns:
             Dict with 'deleted_uids' and 'not_found_uids' keys
@@ -491,10 +458,7 @@ class CalendarConnector:
             CalendarSafetyError: If safety checks block the target calendar
             ValueError: If event_uids is empty
         """
-        self._verify_calendar_safety(calendar_name)
-        self._validate_cli_arg(calendar_name, "calendar_name")
-        if calendar_source:
-            self._validate_cli_arg(calendar_source, "calendar_source")
+        self._verify_calendar_safety_by_id(calendar_id)
 
         uids = [event_uids] if isinstance(event_uids, str) else event_uids
         if not uids:
@@ -507,11 +471,7 @@ class CalendarConnector:
                 f"Split into multiple calls."
             )
 
-        args = ["--calendar", calendar_name]
-        if calendar_id:
-            args += ["--calendar-id", calendar_id]
-        if calendar_source:
-            args += ["--source", calendar_source]
+        args = ["--calendar-id", calendar_id]
         for uid in uids:
             args += ["--uid", uid]
         if span != "this_event":
@@ -643,7 +603,6 @@ class CalendarConnector:
 
     def get_availability(
         self,
-        calendar_names: list[str],
         start_date: str,
         end_date: str,
         min_duration_minutes: int | None = None,
@@ -657,13 +616,12 @@ class CalendarConnector:
         periods, and returns the gaps (free slots) within the date range.
 
         Args:
-            calendar_names: List of calendar names to check
             start_date: Start of range in ISO 8601 format
             end_date: End of range in ISO 8601 format
             min_duration_minutes: Only return slots of at least this many minutes
             working_hours_start: Start of working hours as 'HH:MM' (e.g., '09:00')
             working_hours_end: End of working hours as 'HH:MM' (e.g., '17:00')
-            calendar_ids: Calendar UUID(s) (takes precedence over names).
+            calendar_ids: Calendar UUID(s) to check. None/empty checks all.
 
         Returns:
             List of dicts with 'start_date', 'end_date', 'duration_minutes' keys
@@ -681,7 +639,7 @@ class CalendarConnector:
         range_start = self._parse_iso_datetime(start_date)
         range_end = self._parse_iso_datetime(end_date)
 
-        all_events = self.get_events(calendar_names, start_date, end_date, calendar_ids=calendar_ids)
+        all_events = self.get_events(start_date, end_date, calendar_ids=calendar_ids)
 
         # Only busy/tentative events block availability — free events are excluded
         busy_events = [e for e in all_events if e.get("availability", "busy") != "free"]
@@ -693,7 +651,6 @@ class CalendarConnector:
 
     def get_conflicts(
         self,
-        calendar_names: list[str],
         start_date: str,
         end_date: str,
         calendar_ids: list[str] | None = None,
@@ -704,10 +661,9 @@ class CalendarConnector:
         as "free", and returns pairs of events that overlap in time.
 
         Args:
-            calendar_names: List of calendar names to check
             start_date: Start of range in ISO 8601 format
             end_date: End of range in ISO 8601 format
-            calendar_ids: Calendar UUID(s) (takes precedence over names).
+            calendar_ids: Calendar UUID(s) to check. None/empty checks all.
 
         Returns:
             List of conflict dicts, each with 'event_a', 'event_b',
@@ -717,7 +673,7 @@ class CalendarConnector:
             ValueError: If date format is invalid, calendar not found, or no calendars provided
             PermissionError: If EventKit calendar access is denied
         """
-        all_events = self.get_events(calendar_names or [], start_date, end_date, calendar_ids=calendar_ids)
+        all_events = self.get_events(start_date, end_date, calendar_ids=calendar_ids)
 
         # Filter out free events — only busy/tentative can conflict
         busy_events = [
@@ -811,34 +767,21 @@ class CalendarConnector:
             args += ["--source", calendar_source]
         return self._run_swift_helper_json("create_calendar", args)
 
-    def delete_calendar(
-        self, name: str, calendar_source: str = "", calendar_id: str = ""
-    ) -> dict[str, str]:
+    def delete_calendar(self, calendar_id: str) -> dict[str, str]:
         """Delete a calendar from Apple Calendar.
 
         Uses EventKit via Swift helper for native calendar deletion.
 
         Args:
-            name: Name of the calendar to delete
-            calendar_source: Source/account name to disambiguate duplicates
-            calendar_id: Calendar UUID (takes precedence over name).
+            calendar_id: Calendar UUID of the calendar to delete.
 
         Returns:
             Dict with 'name' key of the deleted calendar
 
         Raises:
             CalendarSafetyError: If safety checks block the target calendar
-            ValueError: If the calendar doesn't exist or is ambiguous
+            ValueError: If the calendar doesn't exist
             PermissionError: If EventKit calendar access is denied
         """
-        self._verify_calendar_safety(name)
-        if name:
-            self._validate_cli_arg(name, "name")
-        if calendar_source:
-            self._validate_cli_arg(calendar_source, "calendar_source")
-        args = ["--name", name]
-        if calendar_id:
-            args += ["--calendar-id", calendar_id]
-        if calendar_source:
-            args += ["--source", calendar_source]
-        return self._run_swift_helper_json("delete_calendar", args)
+        self._verify_calendar_safety_by_id(calendar_id)
+        return self._run_swift_helper_json("delete_calendar", ["--calendar-id", calendar_id])
