@@ -14,9 +14,7 @@ func outputError(_ error: String, _ message: String) {
 // MARK: - Argument Parsing
 
 struct DeleteCalendarArgs {
-    var name: String = ""
     var calendarId: String = ""
-    var source: String = ""
 }
 
 func parseArgs() -> DeleteCalendarArgs {
@@ -25,12 +23,8 @@ func parseArgs() -> DeleteCalendarArgs {
     var i = 1
     while i < args.count {
         switch args[i] {
-        case "--name":
-            i += 1; if i < args.count { result.name = args[i] }
         case "--calendar-id":
             i += 1; if i < args.count { result.calendarId = args[i] }
-        case "--source":
-            i += 1; if i < args.count { result.source = args[i] }
         default:
             break
         }
@@ -43,8 +37,8 @@ func parseArgs() -> DeleteCalendarArgs {
 
 let parsed = parseArgs()
 
-guard !parsed.name.isEmpty || !parsed.calendarId.isEmpty else {
-    outputError("invalid_args", "Required: --name <calendar_name> or --calendar-id <uuid>")
+guard !parsed.calendarId.isEmpty else {
+    outputError("invalid_args", "Required: --calendar-id <uuid>")
     exit(1)
 }
 
@@ -69,27 +63,11 @@ if !accessGranted {
 
 store.refreshSourcesIfNecessary()
 
-// Find the calendar by ID, or by name (and optionally source)
+// Find the calendar by ID
 let allCalendars = store.calendars(for: .event)
-let calendar: EKCalendar
-if !parsed.calendarId.isEmpty {
-    guard let found = allCalendars.first(where: { $0.calendarIdentifier == parsed.calendarId }) else {
-        outputError("calendar_not_found", "Calendar with ID '\(parsed.calendarId)' not found.")
-        exit(1)
-    }
-    calendar = found
-} else {
-    let matches = allCalendars.filter { $0.title == parsed.name && (parsed.source.isEmpty || $0.source.title == parsed.source) }
-    if matches.count > 1 && parsed.source.isEmpty {
-        outputError("ambiguous_calendar", "Multiple calendars named '\(parsed.name)' found. Specify calendar_source or calendar_id to disambiguate.")
-        exit(1)
-    }
-    guard let found = matches.first else {
-        let displayName = parsed.source.isEmpty ? parsed.name : "\(parsed.name) (\(parsed.source))"
-        outputError("calendar_not_found", "Calendar '\(displayName)' not found. Use get_calendars to see available names.")
-        exit(1)
-    }
-    calendar = found
+guard let calendar = allCalendars.first(where: { $0.calendarIdentifier == parsed.calendarId }) else {
+    outputError("calendar_not_found", "Calendar with ID '\(parsed.calendarId)' not found.")
+    exit(1)
 }
 
 do {
@@ -100,7 +78,7 @@ do {
 }
 
 // Output result
-let result: [String: String] = ["name": parsed.name]
+let result: [String: String] = ["name": calendar.title, "calendar_id": calendar.calendarIdentifier]
 
 if let data = try? JSONSerialization.data(withJSONObject: result, options: [.sortedKeys]),
    let str = String(data: data, encoding: .utf8) {

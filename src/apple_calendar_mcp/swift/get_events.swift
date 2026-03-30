@@ -15,9 +15,8 @@ func printUsage() {
     FileHandle.standardError.write(Data(msg.utf8))
 }
 
-func parseArgs() -> (calendars: [String], calendarIds: [String], start: String, end: String, query: String?)? {
+func parseArgs() -> (calendarIds: [String], start: String, end: String, query: String?)? {
     let args = CommandLine.arguments
-    var calendars: [String] = []
     var calendarIds: [String] = []
     var start: String?
     var end: String?
@@ -26,8 +25,6 @@ func parseArgs() -> (calendars: [String], calendarIds: [String], start: String, 
     var i = 1
     while i < args.count {
         switch args[i] {
-        case "--calendar":
-            i += 1; if i < args.count { calendars.append(args[i]) }
         case "--calendar-id":
             i += 1; if i < args.count { calendarIds.append(args[i]) }
         case "--start":
@@ -45,7 +42,7 @@ func parseArgs() -> (calendars: [String], calendarIds: [String], start: String, 
     guard let s = start, let e = end else {
         return nil
     }
-    return (calendars, calendarIds, s, e, query)
+    return (calendarIds, s, e, query)
 }
 
 // MARK: - Date Parsing
@@ -297,7 +294,7 @@ if !accessGranted {
 // Refresh sources to pick up recently-created events
 store.refreshSourcesIfNecessary()
 
-// Resolve calendars: nil means all calendars, otherwise look up by ID or name
+// Resolve calendars: nil means all calendars, otherwise look up by ID
 let allCalendars = store.calendars(for: .event)
 let calendarArray: [EKCalendar]?
 
@@ -306,16 +303,6 @@ if !parsed.calendarIds.isEmpty {
     for calId in parsed.calendarIds {
         guard let cal = allCalendars.first(where: { $0.calendarIdentifier == calId }) else {
             outputError("calendar_not_found", "Calendar with ID '\(calId)' not found.")
-            exit(1)
-        }
-        resolved.append(cal)
-    }
-    calendarArray = resolved
-} else if !parsed.calendars.isEmpty {
-    var resolved: [EKCalendar] = []
-    for calName in parsed.calendars {
-        guard let cal = allCalendars.first(where: { $0.title == calName }) else {
-            outputError("calendar_not_found", "Calendar '\(calName)' not found. Use get_calendars to see available names.")
             exit(1)
         }
         resolved.append(cal)

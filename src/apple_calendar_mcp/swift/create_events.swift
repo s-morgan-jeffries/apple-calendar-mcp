@@ -5,9 +5,7 @@ import Foundation
 // MARK: - Argument Parsing
 
 struct CreateEventsArgs {
-    var calendar: String = ""
     var calendarId: String = ""
-    var source: String = ""
 }
 
 func parseArgs() -> CreateEventsArgs {
@@ -16,12 +14,8 @@ func parseArgs() -> CreateEventsArgs {
     var i = 1
     while i < args.count {
         switch args[i] {
-        case "--calendar":
-            i += 1; if i < args.count { result.calendar = args[i] }
         case "--calendar-id":
             i += 1; if i < args.count { result.calendarId = args[i] }
-        case "--source":
-            i += 1; if i < args.count { result.source = args[i] }
         default:
             break
         }
@@ -155,9 +149,7 @@ func outputError(_ error: String, _ message: String) {
 // MARK: - Main
 
 let parsed = parseArgs()
-let calendarName = parsed.calendar
 let calendarId = parsed.calendarId
-let sourceName = parsed.source
 
 // Read JSON from stdin
 let stdinData = FileHandle.standardInput.readDataToEndOfFile()
@@ -189,24 +181,12 @@ if !calendarId.isEmpty {
         exit(1)
     }
     calendar = found
-} else if calendarName.isEmpty {
+} else {
     guard let defaultCal = store.defaultCalendarForNewEvents else {
         outputError("no_default_calendar", "No default calendar configured.")
         exit(1)
     }
     calendar = defaultCal
-} else {
-    let matches = store.calendars(for: .event).filter { $0.title == calendarName && (sourceName.isEmpty || $0.source.title == sourceName) }
-    if matches.count > 1 && sourceName.isEmpty {
-        outputError("ambiguous_calendar", "Multiple calendars named '\(calendarName)' found. Specify calendar_source or calendar_id to disambiguate.")
-        exit(1)
-    }
-    guard let found = matches.first else {
-        let displayName = sourceName.isEmpty ? calendarName : "\(calendarName) (\(sourceName))"
-        outputError("calendar_not_found", "Calendar '\(displayName)' not found. Use get_calendars to see available names.")
-        exit(1)
-    }
-    calendar = found
 }
 
 // Create events

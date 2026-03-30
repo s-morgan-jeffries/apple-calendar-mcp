@@ -188,10 +188,10 @@ class TestValidateCliArg:
     def test_allows_single_dash(self):
         CalendarConnector._validate_cli_arg("-notes", "calendar_name")
 
-    def test_rejects_in_create_events(self):
+    def test_rejects_in_create_calendar(self):
         connector = CalendarConnector(enable_safety_checks=False)
         with pytest.raises(ValueError, match="must not start with '--'"):
-            connector.create_events("--evil", [{"summary": "Test"}])
+            connector.create_calendar(name="--evil")
 
 
 # ── get_calendars ────────────────────────────────────────────────────────────
@@ -315,10 +315,10 @@ class TestDeleteCalendar:
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_deletes_calendar(self, mock_swift):
         mock_swift.return_value = json.dumps({"name": "Old Calendar"})
-        result = self.connector.delete_calendar("Old Calendar")
+        result = self.connector.delete_calendar(calendar_id="test-cal-id")
         assert result == {"name": "Old Calendar"}
         mock_swift.assert_called_once_with(
-            "delete_calendar", ["--name", "Old Calendar"], stdin_data=None
+            "delete_calendar", ["--calendar-id", "test-cal-id"], stdin_data=None
         )
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
@@ -329,22 +329,15 @@ class TestDeleteCalendar:
             stderr=""
         )
         with pytest.raises(ValueError, match="not found"):
-            self.connector.delete_calendar("Nonexistent")
-
-    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
-    def test_passes_source_to_swift(self, mock_swift):
-        mock_swift.return_value = json.dumps({"name": "Family"})
-        self.connector.delete_calendar("Family", calendar_source="iCloud")
-        mock_swift.assert_called_once_with(
-            "delete_calendar",
-            ["--name", "Family", "--source", "iCloud"],
-            stdin_data=None,
-        )
+            self.connector.delete_calendar(calendar_id="nonexistent-id")
 
     def test_safety_blocks_non_test_calendar(self):
         connector = CalendarConnector(enable_safety_checks=True)
-        with pytest.raises(CalendarSafetyError, match="not an allowed test calendar"):
-            connector.delete_calendar("Personal")
+        with patch.object(connector, "get_calendars", return_value=[
+            {"calendar_id": "non-test-id", "name": "Personal", "writable": True},
+        ]):
+            with pytest.raises(CalendarSafetyError, match="not an allowed test calendar"):
+                connector.delete_calendar(calendar_id="non-test-id")
 
 
 # ── get_events ──────────────────────────────────────────────────────────────
@@ -360,13 +353,13 @@ class TestGetEvents:
     def test_calls_swift_helper_with_correct_args(self, mock_swift):
         mock_swift.return_value = "[]"
         self.connector.get_events(
-            calendar_names=["Work"],
+            calendar_ids=["test-uuid"],
             start_date="2026-03-15T00:00:00",
             end_date="2026-03-16T00:00:00",
         )
         mock_swift.assert_called_once_with(
             "get_events",
-            ["--calendar", "Work", "--start", "2026-03-15T00:00:00", "--end", "2026-03-16T00:00:00"],
+            ["--calendar-id", "test-uuid", "--start", "2026-03-15T00:00:00", "--end", "2026-03-16T00:00:00"],
             stdin_data=None,
         )
 
@@ -374,13 +367,13 @@ class TestGetEvents:
     def test_calls_swift_helper_with_multiple_calendars(self, mock_swift):
         mock_swift.return_value = "[]"
         self.connector.get_events(
-            calendar_names=["Work", "Personal"],
+            calendar_ids=["test-uuid-1", "test-uuid-2"],
             start_date="2026-03-15T00:00:00",
             end_date="2026-03-16T00:00:00",
         )
         mock_swift.assert_called_once_with(
             "get_events",
-            ["--calendar", "Work", "--calendar", "Personal", "--start", "2026-03-15T00:00:00", "--end", "2026-03-16T00:00:00"],
+            ["--calendar-id", "test-uuid-1", "--calendar-id", "test-uuid-2", "--start", "2026-03-15T00:00:00", "--end", "2026-03-16T00:00:00"],
             stdin_data=None,
         )
 
@@ -388,7 +381,7 @@ class TestGetEvents:
     def test_calls_swift_helper_with_no_calendars_queries_all(self, mock_swift):
         mock_swift.return_value = "[]"
         self.connector.get_events(
-            calendar_names=[],
+            calendar_ids=[],
             start_date="2026-03-15T00:00:00",
             end_date="2026-03-16T00:00:00",
         )
@@ -399,37 +392,10 @@ class TestGetEvents:
         )
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
-    def test_string_calendar_name_backward_compat(self, mock_swift):
+    def test_none_calendar_ids_queries_all(self, mock_swift):
         mock_swift.return_value = "[]"
         self.connector.get_events(
-            calendar_names="Work",
-            start_date="2026-03-15T00:00:00",
-            end_date="2026-03-16T00:00:00",
-        )
-        mock_swift.assert_called_once_with(
-            "get_events",
-            ["--calendar", "Work", "--start", "2026-03-15T00:00:00", "--end", "2026-03-16T00:00:00"],
-            stdin_data=None,
-        )
-
-    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
-    def test_calendar_name_kwarg_backward_compat(self, mock_swift):
-        """The calendar_name= kwarg alias resolves to --calendar in Swift args."""
-        mock_swift.return_value = "[]"
-        self.connector.get_events(
-            calendar_name="Work",
-            start_date="2026-03-15T00:00:00",
-            end_date="2026-03-16T00:00:00",
-        )
-        args = mock_swift.call_args[0][1]
-        assert "--calendar" in args
-        assert "Work" in args
-
-    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
-    def test_none_calendar_names_queries_all(self, mock_swift):
-        mock_swift.return_value = "[]"
-        self.connector.get_events(
-            calendar_names=None,
+            calendar_ids=None,
             start_date="2026-03-15T00:00:00",
             end_date="2026-03-16T00:00:00",
         )
@@ -446,7 +412,7 @@ class TestGetEvents:
              "end_date": "2026-03-15T15:00:00", "allday_event": False, "location": "",
              "notes": "", "url": "", "status": "confirmed", "calendar_name": "Work"},
         ])
-        result = self.connector.get_events("Work", "2026-03-15T00:00:00", "2026-03-16T00:00:00")
+        result = self.connector.get_events(start_date="2026-03-15T00:00:00", end_date="2026-03-16T00:00:00")
         assert isinstance(result, list)
         assert len(result) == 1
         assert result[0]["uid"] == "ABC-123"
@@ -455,16 +421,16 @@ class TestGetEvents:
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_returns_empty_list_when_no_events(self, mock_swift):
         mock_swift.return_value = "[]"
-        result = self.connector.get_events("Work", "2026-03-15T00:00:00", "2026-03-16T00:00:00")
+        result = self.connector.get_events(start_date="2026-03-15T00:00:00", end_date="2026-03-16T00:00:00")
         assert result == []
 
     def test_invalid_start_date_raises_error(self):
         with pytest.raises(ValueError, match="Invalid date format"):
-            self.connector.get_events("Work", "not-a-date", "2026-03-16T00:00:00")
+            self.connector.get_events(start_date="not-a-date", end_date="2026-03-16T00:00:00")
 
     def test_invalid_end_date_raises_error(self):
         with pytest.raises(ValueError, match="Invalid date format"):
-            self.connector.get_events("Work", "2026-03-15T00:00:00", "not-a-date")
+            self.connector.get_events(start_date="2026-03-15T00:00:00", end_date="not-a-date")
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_handles_authorization_error(self, mock_swift):
@@ -472,7 +438,7 @@ class TestGetEvents:
             {"error": "calendar_access_denied", "message": "Access denied"}
         )
         with pytest.raises(PermissionError, match="Access denied"):
-            self.connector.get_events("Work", "2026-03-15T00:00:00", "2026-03-16T00:00:00")
+            self.connector.get_events(start_date="2026-03-15T00:00:00", end_date="2026-03-16T00:00:00")
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_handles_calendar_not_found_error(self, mock_swift):
@@ -480,12 +446,12 @@ class TestGetEvents:
             {"error": "calendar_not_found", "message": "Calendar 'Foo' not found."}
         )
         with pytest.raises(ValueError, match="Calendar 'Foo' not found"):
-            self.connector.get_events("Foo", "2026-03-15T00:00:00", "2026-03-16T00:00:00")
+            self.connector.get_events(start_date="2026-03-15T00:00:00", end_date="2026-03-16T00:00:00")
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_date_only_format_accepted(self, mock_swift):
         mock_swift.return_value = "[]"
-        self.connector.get_events("Work", "2026-03-15", "2026-03-16")
+        self.connector.get_events(start_date="2026-03-15", end_date="2026-03-16")
         mock_swift.assert_called_once()
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
@@ -497,7 +463,7 @@ class TestGetEvents:
              "is_recurring": True, "recurrence": "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,WE,FR",
              "is_detached": False, "occurrence_date": "2026-07-01T09:00:00"},
         ])
-        result = self.connector.get_events("Work", "2026-07-01", "2026-07-02")
+        result = self.connector.get_events(start_date="2026-07-01", end_date="2026-07-02")
         event = result[0]
         assert event["is_recurring"] is True
         assert "FREQ=WEEKLY" in event["recurrence"]
@@ -515,7 +481,7 @@ class TestGetEvents:
              "recurrence_parsed": {"frequency": "weekly", "interval": 2, "days_of_week": ["MO"], "count": 10},
              "is_detached": False, "occurrence_date": "2026-07-01T09:00:00"},
         ])
-        result = self.connector.get_events("Work", "2026-07-01", "2026-07-02")
+        result = self.connector.get_events(start_date="2026-07-01", end_date="2026-07-02")
         event = result[0]
         assert event["recurrence_parsed"]["frequency"] == "weekly"
         assert event["recurrence_parsed"]["interval"] == 2
@@ -535,7 +501,7 @@ class TestGetEvents:
                  {"name": "", "email": "bob@example.com", "role": "optional", "status": "pending"},
              ]},
         ])
-        result = self.connector.get_events("Work", "2026-07-01", "2026-07-02")
+        result = self.connector.get_events(start_date="2026-07-01", end_date="2026-07-02")
         event = result[0]
         assert len(event["attendees"]) == 2
         assert event["attendees"][0]["name"] == "Alice"
@@ -551,7 +517,7 @@ class TestGetEvents:
              "is_recurring": False, "recurrence": None, "is_detached": False,
              "occurrence_date": "2026-07-01T10:00:00", "attendees": []},
         ])
-        result = self.connector.get_events("Work", "2026-07-01", "2026-07-02")
+        result = self.connector.get_events(start_date="2026-07-01", end_date="2026-07-02")
         assert result[0]["attendees"] == []
 
 
@@ -576,7 +542,7 @@ class TestGetAvailability:
     def test_no_events_entire_range_free(self, mock_swift):
         mock_swift.return_value = "[]"
         result = self.connector.get_availability(
-            ["Work"], "2026-03-15T09:00:00", "2026-03-15T17:00:00"
+            start_date="2026-03-15T09:00:00", end_date="2026-03-15T17:00:00", calendar_ids=["test-uuid"]
         )
         assert len(result) == 1
         assert result[0]["start_date"] == "2026-03-15T09:00:00"
@@ -589,7 +555,7 @@ class TestGetAvailability:
             self._make_event("2026-03-15T10:00:00", "2026-03-15T11:00:00"),
         ])
         result = self.connector.get_availability(
-            ["Work"], "2026-03-15T09:00:00", "2026-03-15T17:00:00"
+            start_date="2026-03-15T09:00:00", end_date="2026-03-15T17:00:00", calendar_ids=["test-uuid"]
         )
         assert len(result) == 2
         assert result[0]["start_date"] == "2026-03-15T09:00:00"
@@ -606,7 +572,7 @@ class TestGetAvailability:
             self._make_event("2026-03-15T11:00:00", "2026-03-15T12:00:00"),
         ])
         result = self.connector.get_availability(
-            ["Work"], "2026-03-15T09:00:00", "2026-03-15T13:00:00"
+            start_date="2026-03-15T09:00:00", end_date="2026-03-15T13:00:00", calendar_ids=["test-uuid"]
         )
         assert len(result) == 2
         assert result[0]["start_date"] == "2026-03-15T10:00:00"
@@ -622,7 +588,7 @@ class TestGetAvailability:
             self._make_event("2026-03-15T10:00:00", "2026-03-15T12:00:00", calendar="Personal"),
         ])
         result = self.connector.get_availability(
-            ["Work", "Personal"], "2026-03-15T08:00:00", "2026-03-15T14:00:00"
+            start_date="2026-03-15T08:00:00", end_date="2026-03-15T14:00:00", calendar_ids=["test-uuid-1", "test-uuid-2"]
         )
         assert len(result) == 2
         assert result[0]["start_date"] == "2026-03-15T08:00:00"
@@ -637,7 +603,7 @@ class TestGetAvailability:
             self._make_event("2026-03-15T10:00:00", "2026-03-15T11:00:00"),
         ])
         result = self.connector.get_availability(
-            ["Work"], "2026-03-15T09:00:00", "2026-03-15T11:00:00"
+            start_date="2026-03-15T09:00:00", end_date="2026-03-15T11:00:00", calendar_ids=["test-uuid"]
         )
         assert len(result) == 0
 
@@ -648,7 +614,7 @@ class TestGetAvailability:
             self._make_event("2026-03-15", "2026-03-16", allday=True),
         ])
         result = self.connector.get_availability(
-            ["Work"], "2026-03-15T00:00:00", "2026-03-16T00:00:00"
+            start_date="2026-03-15T00:00:00", end_date="2026-03-16T00:00:00", calendar_ids=["test-uuid"]
         )
         assert len(result) == 0
 
@@ -658,17 +624,21 @@ class TestGetAvailability:
             self._make_event("2026-03-15T08:00:00", "2026-03-15T18:00:00"),
         ])
         result = self.connector.get_availability(
-            ["Work"], "2026-03-15T09:00:00", "2026-03-15T17:00:00"
+            start_date="2026-03-15T09:00:00", end_date="2026-03-15T17:00:00", calendar_ids=["test-uuid"]
         )
         assert len(result) == 0
 
     def test_invalid_start_date_raises(self):
         with pytest.raises(ValueError, match="Invalid date format"):
-            self.connector.get_availability(["Work"], "not-a-date", "2026-03-16T00:00:00")
+            self.connector.get_availability(
+            start_date="not-a-date", end_date="2026-03-16T00:00:00", calendar_ids=["test-uuid"]
+        )
 
     def test_invalid_end_date_raises(self):
         with pytest.raises(ValueError, match="Invalid date format"):
-            self.connector.get_availability(["Work"], "2026-03-15T00:00:00", "not-a-date")
+            self.connector.get_availability(
+            start_date="2026-03-15T00:00:00", end_date="not-a-date", calendar_ids=["test-uuid"]
+        )
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_multiple_calendars_combined(self, mock_swift):
@@ -678,7 +648,7 @@ class TestGetAvailability:
             self._make_event("2026-03-15T14:00:00", "2026-03-15T15:00:00", calendar="Personal"),
         ])
         result = self.connector.get_availability(
-            ["Work", "Personal"], "2026-03-15T08:00:00", "2026-03-15T16:00:00"
+            start_date="2026-03-15T08:00:00", end_date="2026-03-15T16:00:00", calendar_ids=["test-uuid-1", "test-uuid-2"]
         )
         assert len(result) == 3
         assert result[0]["end_date"] == "2026-03-15T09:00:00"
@@ -693,7 +663,7 @@ class TestGetAvailability:
         event["availability"] = "free"
         mock_swift.return_value = json.dumps([event])
         result = self.connector.get_availability(
-            ["Work"], "2026-03-15T09:00:00", "2026-03-15T17:00:00"
+            start_date="2026-03-15T09:00:00", end_date="2026-03-15T17:00:00", calendar_ids=["test-uuid"]
         )
         # Entire range should be free since the event is marked "free"
         assert len(result) == 1
@@ -706,7 +676,7 @@ class TestGetAvailability:
         event["availability"] = "tentative"
         mock_swift.return_value = json.dumps([event])
         result = self.connector.get_availability(
-            ["Work"], "2026-03-15T09:00:00", "2026-03-15T17:00:00"
+            start_date="2026-03-15T09:00:00", end_date="2026-03-15T17:00:00", calendar_ids=["test-uuid"]
         )
         # Should have two free slots (before and after the tentative event)
         assert len(result) == 2
@@ -739,7 +709,7 @@ class TestGetAvailabilityFiltering:
             self._make_event("2026-03-15T12:00:00", "2026-03-15T13:00:00"),
         ])
         result = self.connector.get_availability(
-            ["Work"], "2026-03-15T09:00:00", "2026-03-15T17:00:00",
+            start_date="2026-03-15T09:00:00", end_date="2026-03-15T17:00:00", calendar_ids=["test-uuid"],
             min_duration_minutes=45,
         )
         # 9:00-10:00 (60m) ✓, 10:30-12:00 (90m) ✓, 13:00-17:00 (240m) ✓
@@ -753,7 +723,7 @@ class TestGetAvailabilityFiltering:
             self._make_event("2026-03-15T09:30:00", "2026-03-15T10:00:00"),
         ])
         result = self.connector.get_availability(
-            ["Work"], "2026-03-15T09:00:00", "2026-03-15T10:30:00",
+            start_date="2026-03-15T09:00:00", end_date="2026-03-15T10:30:00", calendar_ids=["test-uuid"],
             min_duration_minutes=60,
         )
         # 9:00-9:30 (30m) ✗, 10:00-10:30 (30m) ✗
@@ -764,7 +734,7 @@ class TestGetAvailabilityFiltering:
         """Free slot clipped to working hours window."""
         mock_swift.return_value = "[]"
         result = self.connector.get_availability(
-            ["Work"], "2026-03-15T00:00:00", "2026-03-16T00:00:00",
+            start_date="2026-03-15T00:00:00", end_date="2026-03-16T00:00:00", calendar_ids=["test-uuid"],
             working_hours_start="09:00", working_hours_end="17:00",
         )
         assert len(result) == 1
@@ -779,7 +749,7 @@ class TestGetAvailabilityFiltering:
             self._make_event("2026-03-15T12:00:00", "2026-03-15T13:00:00"),
         ])
         result = self.connector.get_availability(
-            ["Work"], "2026-03-15T06:00:00", "2026-03-15T20:00:00",
+            start_date="2026-03-15T06:00:00", end_date="2026-03-15T20:00:00", calendar_ids=["test-uuid"],
             working_hours_start="09:00", working_hours_end="17:00",
         )
         # 6:00-12:00 clipped to 9:00-12:00 (180m), 13:00-20:00 clipped to 13:00-17:00 (240m)
@@ -798,7 +768,7 @@ class TestGetAvailabilityFiltering:
             self._make_event("2026-03-15T09:00:00", "2026-03-15T17:00:00"),
         ])
         result = self.connector.get_availability(
-            ["Work"], "2026-03-15T06:00:00", "2026-03-15T20:00:00",
+            start_date="2026-03-15T06:00:00", end_date="2026-03-15T20:00:00", calendar_ids=["test-uuid"],
             working_hours_start="09:00", working_hours_end="17:00",
         )
         # 6:00-9:00 outside WH, 17:00-20:00 outside WH → both excluded
@@ -809,7 +779,7 @@ class TestGetAvailabilityFiltering:
         """Multi-day free slot split into per-day working hour windows."""
         mock_swift.return_value = "[]"
         result = self.connector.get_availability(
-            ["Work"], "2026-03-15T00:00:00", "2026-03-18T00:00:00",
+            start_date="2026-03-15T00:00:00", end_date="2026-03-18T00:00:00", calendar_ids=["test-uuid"],
             working_hours_start="09:00", working_hours_end="17:00",
         )
         # 3 days: Mar 15, 16, 17 → 3 slots of 8h each
@@ -828,7 +798,7 @@ class TestGetAvailabilityFiltering:
             self._make_event("2026-03-15T12:00:00", "2026-03-15T16:45:00"),
         ])
         result = self.connector.get_availability(
-            ["Work"], "2026-03-15T06:00:00", "2026-03-15T20:00:00",
+            start_date="2026-03-15T06:00:00", end_date="2026-03-15T20:00:00", calendar_ids=["test-uuid"],
             min_duration_minutes=30,
             working_hours_start="09:00", working_hours_end="17:00",
         )
@@ -840,44 +810,44 @@ class TestGetAvailabilityFiltering:
     def test_working_hours_start_only_raises(self):
         with pytest.raises(ValueError, match="Both working_hours"):
             self.connector.get_availability(
-                ["Work"], "2026-03-15T09:00:00", "2026-03-15T17:00:00",
-                working_hours_start="09:00",
-            )
+            start_date="2026-03-15T09:00:00", end_date="2026-03-15T17:00:00", calendar_ids=["test-uuid"],
+            working_hours_start="09:00",
+        )
 
     def test_working_hours_end_only_raises(self):
         with pytest.raises(ValueError, match="Both working_hours"):
             self.connector.get_availability(
-                ["Work"], "2026-03-15T09:00:00", "2026-03-15T17:00:00",
-                working_hours_end="17:00",
-            )
+            start_date="2026-03-15T09:00:00", end_date="2026-03-15T17:00:00", calendar_ids=["test-uuid"],
+            working_hours_end="17:00",
+        )
 
     def test_invalid_time_format_raises(self):
         with pytest.raises(ValueError, match="Invalid time format"):
             self.connector.get_availability(
-                ["Work"], "2026-03-15T09:00:00", "2026-03-15T17:00:00",
-                working_hours_start="9am", working_hours_end="5pm",
-            )
+            start_date="2026-03-15T09:00:00", end_date="2026-03-15T17:00:00", calendar_ids=["test-uuid"],
+            working_hours_start="9am", working_hours_end="5pm",
+        )
 
     def test_working_hours_start_after_end_raises(self):
         with pytest.raises(ValueError, match="must be before"):
             self.connector.get_availability(
-                ["Work"], "2026-03-15T09:00:00", "2026-03-15T17:00:00",
-                working_hours_start="17:00", working_hours_end="09:00",
-            )
+            start_date="2026-03-15T09:00:00", end_date="2026-03-15T17:00:00", calendar_ids=["test-uuid"],
+            working_hours_start="17:00", working_hours_end="09:00",
+        )
 
     def test_min_duration_zero_raises(self):
         with pytest.raises(ValueError, match="positive integer"):
             self.connector.get_availability(
-                ["Work"], "2026-03-15T09:00:00", "2026-03-15T17:00:00",
-                min_duration_minutes=0,
-            )
+            start_date="2026-03-15T09:00:00", end_date="2026-03-15T17:00:00", calendar_ids=["test-uuid"],
+            min_duration_minutes=0,
+        )
 
     def test_min_duration_negative_raises(self):
         with pytest.raises(ValueError, match="positive integer"):
             self.connector.get_availability(
-                ["Work"], "2026-03-15T09:00:00", "2026-03-15T17:00:00",
-                min_duration_minutes=-10,
-            )
+            start_date="2026-03-15T09:00:00", end_date="2026-03-15T17:00:00", calendar_ids=["test-uuid"],
+            min_duration_minutes=-10,
+        )
 
 
 class TestGetConflicts:
@@ -897,7 +867,7 @@ class TestGetConflicts:
     @patch.object(CalendarConnector, "get_events")
     def test_no_events_returns_empty(self, mock_get):
         mock_get.return_value = []
-        result = self.connector.get_conflicts(["Work"], "2026-03-15", "2026-03-16")
+        result = self.connector.get_conflicts(start_date="2026-03-15", end_date="2026-03-16", calendar_ids=["test-uuid"])
         assert result == []
 
     @patch.object(CalendarConnector, "get_events")
@@ -906,7 +876,7 @@ class TestGetConflicts:
             self._make_event("A", "Meeting", "2026-03-15T10:00:00", "2026-03-15T11:00:00"),
             self._make_event("B", "Lunch", "2026-03-15T12:00:00", "2026-03-15T13:00:00"),
         ]
-        result = self.connector.get_conflicts(["Work"], "2026-03-15", "2026-03-16")
+        result = self.connector.get_conflicts(start_date="2026-03-15", end_date="2026-03-16", calendar_ids=["test-uuid"])
         assert result == []
 
     @patch.object(CalendarConnector, "get_events")
@@ -915,7 +885,7 @@ class TestGetConflicts:
             self._make_event("A", "Meeting", "2026-03-15T10:00:00", "2026-03-15T11:00:00"),
             self._make_event("B", "Call", "2026-03-15T10:30:00", "2026-03-15T11:30:00"),
         ]
-        result = self.connector.get_conflicts(["Work"], "2026-03-15", "2026-03-16")
+        result = self.connector.get_conflicts(start_date="2026-03-15", end_date="2026-03-16", calendar_ids=["test-uuid"])
         assert len(result) == 1
         assert result[0]["event_a"]["uid"] == "A"
         assert result[0]["event_b"]["uid"] == "B"
@@ -930,7 +900,7 @@ class TestGetConflicts:
             self._make_event("B", "Call", "2026-03-15T10:00:00", "2026-03-15T11:00:00"),
             self._make_event("C", "Review", "2026-03-15T10:30:00", "2026-03-15T11:30:00"),
         ]
-        result = self.connector.get_conflicts(["Work"], "2026-03-15", "2026-03-16")
+        result = self.connector.get_conflicts(start_date="2026-03-15", end_date="2026-03-16", calendar_ids=["test-uuid"])
         assert len(result) == 3  # A-B, A-C, B-C
 
     @patch.object(CalendarConnector, "get_events")
@@ -939,7 +909,7 @@ class TestGetConflicts:
             self._make_event("A", "Meeting", "2026-03-15T10:00:00", "2026-03-15T11:00:00", availability="busy"),
             self._make_event("B", "Lunch", "2026-03-15T10:30:00", "2026-03-15T11:30:00", availability="free"),
         ]
-        result = self.connector.get_conflicts(["Work"], "2026-03-15", "2026-03-16")
+        result = self.connector.get_conflicts(start_date="2026-03-15", end_date="2026-03-16", calendar_ids=["test-uuid"])
         assert result == []
 
     @patch.object(CalendarConnector, "get_events")
@@ -948,7 +918,7 @@ class TestGetConflicts:
             self._make_event("A", "Meeting", "2026-03-15T10:00:00", "2026-03-15T11:00:00", availability="busy"),
             self._make_event("B", "Maybe", "2026-03-15T10:30:00", "2026-03-15T11:30:00", availability="tentative"),
         ]
-        result = self.connector.get_conflicts(["Work"], "2026-03-15", "2026-03-16")
+        result = self.connector.get_conflicts(start_date="2026-03-15", end_date="2026-03-16", calendar_ids=["test-uuid"])
         assert len(result) == 1
 
     @patch.object(CalendarConnector, "get_events")
@@ -957,7 +927,7 @@ class TestGetConflicts:
             self._make_event("A", "Meeting", "2026-03-15T10:00:00", "2026-03-15T11:00:00", "Work"),
             self._make_event("B", "Dentist", "2026-03-15T10:30:00", "2026-03-15T11:30:00", "Personal"),
         ]
-        result = self.connector.get_conflicts(["Work", "Personal"], "2026-03-15", "2026-03-16")
+        result = self.connector.get_conflicts(start_date="2026-03-15", end_date="2026-03-16", calendar_ids=["test-uuid-1", "test-uuid-2"])
         assert len(result) == 1
         assert result[0]["event_a"]["calendar_name"] == "Work"
         assert result[0]["event_b"]["calendar_name"] == "Personal"
@@ -968,7 +938,7 @@ class TestGetConflicts:
             self._make_event("A", "Meeting", "2026-03-15T10:00:00", "2026-03-15T11:00:00"),
             self._make_event("B", "Call", "2026-03-15T11:00:00", "2026-03-15T12:00:00"),
         ]
-        result = self.connector.get_conflicts(["Work"], "2026-03-15", "2026-03-16")
+        result = self.connector.get_conflicts(start_date="2026-03-15", end_date="2026-03-16", calendar_ids=["test-uuid"])
         assert result == []
 
 class TestParseTimeString:
@@ -1005,7 +975,7 @@ class TestDeleteEvents:
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_deletes_single_event(self, mock_swift):
         mock_swift.return_value = json.dumps({"deleted_uids": ["ABC-123"], "not_found_uids": []})
-        result = self.connector.delete_events("MCP-Test-Calendar", "ABC-123")
+        result = self.connector.delete_events("test-cal-id", "ABC-123")
         assert result["deleted_uids"] == ["ABC-123"]
         assert result["not_found_uids"] == []
         args = mock_swift.call_args[0][1]
@@ -1015,7 +985,7 @@ class TestDeleteEvents:
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_deletes_multiple_events(self, mock_swift):
         mock_swift.return_value = json.dumps({"deleted_uids": ["UID-1", "UID-2", "UID-3"], "not_found_uids": []})
-        result = self.connector.delete_events("MCP-Test-Calendar", ["UID-1", "UID-2", "UID-3"])
+        result = self.connector.delete_events("test-cal-id", ["UID-1", "UID-2", "UID-3"])
         assert result["deleted_uids"] == ["UID-1", "UID-2", "UID-3"]
         args = mock_swift.call_args[0][1]
         # All UIDs passed in single call
@@ -1024,37 +994,40 @@ class TestDeleteEvents:
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_normalizes_single_uid_to_list(self, mock_swift):
         mock_swift.return_value = json.dumps({"deleted_uids": ["SINGLE-UID"], "not_found_uids": []})
-        result = self.connector.delete_events("MCP-Test-Calendar", "SINGLE-UID")
+        result = self.connector.delete_events("test-cal-id", "SINGLE-UID")
         assert isinstance(result["deleted_uids"], list)
         assert result["deleted_uids"] == ["SINGLE-UID"]
 
     def test_safety_blocks_non_test_calendar(self):
         connector = CalendarConnector(enable_safety_checks=True)
-        with pytest.raises(CalendarSafetyError, match="not an allowed test calendar"):
-            connector.delete_events("Personal", "ABC-123")
+        with patch.object(connector, "get_calendars", return_value=[
+            {"calendar_id": "non-test-id", "name": "Personal", "writable": True},
+        ]):
+            with pytest.raises(CalendarSafetyError, match="not an allowed test calendar"):
+                connector.delete_events(calendar_id="non-test-id", event_uids="ABC-123")
 
     def test_empty_list_raises(self):
         with pytest.raises(ValueError, match="At least one event UID"):
-            self.connector.delete_events("MCP-Test-Calendar", [])
+            self.connector.delete_events("test-cal-id", [])
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_not_found_uid(self, mock_swift):
         mock_swift.return_value = json.dumps({"deleted_uids": [], "not_found_uids": ["BAD-UID"]})
-        result = self.connector.delete_events("MCP-Test-Calendar", "BAD-UID")
+        result = self.connector.delete_events("test-cal-id", "BAD-UID")
         assert result["deleted_uids"] == []
         assert result["not_found_uids"] == ["BAD-UID"]
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_batch_partial_failure(self, mock_swift):
         mock_swift.return_value = json.dumps({"deleted_uids": ["UID-1", "UID-3"], "not_found_uids": ["UID-2"]})
-        result = self.connector.delete_events("MCP-Test-Calendar", ["UID-1", "UID-2", "UID-3"])
+        result = self.connector.delete_events("test-cal-id", ["UID-1", "UID-2", "UID-3"])
         assert result["deleted_uids"] == ["UID-1", "UID-3"]
         assert result["not_found_uids"] == ["UID-2"]
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_passes_span_future_events(self, mock_swift):
         mock_swift.return_value = json.dumps({"deleted_uids": ["REC-123"], "not_found_uids": []})
-        self.connector.delete_events("MCP-Test-Calendar", "REC-123", span="future_events")
+        self.connector.delete_events("test-cal-id", "REC-123", span="future_events")
         args = mock_swift.call_args[0][1]
         assert "--span" in args
         assert "future_events" in args
@@ -1062,21 +1035,21 @@ class TestDeleteEvents:
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_default_span_not_passed(self, mock_swift):
         mock_swift.return_value = json.dumps({"deleted_uids": ["ABC-123"], "not_found_uids": []})
-        self.connector.delete_events("MCP-Test-Calendar", "ABC-123")
+        self.connector.delete_events("test-cal-id", "ABC-123")
         args = mock_swift.call_args[0][1]
         assert "--span" not in args
 
     def test_exceeds_batch_limit(self):
         uids = [f"UID-{i}" for i in range(51)]
         with pytest.raises(ValueError, match="exceeds limit of 50"):
-            self.connector.delete_events("MCP-Test-Calendar", uids)
+            self.connector.delete_events("test-cal-id", uids)
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_batch_limit_boundary_succeeds(self, mock_swift):
         """Exactly 50 UIDs should succeed (boundary of MAX_BATCH_SIZE)."""
         uids = [f"UID-{i}" for i in range(50)]
         mock_swift.return_value = json.dumps({"deleted_uids": uids, "not_found_uids": []})
-        result = self.connector.delete_events("MCP-Test-Calendar", uids)
+        result = self.connector.delete_events("test-cal-id", uids)
         assert len(result["deleted_uids"]) == 50
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
@@ -1173,7 +1146,7 @@ class TestCreateEvents:
             {"summary": "Event 1", "start_date": "2026-03-15T10:00:00", "end_date": "2026-03-15T11:00:00"},
             {"summary": "Event 2", "start_date": "2026-03-15T12:00:00", "end_date": "2026-03-15T13:00:00"},
         ]
-        result = self.connector.create_events("MCP-Test-Calendar", events)
+        result = self.connector.create_events(events=events, calendar_id="test-cal-id")
         assert len(result["created"]) == 2
         assert result["errors"] == []
 
@@ -1183,28 +1156,31 @@ class TestCreateEvents:
             "created": [{"uid": "UID-1", "summary": "Event 1", "calendar_name": "MCP-Test-Calendar"}],
             "errors": [{"index": 1, "summary": "Bad Event", "error": "invalid date"}],
         })
-        result = self.connector.create_events("MCP-Test-Calendar", [{"summary": "Event 1"}, {"summary": "Bad Event"}])
+        result = self.connector.create_events(events=[{"summary": "Event 1"}, {"summary": "Bad Event"}], calendar_id="test-cal-id")
         assert len(result["created"]) == 1
         assert len(result["errors"]) == 1
 
     def test_empty_list_raises(self):
         with pytest.raises(ValueError, match="At least one event"):
-            self.connector.create_events("MCP-Test-Calendar", [])
+            self.connector.create_events(events=[], calendar_id="test-cal-id")
 
     def test_safety_blocks_non_test_calendar(self):
         connector = CalendarConnector(enable_safety_checks=True)
-        with pytest.raises(CalendarSafetyError):
-            connector.create_events("Personal", [{"summary": "Test"}])
+        with patch.object(connector, "get_calendars", return_value=[
+            {"calendar_id": "non-test-id", "name": "Personal", "writable": True},
+        ]):
+            with pytest.raises(CalendarSafetyError):
+                connector.create_events(events=[{"summary": "Test"}], calendar_id="non-test-id")
 
-    def test_safety_blocks_empty_calendar_name(self):
+    def test_safety_blocks_empty_calendar_id(self):
         connector = CalendarConnector(enable_safety_checks=True)
-        with pytest.raises(CalendarSafetyError, match="calendar_name or calendar_id is required"):
-            connector.create_events("", [{"summary": "Test"}])
+        with pytest.raises(CalendarSafetyError, match="calendar_id is required"):
+            connector.create_events(events=[{"summary": "Test"}], calendar_id="")
 
     def test_exceeds_batch_limit(self):
         events = [{"summary": f"Event {i}"} for i in range(51)]
         with pytest.raises(ValueError, match="exceeds limit of 50"):
-            self.connector.create_events("MCP-Test-Calendar", events)
+            self.connector.create_events(events=events, calendar_id="test-cal-id")
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_batch_limit_boundary_succeeds(self, mock_swift):
@@ -1212,31 +1188,22 @@ class TestCreateEvents:
         created = [{"uid": f"UID-{i}", "summary": f"Event {i}", "calendar_name": "MCP-Test-Calendar"} for i in range(50)]
         mock_swift.return_value = json.dumps({"created": created, "errors": []})
         events = [{"summary": f"Event {i}", "start_date": "2026-03-15T10:00:00", "end_date": "2026-03-15T11:00:00"} for i in range(50)]
-        result = self.connector.create_events("MCP-Test-Calendar", events)
+        result = self.connector.create_events(events=events, calendar_id="test-cal-id")
         assert len(result["created"]) == 50
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
-    def test_passes_calendar_source_to_swift(self, mock_swift):
+    def test_passes_calendar_id_to_swift(self, mock_swift):
         mock_swift.return_value = json.dumps({
             "created": [{"uid": "UID-1", "summary": "Event 1", "calendar_name": "MCP-Test-Calendar"}],
             "errors": [],
         })
         self.connector.create_events(
-            "MCP-Test-Calendar",
-            [{"summary": "Event 1", "start_date": "2026-03-15T10:00:00", "end_date": "2026-03-15T11:00:00"}],
-            calendar_source="iCloud",
+            events=[{"summary": "Event 1", "start_date": "2026-03-15T10:00:00", "end_date": "2026-03-15T11:00:00"}],
+            calendar_id="test-cal-id",
         )
         args = mock_swift.call_args[0][1]
-        assert "--source" in args
-        assert "iCloud" in args
-
-    def test_rejects_invalid_calendar_source(self):
-        with pytest.raises(ValueError, match="must not start with '--'"):
-            self.connector.create_events(
-                "MCP-Test-Calendar",
-                [{"summary": "Test"}],
-                calendar_source="--evil",
-            )
+        assert "--calendar-id" in args
+        assert "test-cal-id" in args
 
 
 # ── update_events (batch) ─────────────────────────────────────────────────
@@ -1254,12 +1221,12 @@ class TestUpdateEvents:
             "updated": [{"uid": "UID-1", "summary": "Updated", "updated_fields": ["summary"]}],
             "errors": [],
         })
-        result = self.connector.update_events("MCP-Test-Calendar", [{"uid": "UID-1", "summary": "Updated"}])
+        result = self.connector.update_events(calendar_id="test-cal-id", updates=[{"uid": "UID-1", "summary": "Updated"}])
         assert len(result["updated"]) == 1
 
     def test_empty_list_raises(self):
         with pytest.raises(ValueError, match="At least one update"):
-            self.connector.update_events("MCP-Test-Calendar", [])
+            self.connector.update_events(calendar_id="test-cal-id", updates=[])
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_occurrence_date_passed_through(self, mock_swift):
@@ -1269,8 +1236,8 @@ class TestUpdateEvents:
             "errors": [],
         })
         result = self.connector.update_events(
-            "MCP-Test-Calendar",
-            [{"uid": "UID-1", "summary": "Test", "occurrence_date": "2026-03-15T10:00:00"}],
+            calendar_id="test-cal-id",
+            updates=[{"uid": "UID-1", "summary": "Test", "occurrence_date": "2026-03-15T10:00:00"}],
         )
         assert len(result["updated"]) == 1
         # Verify the occurrence_date was included in the JSON sent to stdin
@@ -1283,13 +1250,16 @@ class TestUpdateEvents:
 
     def test_safety_blocks_non_test_calendar(self):
         connector = CalendarConnector(enable_safety_checks=True)
-        with pytest.raises(CalendarSafetyError):
-            connector.update_events("Personal", [{"uid": "UID-1", "summary": "Test"}])
+        with patch.object(connector, "get_calendars", return_value=[
+            {"calendar_id": "non-test-id", "name": "Personal", "writable": True},
+        ]):
+            with pytest.raises(CalendarSafetyError):
+                connector.update_events(calendar_id="non-test-id", updates=[{"uid": "UID-1", "summary": "Test"}])
 
     def test_exceeds_batch_limit(self):
         updates = [{"uid": f"UID-{i}", "summary": f"Event {i}"} for i in range(51)]
         with pytest.raises(ValueError, match="exceeds limit of 50"):
-            self.connector.update_events("MCP-Test-Calendar", updates)
+            self.connector.update_events(calendar_id="test-cal-id", updates=updates)
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_batch_limit_boundary_succeeds(self, mock_swift):
@@ -1297,31 +1267,22 @@ class TestUpdateEvents:
         updated = [{"uid": f"UID-{i}", "summary": f"Event {i}", "updated_fields": ["summary"]} for i in range(50)]
         mock_swift.return_value = json.dumps({"updated": updated, "errors": []})
         updates = [{"uid": f"UID-{i}", "summary": f"Event {i}"} for i in range(50)]
-        result = self.connector.update_events("MCP-Test-Calendar", updates)
+        result = self.connector.update_events(calendar_id="test-cal-id", updates=updates)
         assert len(result["updated"]) == 50
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
-    def test_passes_calendar_source_to_swift(self, mock_swift):
+    def test_passes_calendar_id_to_swift(self, mock_swift):
         mock_swift.return_value = json.dumps({
             "updated": [{"uid": "UID-1", "summary": "Updated", "updated_fields": ["summary"]}],
             "errors": [],
         })
         self.connector.update_events(
-            "MCP-Test-Calendar",
-            [{"uid": "UID-1", "summary": "Updated"}],
-            calendar_source="iCloud",
+            calendar_id="test-cal-id",
+            updates=[{"uid": "UID-1", "summary": "Updated"}],
         )
         args = mock_swift.call_args[0][1]
-        assert "--source" in args
-        assert "iCloud" in args
-
-    def test_rejects_invalid_calendar_source(self):
-        with pytest.raises(ValueError, match="must not start with '--'"):
-            self.connector.update_events(
-                "MCP-Test-Calendar",
-                [{"uid": "UID-1", "summary": "Test"}],
-                calendar_source="--evil",
-            )
+        assert "--calendar-id" in args
+        assert "test-cal-id" in args
 
 
 # ── search_events ─────────────────────────────────────────────────────────
@@ -1339,67 +1300,47 @@ class TestSearchEvents:
             {"uid": "UID-1", "summary": "Team Lunch", "start_date": "2026-03-15T12:00:00",
              "end_date": "2026-03-15T13:00:00", "calendar_name": "Work"},
         ])
-        results = self.connector.search_events("lunch", calendar_names=["Work"],
+        results = self.connector.search_events("lunch", calendar_ids=["test-uuid"],
                                                 start_date="2026-03-01", end_date="2026-04-01")
         assert len(results) == 1
         assert results[0]["summary"] == "Team Lunch"
         args = mock_swift.call_args[0][1]
         assert "--query" in args
         assert "lunch" in args
-        assert "--calendar" in args
-        assert "Work" in args
+        assert "--calendar-id" in args
+        assert "test-uuid" in args
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_searches_multiple_calendars(self, mock_swift):
         """When multiple calendars specified, passes all to Swift helper."""
         mock_swift.return_value = json.dumps([])
-        self.connector.search_events("lunch", calendar_names=["Work", "Personal"],
+        self.connector.search_events("lunch", calendar_ids=["test-uuid-1", "test-uuid-2"],
                                       start_date="2026-03-01", end_date="2026-04-01")
         args = mock_swift.call_args[0][1]
-        assert args.count("--calendar") == 2
-        assert "Work" in args
-        assert "Personal" in args
+        assert args.count("--calendar-id") == 2
+        assert "test-uuid-1" in args
+        assert "test-uuid-2" in args
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_searches_all_calendars(self, mock_swift):
-        """When no calendar_names, searches all calendars (no --calendar flags)."""
+        """When no calendar_ids, searches all calendars (no --calendar-id flags)."""
         mock_swift.return_value = json.dumps([])
         results = self.connector.search_events("lunch", start_date="2026-03-01", end_date="2026-04-01")
         assert results == []
-        # Single call with no --calendar flags
+        # Single call with no --calendar-id flags
         assert mock_swift.call_count == 1
         args = mock_swift.call_args[0][1]
-        assert "--calendar" not in args
+        assert "--calendar-id" not in args
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_default_date_range(self, mock_swift):
         """When no dates, defaults to 1 month ago to 6 months from now."""
         mock_swift.return_value = json.dumps([])
-        self.connector.search_events("test", calendar_names=["Work"])
+        self.connector.search_events("test", calendar_ids=["test-uuid"])
         args = mock_swift.call_args[0][1]
         # Should have --start and --end with auto-generated dates
         assert "--start" in args
         assert "--end" in args
-
-    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
-    def test_string_calendar_name_backward_compat(self, mock_swift):
-        """A single string calendar_names value is accepted for backward compat."""
-        mock_swift.return_value = json.dumps([])
-        self.connector.search_events("test", calendar_names="Work",
-                                      start_date="2026-03-01", end_date="2026-04-01")
-        args = mock_swift.call_args[0][1]
-        assert "--calendar" in args
-        assert "Work" in args
-
-    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
-    def test_calendar_name_kwarg_backward_compat(self, mock_swift):
-        """The calendar_name= kwarg alias resolves to --calendar in Swift args."""
-        mock_swift.return_value = json.dumps([])
-        self.connector.search_events("test", calendar_name="Work",
-                                      start_date="2026-03-01", end_date="2026-04-01")
-        args = mock_swift.call_args[0][1]
-        assert "--calendar" in args
-        assert "Work" in args
 
 
 # ── all-day inclusive end_date helpers ─────────────────────────────────────
@@ -1431,7 +1372,7 @@ class TestAlldayEndDateConversion:
              "end_date": "2026-03-15T11:00:00", "allday_event": False, "location": "",
              "notes": "", "url": "", "status": "confirmed", "calendar_name": "Work"},
         ])
-        result = self.connector.get_events("Work", "2026-03-15", "2026-03-17")
+        result = self.connector.get_events(start_date="2026-03-15", end_date="2026-03-17")
         # All-day event end_date should be date-only (inclusive)
         assert result[0]["end_date"] == "2026-03-15"
         # Timed event end_date should be unchanged

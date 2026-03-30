@@ -12,7 +12,7 @@ mcp = FastMCP("apple-calendar-mcp", instructions="""Apple Calendar MCP server fo
 
 DATES: ISO 8601 local time, no "Z" suffix — dates are NOT UTC.
 
-CALENDAR NAMES: Not unique across accounts — use calendar_source to disambiguate when needed.
+CALENDARS: Use get_calendars to discover calendar_ids (UUIDs). All tools identify calendars by calendar_id, not name.
 
 RECURRING EVENTS: Deleting without occurrence_date removes the entire series. Always check is_recurring first.
 
@@ -41,7 +41,8 @@ def get_client() -> CalendarConnector:
 def _format_calendar(cal: dict) -> str:
     """Format a calendar dict as human-readable text."""
     writable = "read-write" if cal["writable"] else "read-only"
-    result = f"Name: {cal['name']}\n"
+    result = f"ID: {cal['calendar_id']}\n"
+    result += f"Name: {cal['name']}\n"
     result += f"Access: {writable}\n"
     if cal.get("source"):
         result += f"Source: {cal['source']}\n"
@@ -98,16 +99,15 @@ def create_calendar(calendar_name: str, calendar_source: str = "") -> str:
 
 
 @mcp.tool()
-def delete_calendar(calendar_name: str = "", calendar_source: str = "", calendar_id: str = "") -> str:
+def delete_calendar(calendar_id: str) -> str:
     """Permanently delete a calendar and all its events.
 
     Args:
-        calendar_id: Calendar UUID from get_calendars (takes precedence over name).
-        calendar_source: Source/account to disambiguate calendars with the same name.
+        calendar_id: Calendar UUID from get_calendars.
     """
     client = get_client()
     try:
-        result = client.delete_calendar(name=calendar_name, calendar_source=calendar_source, calendar_id=calendar_id)
+        result = client.delete_calendar(calendar_id=calendar_id)
     except Exception as e:
         return f"Error deleting calendar: {e}"
     return f"Deleted calendar '{result['name']}'"
@@ -115,16 +115,13 @@ def delete_calendar(calendar_name: str = "", calendar_source: str = "", calendar
 
 @mcp.tool()
 def create_events(
-    calendar_name: str = "",
     events: str = "",
-    calendar_source: str = "",
     calendar_id: str = "",
 ) -> str:
     """Create one or more events in a calendar. Pass a JSON array with one element for a single event.
 
     Args:
-        calendar_name: Target calendar. If omitted, uses the system default.
-        calendar_id: Calendar UUID from get_calendars (takes precedence over name).
+        calendar_id: Calendar UUID from get_calendars. If omitted, uses the system default.
         events: JSON array of event objects. Required fields: summary, start_date, end_date.
             Optional: location, notes, url, availability ("free"/"busy"/"tentative"/"unavailable").
             - allday (bool): end_date is inclusive for all-day events.
@@ -135,7 +132,6 @@ def create_events(
                 Omit to inherit calendar defaults. Pass [] to suppress defaults.
             - timezone (str): IANA identifier. Schedule in a remote timezone without converting manually.
             - structured_location: Object with title, latitude, longitude, radius.
-        calendar_source: Source/account to disambiguate calendars with the same name.
     """
     try:
         event_list = json.loads(events)
@@ -148,9 +144,7 @@ def create_events(
     client = get_client()
     try:
         result = client.create_events(
-            calendar_name=calendar_name,
             events=event_list,
-            calendar_source=calendar_source,
             calendar_id=calendar_id,
         )
     except Exception as e:
@@ -159,7 +153,7 @@ def create_events(
     created = result.get("created", [])
     errors = result.get("errors", [])
 
-    resolved_calendar = created[0].get("calendar_name", calendar_name) if created else calendar_name
+    resolved_calendar = created[0].get("calendar_name", "default") if created else "default"
     parts = [f"Created {len(created)} event(s) in calendar '{resolved_calendar}'"]
     for c in created:
         parts.append(f"  {c['summary']} (UID: {c['uid']})")
@@ -172,24 +166,21 @@ def create_events(
 
 @mcp.tool()
 def update_events(
-    calendar_name: str = "",
+    calendar_id: str,
     updates: str = "",
-    calendar_source: str = "",
-    calendar_id: str = "",
 ) -> str:
     """Update one or more events. Only provided fields are changed; omitted fields are unchanged.
 
     Use get_events or search_events first to find event UIDs.
 
     Args:
-        calendar_name: Calendar containing the events.
+        calendar_id: Calendar UUID from get_calendars.
         updates: JSON array of update objects. Each must have "uid" plus fields to update.
             Supports same fields as create_events, plus:
             - Pass "" to clear location, notes, url, or recurrence. Pass [] to clear alerts.
             - allday (bool): Include when updating dates on all-day events.
             - occurrence_date (str): Target a specific recurring event occurrence.
             - span: "this_event" (default) or "future_events" for recurring events.
-        calendar_source: Source/account to disambiguate calendars with the same name.
     """
     try:
         update_list = json.loads(updates)
@@ -202,10 +193,8 @@ def update_events(
     client = get_client()
     try:
         result = client.update_events(
-            calendar_name=calendar_name,
-            updates=update_list,
-            calendar_source=calendar_source,
             calendar_id=calendar_id,
+            updates=update_list,
         )
     except Exception as e:
         return f"Error updating events: {e}"
@@ -213,7 +202,7 @@ def update_events(
     updated = result.get("updated", [])
     errors = result.get("errors", [])
 
-    parts = [f"Updated {len(updated)} event(s) in calendar '{calendar_name}'"]
+    parts = [f"Updated {len(updated)} event(s)"]
     for u in updated:
         fields = ", ".join(u.get("updated_fields", []))
         parts.append(f"  {u.get('summary', '?')} — {fields}")
@@ -291,7 +280,6 @@ def _format_event(event: dict) -> str:
 
 @mcp.tool()
 def get_events(
-    calendar_names: list[str] = [],
     start_date: str = "",
     end_date: str = "",
     calendar_ids: list[str] = [],
@@ -299,19 +287,18 @@ def get_events(
     """Get events from one or more calendars within a date range.
 
     Args:
-        calendar_names: Calendars to query. If empty, queries all.
+        calendar_ids: Calendar UUIDs to query. If empty, queries all.
         end_date: End of range (inclusive for date-only, e.g. "2026-03-29" includes March 29).
 
     Returns:
         For all-day events, end_date is inclusive. Alerts may include calendar-level
         defaults; omit alerts in create_events to inherit defaults, pass [] to suppress.
-        Use uid + calendar_name with update_events/delete_events. For recurring events,
+        Use uid + calendar_id with update_events/delete_events. For recurring events,
         also pass occurrence_date to target a specific occurrence.
     """
     client = get_client()
     try:
         events = client.get_events(
-            calendar_names=calendar_names,
             start_date=start_date,
             end_date=end_date,
             calendar_ids=calendar_ids or None,
@@ -319,7 +306,7 @@ def get_events(
     except Exception as e:
         return f"Error getting events: {e}"
 
-    cal_desc = ", ".join(f"'{c}'" for c in calendar_names) if calendar_names else "all calendars"
+    cal_desc = f"{len(calendar_ids)} calendar(s)" if calendar_ids else "all calendars"
 
     if not events:
         return f"No events found in {cal_desc} between {start_date} and {end_date}."
@@ -334,7 +321,6 @@ def get_events(
 @mcp.tool()
 def search_events(
     query: str,
-    calendar_names: list[str] = [],
     start_date: str = "",
     end_date: str = "",
     calendar_ids: list[str] = [],
@@ -346,7 +332,6 @@ def search_events(
     try:
         events = client.search_events(
             query=query,
-            calendar_names=calendar_names or None,
             start_date=start_date or None,
             end_date=end_date or None,
             calendar_ids=calendar_ids or None,
@@ -354,10 +339,7 @@ def search_events(
     except Exception as e:
         return f"Error searching events: {e}"
 
-    if calendar_names:
-        scope = "in " + ", ".join(f"'{c}'" for c in calendar_names)
-    else:
-        scope = "across all calendars"
+    scope = f"in {len(calendar_ids)} calendar(s)" if calendar_ids else "across all calendars"
 
     if not events:
         return f"No events matching '{query}' found {scope}."
@@ -381,7 +363,6 @@ def _format_free_slot(slot: dict) -> str:
 
 @mcp.tool()
 def get_availability(
-    calendar_names: list[str] = [],
     start_date: str = "",
     end_date: str = "",
     min_duration_minutes: int | None = None,
@@ -399,7 +380,6 @@ def get_availability(
     client = get_client()
     try:
         slots = client.get_availability(
-            calendar_names=calendar_names,
             start_date=start_date,
             end_date=end_date,
             min_duration_minutes=min_duration_minutes,
@@ -410,7 +390,7 @@ def get_availability(
     except Exception as e:
         return f"Error checking availability: {e}"
 
-    cal_list = ", ".join(f"'{c}'" for c in calendar_names)
+    cal_list = f"{len(calendar_ids)} calendar(s)" if calendar_ids else "all calendars"
     filters = []
     if min_duration_minutes:
         filters.append(f">= {min_duration_minutes} min")
@@ -440,7 +420,6 @@ def _format_conflict(conflict: dict) -> str:
 
 @mcp.tool()
 def get_conflicts(
-    calendar_names: list[str] = [],
     start_date: str = "",
     end_date: str = "",
     calendar_ids: list[str] = [],
@@ -451,7 +430,6 @@ def get_conflicts(
     client = get_client()
     try:
         conflicts = client.get_conflicts(
-            calendar_names=calendar_names,
             start_date=start_date,
             end_date=end_date,
             calendar_ids=calendar_ids or None,
@@ -459,7 +437,7 @@ def get_conflicts(
     except Exception as e:
         return f"Error checking conflicts: {e}"
 
-    cal_list = ", ".join(f"'{c}'" for c in calendar_names)
+    cal_list = f"{len(calendar_ids)} calendar(s)" if calendar_ids else "all calendars"
 
     if not conflicts:
         return f"No conflicts found in {cal_list} between {start_date} and {end_date}."
@@ -470,12 +448,10 @@ def get_conflicts(
 
 @mcp.tool()
 def delete_events(
-    calendar_name: str = "",
+    calendar_id: str,
     event_uids: str | list[str] = "",
     span: str = "this_event",
     occurrence_date: str = "",
-    calendar_source: str = "",
-    calendar_id: str = "",
 ) -> str:
     """Delete one or more events by UID. Accepts a single UID or list of UIDs.
 
@@ -485,19 +461,16 @@ def delete_events(
     to target a specific occurrence.
 
     Args:
+        calendar_id: Calendar UUID from get_calendars.
         span: "this_event" (default) or "future_events" for recurring events.
-        calendar_id: Calendar UUID from get_calendars (takes precedence over name).
-        calendar_source: Source/account to disambiguate calendars with the same name.
     """
     client = get_client()
     try:
         result = client.delete_events(
-            calendar_name=calendar_name,
+            calendar_id=calendar_id,
             event_uids=event_uids,
             span=span,
             occurrence_date=occurrence_date or None,
-            calendar_source=calendar_source,
-            calendar_id=calendar_id,
         )
     except Exception as e:
         return f"Error deleting event(s): {e}"
@@ -505,7 +478,7 @@ def delete_events(
     deleted = result["deleted_uids"]
     not_found = result["not_found_uids"]
 
-    msg = f"Deleted {len(deleted)} event(s) from calendar '{calendar_name}'"
+    msg = f"Deleted {len(deleted)} event(s)"
     if not_found:
         msg += f"\nNot found ({len(not_found)}): {', '.join(not_found)}"
     return msg
