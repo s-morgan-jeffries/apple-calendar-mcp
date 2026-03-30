@@ -48,18 +48,24 @@ def create_test_calendar(name: str = DEFAULT_CALENDAR_NAME) -> bool:
     return True
 
 
+def _resolve_calendar_id(name: str) -> str | None:
+    """Resolve a calendar name to its UUID. Returns None if not found."""
+    result = run_swift_helper("get_calendars", [])
+    calendars = json.loads(result)
+    cal = next((c for c in calendars if c["name"] == name), None)
+    return cal["calendar_id"] if cal else None
+
+
 def delete_test_calendar(name: str = DEFAULT_CALENDAR_NAME) -> bool:
     """Delete one test calendar if it exists.
 
-    Passes DEFAULT_CALENDAR_SOURCE to disambiguate when duplicates exist.
+    Resolves the name to a calendar_id first.
     Returns True if the calendar was deleted, False if it didn't exist.
     """
-    if not calendar_exists(name):
+    cal_id = _resolve_calendar_id(name)
+    if cal_id is None:
         return False
-    args = ["--name", name]
-    if DEFAULT_CALENDAR_SOURCE:
-        args += ["--source", DEFAULT_CALENDAR_SOURCE]
-    run_swift_helper("delete_calendar", args)
+    run_swift_helper("delete_calendar", ["--calendar-id", cal_id])
     return True
 
 

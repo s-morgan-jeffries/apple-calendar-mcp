@@ -8,6 +8,7 @@ import os
 
 import pytest
 
+from apple_calendar_mcp.calendar_connector import CalendarConnector
 from tests.helpers.calendar_setup import (
     calendar_exists,
     create_test_calendar,
@@ -37,17 +38,32 @@ def ensure_test_calendar():
 def fresh_calendar():
     """Provide a clean test calendar for tests that need full calendar reset.
 
-    Used by recurring event tests where events can't be fully deleted
-    via the API — the calendar must be recreated to ensure clean state.
+    Yields the fresh calendar_id since recreation changes the UUID.
 
     WARNING: Not compatible with parallel test execution (pytest-xdist).
     """
     delete_all_test_calendars(TEST_CALENDAR)
     create_test_calendar(TEST_CALENDAR)
-    yield
+    # Resolve the fresh calendar ID
+    c = CalendarConnector(enable_safety_checks=True)
+    calendars = c.get_calendars()
+    cal = next((x for x in calendars if x["name"] == TEST_CALENDAR), None)
+    yield cal["calendar_id"] if cal else None
     try:
         delete_all_test_calendars(TEST_CALENDAR)
     finally:
-        # Always recreate, even if delete failed or was partial
         if not calendar_exists(TEST_CALENDAR):
             create_test_calendar(TEST_CALENDAR)
+
+
+@pytest.fixture
+def test_calendar_id():
+    """Resolve the test calendar name to its UUID (fresh each test)."""
+    if os.environ.get("CALENDAR_TEST_MODE") != "true":
+        return None
+    c = CalendarConnector(enable_safety_checks=True)
+    calendars = c.get_calendars()
+    cal = next((x for x in calendars if x["name"] == TEST_CALENDAR), None)
+    if cal is None:
+        return None
+    return cal["calendar_id"]

@@ -78,7 +78,7 @@ do {
 }
 
 // Output result
-let result: [String: String] = ["name": parsed.name]
+let result: [String: String] = ["name": calendar.title, "calendar_id": calendar.calendarIdentifier]
 
 if let data = try? JSONSerialization.data(withJSONObject: result, options: [.sortedKeys]),
    let str = String(data: data, encoding: .utf8) {
