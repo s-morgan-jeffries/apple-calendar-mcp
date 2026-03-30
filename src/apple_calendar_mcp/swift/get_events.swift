@@ -90,6 +90,7 @@ func eventToDict(_ event: EKEvent) -> [String: Any] {
         "end_date": df.string(from: event.endDate),
         "allday_event": event.isAllDay,
         "calendar_name": event.calendar.title,
+        "calendar_id": event.calendar.calendarIdentifier,
     ]
 
     dict["location"] = event.location ?? ""
