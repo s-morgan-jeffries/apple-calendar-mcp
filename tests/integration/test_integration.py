@@ -1130,12 +1130,21 @@ class TestRecurringEventsIntegration:
         second_occ = series[1]
         second_occ_date_str = second_occ["occurrence_date"]
         second_occ_day = second_occ_date_str[:10]
-        _update_single_event(connector, fresh_calendar, uid,
-            start_date=f"{second_occ_day}T14:00:00",
-            end_date=f"{second_occ_day}T15:00:00",
-            occurrence_date=second_occ_date_str,
-            span="this_event",
-        )
+        # Retry: EventKit may not have fully materialized the occurrence yet
+        for attempt in range(3):
+            try:
+                _update_single_event(connector, fresh_calendar, uid,
+                    start_date=f"{second_occ_day}T14:00:00",
+                    end_date=f"{second_occ_day}T15:00:00",
+                    occurrence_date=second_occ_date_str,
+                    span="this_event",
+                )
+                break
+            except (RuntimeError, ValueError) as e:
+                if "not found" in str(e).lower() and attempt < 2:
+                    time.sleep(1)
+                    continue
+                raise
 
         # Check results
         events = connector.get_events(start_date=_future_date(5, 6, 1), end_date=_future_date(5, 6, 30), calendar_ids=[fresh_calendar])
