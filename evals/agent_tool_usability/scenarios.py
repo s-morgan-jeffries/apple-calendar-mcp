@@ -87,7 +87,7 @@ SCENARIOS = [
             "tools": ["get_calendars", "get_events"],
             "key_params": {
                 "get_events": {
-                    "calendar_names": "Work",
+                    "calendar_ids": "<work_uuid>",
                 }
             },
         },
@@ -109,7 +109,7 @@ SCENARIOS = [
             "tools": ["get_events"],
             "key_params": {
                 "get_events": {
-                    "calendar_names": "Personal",
+                    "calendar_ids": "<personal_uuid>",
                     "start_date": "2026-03-23T00:00:00",
                     "end_date": "2026-03-29",
                 }
@@ -131,7 +131,7 @@ SCENARIOS = [
             "tools": ["get_calendars", "get_events"],
             "key_params": {
                 "get_events": {
-                    "calendar_names": "Family",
+                    "calendar_ids": "<family_uuid>",
                 }
             },
         },
@@ -159,7 +159,7 @@ SCENARIOS = [
             "tools": ["get_calendars", "create_events"],
             "key_params": {
                 "create_events": {
-                    "calendar_name": "Work",
+                    "calendar_id": "<work_uuid>",
                 }
             },
         },
@@ -180,7 +180,7 @@ SCENARIOS = [
             "tools": ["create_events"],
             "key_params": {
                 "create_events": {
-                    "calendar_name": "Personal",
+                    "calendar_id": "<personal_uuid>",
                 }
             },
         },
@@ -204,7 +204,7 @@ SCENARIOS = [
             "tools": ["create_events"],
             "key_params": {
                 "create_events": {
-                    "calendar_name": "Work",
+                    "calendar_id": "<work_uuid>",
                 }
             },
         },
@@ -224,7 +224,7 @@ SCENARIOS = [
             "tools": ["get_calendars", "create_events"],
             "key_params": {
                 "create_events": {
-                    "calendar_name": "Family",
+                    "calendar_id": "<family_uuid>",
                 }
             },
         },
@@ -252,7 +252,7 @@ SCENARIOS = [
             "tools": ["create_events"],
             "key_params": {
                 "create_events": {
-                    "calendar_name": "Work",
+                    "calendar_id": "<work_uuid>",
                 }
             },
         },
@@ -275,7 +275,7 @@ SCENARIOS = [
             "tools": ["create_events"],
             "key_params": {
                 "create_events": {
-                    "calendar_name": "Work",
+                    "calendar_id": "<work_uuid>",
                 }
             },
         },
@@ -298,7 +298,7 @@ SCENARIOS = [
             "tools": ["create_events"],
             "key_params": {
                 "create_events": {
-                    "calendar_name": "Work",
+                    "calendar_id": "<work_uuid>",
                 }
             },
         },
@@ -321,7 +321,7 @@ SCENARIOS = [
             "tools": ["create_events"],
             "key_params": {
                 "create_events": {
-                    "calendar_name": "Work",
+                    "calendar_id": "<work_uuid>",
                 }
             },
         },
@@ -344,7 +344,7 @@ SCENARIOS = [
             "tools": ["create_events"],
             "key_params": {
                 "create_events": {
-                    "calendar_name": "Work",
+                    "calendar_id": "<work_uuid>",
                 }
             },
         },
@@ -372,7 +372,7 @@ SCENARIOS = [
             "tools": ["create_events"],
             "key_params": {
                 "create_events": {
-                    "calendar_name": "Work",
+                    "calendar_id": "<work_uuid>",
                 }
             },
         },
@@ -392,7 +392,7 @@ SCENARIOS = [
             "tools": ["create_events"],
             "key_params": {
                 "create_events": {
-                    "calendar_name": "Personal",
+                    "calendar_id": "<personal_uuid>",
                 }
             },
         },
@@ -416,7 +416,7 @@ SCENARIOS = [
             "tools": ["create_events"],
             "key_params": {
                 "create_events": {
-                    "calendar_name": "Work",
+                    "calendar_id": "<work_uuid>",
                 }
             },
         },
@@ -441,7 +441,7 @@ SCENARIOS = [
             "tools": ["create_events"],
             "key_params": {
                 "create_events": {
-                    "calendar_name": "Work",
+                    "calendar_id": "<work_uuid>",
                 }
             },
         },
@@ -466,7 +466,7 @@ SCENARIOS = [
             "tools": ["create_events"],
             "key_params": {
                 "create_events": {
-                    "calendar_name": "Work",
+                    "calendar_id": "<work_uuid>",
                     "timezone": "America/Los_Angeles",
                 }
             },
@@ -652,13 +652,13 @@ SCENARIOS = [
             "tools": ["delete_events"],
             "key_params": {
                 "delete_events": {
-                    "calendar_name": "Work",
+                    "calendar_id": "<work_uuid>",
                     "event_uids": "ABC-123",
                 }
             },
         },
         "scoring_notes": (
-            "PASS: Passes UID as string with correct calendar_name. "
+            "PASS: Passes UID as string with correct calendar_id. "
             "FAIL: Wrong calendar or fabricated UID."
         ),
         "safety_critical": True,
@@ -674,7 +674,7 @@ SCENARIOS = [
             "tools": ["delete_events"],
             "key_params": {
                 "delete_events": {
-                    "calendar_name": "Work",
+                    "calendar_id": "<work_uuid>",
                     "event_uids": ["ABC-123", "DEF-456", "GHI-789"],
                 }
             },
@@ -714,7 +714,7 @@ SCENARIOS = [
             "tools": ["delete_events"],
             "key_params": {
                 "delete_events": {
-                    "calendar_name": "Work",
+                    "calendar_id": "<work_uuid>",
                     "event_uids": ["ABC-123", "DEF-456"],
                 }
             },
@@ -748,7 +748,7 @@ SCENARIOS = [
                     "start_date": "2026-03-24T15:00:00",
                 },
                 "create_events": {
-                    "calendar_name": "Work",
+                    "calendar_id": "<work_uuid>",
                 },
             },
         },
@@ -772,7 +772,7 @@ SCENARIOS = [
             "tools": ["get_availability"],
             "key_params": {
                 "get_availability": {
-                    "calendar_names": ["Work", "Personal"],
+                    "calendar_ids": ["<work_uuid>", "<personal_uuid>"],
                     "min_duration_minutes": 90,
                     "working_hours_start": "09:00",
                     "working_hours_end": "17:00",
@@ -799,7 +799,7 @@ SCENARIOS = [
             "tools": ["create_events"],
             "key_params": {
                 "create_events": {
-                    "calendar_name": "Personal",
+                    "calendar_id": "<personal_uuid>",
                 }
             },
         },
@@ -827,7 +827,7 @@ SCENARIOS = [
             "tools": ["create_events"],
             "key_params": {
                 "create_events": {
-                    "calendar_name": "Work",
+                    "calendar_id": "<work_uuid>",
                 }
             },
         },
@@ -855,7 +855,7 @@ SCENARIOS = [
             "tools": ["create_events"],
             "key_params": {
                 "create_events": {
-                    "calendar_name": "Work",
+                    "calendar_id": "<work_uuid>",
                 }
             },
         },
@@ -883,7 +883,7 @@ SCENARIOS = [
             "tools": ["create_events"],
             "key_params": {
                 "create_events": {
-                    "calendar_name": "Work",
+                    "calendar_id": "<work_uuid>",
                 }
             },
         },
@@ -906,12 +906,12 @@ SCENARIOS = [
             "tools": ["get_conflicts"],
             "key_params": {
                 "get_conflicts": {
-                    "calendar_names": ["Work"],
+                    "calendar_ids": ["<work_uuid>"],
                 }
             },
         },
         "scoring_notes": (
-            "PASS: Uses get_conflicts with calendar_names=['Work'] and appropriate date range. "
+            "PASS: Uses get_conflicts with calendar_ids and appropriate date range. "
             "PARTIAL: Uses get_events and manually scans for overlaps. "
             "FAIL: Uses get_availability or wrong tool."
         ),
@@ -952,12 +952,12 @@ SCENARIOS = [
             "tools": ["get_events"],
             "key_params": {
                 "get_events": {
-                    "calendar_names": ["Work"],
+                    "calendar_ids": ["<work_uuid>"],
                 }
             },
         },
         "scoring_notes": (
-            "PASS: Uses get_events with calendar_names=['Work'] and tomorrow's date range. "
+            "PASS: Uses get_events with calendar_ids and tomorrow's date range. "
             "PARTIAL: Uses search_events with query='meetings' — wrong tool for a date-only query. "
             "FAIL: Uses get_availability, get_conflicts, or wrong tool."
         ),
@@ -1043,12 +1043,12 @@ SCENARIOS = [
             "tools": ["get_events"],
             "key_params": {
                 "get_events": {
-                    "calendar_names": ["Work", "Personal"],
+                    "calendar_ids": ["<work_uuid>", "<personal_uuid>"],
                 }
             },
         },
         "scoring_notes": (
-            "PASS: Uses get_events with calendar_names=['Work', 'Personal'] and today's date range. "
+            "PASS: Uses get_events with calendar_ids for Work and Personal and today's date range. "
             "PARTIAL: Makes two separate get_events calls (one per calendar). "
             "FAIL: Queries only one calendar or uses wrong tool. "
             "Note: expected dates are relative to 'today' — score based on correct date calculation, not exact match."
@@ -1105,7 +1105,7 @@ SCENARIOS = [
             "tools": ["create_events"],
             "key_params": {
                 "create_events": {
-                    "calendar_name": "Work",
+                    "calendar_id": "<work_uuid>",
                 }
             },
         },
@@ -1138,9 +1138,8 @@ SCENARIOS = [
         },
         "scoring_notes": (
             "PASS: Calls get_calendars, identifies the iCloud 'Family' calendar by source, "
-            "then uses calendar_id or calendar_source to query get_events unambiguously. "
-            "PARTIAL: Uses calendar_name='Family' with calendar_source. "
-            "FAIL: Queries 'Family' without disambiguation."
+            "then uses its calendar_id to query get_events. "
+            "FAIL: Queries without calling get_calendars first."
         ),
         "safety_critical": False,
     },

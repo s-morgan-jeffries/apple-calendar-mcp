@@ -2,7 +2,7 @@ Apple Calendar MCP server for macOS.
 
 DATES: ISO 8601 local time, no "Z" suffix — dates are NOT UTC.
 
-CALENDAR NAMES: Not unique across accounts — use calendar_source to disambiguate when needed.
+CALENDARS: Use get_calendars to discover calendar_ids (UUIDs). All tools identify calendars by calendar_id, not name.
 
 RECURRING EVENTS: Deleting without occurrence_date removes the entire series. Always check is_recurring first.
 
