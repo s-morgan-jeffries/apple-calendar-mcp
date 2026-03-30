@@ -1776,17 +1776,20 @@ class TestBatchLimitsIntegration:
     """Integration tests for per-call batch size limits."""
 
     def test_create_events_exceeds_batch_limit(self, connector, test_calendar_id):
+        """Batch create should reject arrays exceeding the size limit."""
         events = [{"summary": f"Event {i}", "start_date": _future_date(3, 6, 15, "10:00:00"),
                     "end_date": _future_date(3, 6, 15, "11:00:00")} for i in range(51)]
         with pytest.raises(ValueError, match="exceeds limit of 50"):
             connector.create_events(events=events, calendar_id=test_calendar_id)
 
     def test_update_events_exceeds_batch_limit(self, connector, test_calendar_id):
+        """Batch update should reject arrays exceeding the size limit."""
         updates = [{"uid": f"UID-{i}", "summary": f"Event {i}"} for i in range(51)]
         with pytest.raises(ValueError, match="exceeds limit of 50"):
             connector.update_events(calendar_id=test_calendar_id, updates=updates)
 
     def test_delete_events_exceeds_batch_limit(self, connector, test_calendar_id):
+        """Batch delete should reject arrays exceeding the size limit."""
         uids = [f"UID-{i}" for i in range(51)]
         with pytest.raises(ValueError, match="exceeds limit of 50"):
             connector.delete_events(calendar_id=test_calendar_id, event_uids=uids)
@@ -1799,17 +1802,21 @@ class TestCalendarSafetyIntegration:
     """Verify safety guards block destructive operations on non-test calendars."""
 
     def test_create_events_blocked_on_non_test_calendar(self, connector):
+        """Creating events on a non-test calendar should raise CalendarSafetyError."""
         with pytest.raises(CalendarSafetyError):
             connector.create_events(events=[{"summary": "Test"}], calendar_id="fake-uuid")
 
     def test_delete_events_blocked_on_non_test_calendar(self, connector):
+        """Deleting events on a non-test calendar should raise CalendarSafetyError."""
         with pytest.raises(CalendarSafetyError):
             connector.delete_events(calendar_id="fake-uuid", event_uids="UID-1")
 
     def test_update_events_blocked_on_non_test_calendar(self, connector):
+        """Updating events on a non-test calendar should raise CalendarSafetyError."""
         with pytest.raises(CalendarSafetyError):
             connector.update_events(calendar_id="fake-uuid", updates=[{"uid": "UID-1", "summary": "Test"}])
 
     def test_delete_calendar_blocked_on_non_test_calendar(self, connector):
+        """Deleting a non-test calendar should raise CalendarSafetyError."""
         with pytest.raises(CalendarSafetyError):
             connector.delete_calendar(calendar_id="fake-uuid")
