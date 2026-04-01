@@ -191,13 +191,10 @@ def score_response_llm(client: OpenAI, scorer_model: str, response_text: str, sc
     expected = scenario["expected"]
     expected_tools = expected.get("tools", [])
 
-    if not expected_tools:
-        return {"score": "MANUAL", "justification": "Under-specified scenario requires human judgment"}
-
     key_params = expected.get("key_params", {})
     user_prompt = (
         f"## User Request\n{scenario['prompt']}\n\n"
-        f"## Expected Tools\n{json.dumps(expected_tools)}\n\n"
+        f"## Expected Tools\n{json.dumps(expected_tools) if expected_tools else 'None — the model should ask for clarification, not call tools'}\n\n"
         f"## Expected Key Parameters\n{json.dumps(key_params, indent=2)}\n\n"
         f"## Scoring Rubric\n{scenario['scoring_notes']}\n\n"
         f"## Assistant Response to Score\n{response_text}"
