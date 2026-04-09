@@ -199,13 +199,11 @@ class CalendarConnector:
 
     def update_events(
         self,
-        calendar_id: str,
-        updates: list[dict[str, Any]],
+        updates: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         """Update one or more events in a single batch operation.
 
         Args:
-            calendar_id: Calendar UUID containing the events.
             updates: List of update dicts, each with 'uid' (required) and optional fields
                      to update: summary, start, end, location, notes, url, allday,
                      alerts, availability, timezone, recurrence.
@@ -219,8 +217,6 @@ class CalendarConnector:
             span="this_event"), a new standalone event is created — the returned UID
             may differ, and 'rescheduled': true is included.
         """
-        self._verify_calendar_safety_by_id(calendar_id)
-
         if not updates:
             raise ValueError("At least one update must be provided")
         if len(updates) > self.MAX_BATCH_SIZE:
@@ -229,11 +225,9 @@ class CalendarConnector:
                 f"Split into multiple calls."
             )
 
-        args = ["--calendar-id", calendar_id]
-
         stdin_data = json.dumps(updates)
         return self._run_swift_helper_json(
-            "update_events", args, stdin_data=stdin_data
+            "update_events", [], stdin_data=stdin_data
         )
 
     def _normalize_calendar_names(
@@ -438,15 +432,13 @@ class CalendarConnector:
 
     def delete_events(
         self,
-        calendar_id: str,
-        event_uids: str | list[str],
+        event_uids: str | list[str] = "",
         span: str = "this_event",
         occurrence_date: Optional[str] = None,
     ) -> dict[str, Any]:
         """Delete one or more events by UID.
 
         Args:
-            calendar_id: Calendar UUID containing the events.
             event_uids: Single UID string or list of UIDs to delete
             span: "this_event" to delete one occurrence, "future_events" to delete series from this point (default: "this_event")
             occurrence_date: For recurring events, the date of the specific occurrence to delete (optional)
@@ -455,11 +447,8 @@ class CalendarConnector:
             Dict with 'deleted_uids' and 'not_found_uids' keys
 
         Raises:
-            CalendarSafetyError: If safety checks block the target calendar
             ValueError: If event_uids is empty
         """
-        self._verify_calendar_safety_by_id(calendar_id)
-
         uids = [event_uids] if isinstance(event_uids, str) else event_uids
         if not uids:
             raise ValueError("At least one event UID must be provided")
@@ -471,7 +460,7 @@ class CalendarConnector:
                 f"Split into multiple calls."
             )
 
-        args = ["--calendar-id", calendar_id]
+        args = []
         for uid in uids:
             args += ["--uid", uid]
         if span != "this_event":

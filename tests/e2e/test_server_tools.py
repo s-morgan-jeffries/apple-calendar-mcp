@@ -119,7 +119,7 @@ class TestUpdateE2E:
 
         # Update title
         update = [{"uid": uid, "summary": "After Update"}]
-        update_result = update_events(calendar_id=test_calendar_id, updates=json.dumps(update))
+        update_result = update_events(updates=json.dumps(update))
         assert "Updated 1 event(s)" in update_result
         assert "summary" in update_result
 
@@ -145,7 +145,7 @@ class TestDeleteE2E:
         uid = uid_line.split("UID: ")[1].strip().rstrip(")")
 
         # Delete
-        delete_result = delete_events(calendar_id=test_calendar_id, event_uids=uid)
+        delete_result = delete_events(event_uids=uid)
         assert "Deleted 1 event(s)" in delete_result
 
         # Verify gone

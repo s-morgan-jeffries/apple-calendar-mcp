@@ -60,7 +60,7 @@ def connector():
     return CalendarConnector(enable_safety_checks=True)
 
 
-def _update_single_event(connector, calendar_id, event_uid, **kwargs):
+def _update_single_event(connector, event_uid, **kwargs):
     """Update a single event via update_events and return the result."""
     update = {"uid": event_uid}
     field_map = {
@@ -79,7 +79,7 @@ def _update_single_event(connector, calendar_id, event_uid, **kwargs):
             update[json_key] = value
     if "alert_minutes" in kwargs:
         update["alerts"] = kwargs["alert_minutes"]
-    result = connector.update_events(calendar_id=calendar_id, updates=[update])
+    result = connector.update_events(updates=[update])
     if result.get("errors"):
         raise ValueError(result["errors"][0].get("error", "Unknown error"))
     return result["updated"][0] if result.get("updated") else {}
@@ -439,7 +439,7 @@ class TestUpdateEventIntegration:
             end_date=_future_date(3, 9, 1, "11:00:00"),
         )
         try:
-            _update_single_event(connector, test_calendar_id, uid, summary="Updated Summary")
+            _update_single_event(connector,uid, summary="Updated Summary")
             events = connector.get_events(start_date=_future_date(3, 9, 1, "00:00:00"), end_date=_future_date(3, 9, 2, "00:00:00"), calendar_ids=[test_calendar_id])
             test_events = [e for e in events if e["uid"] == uid]
             assert len(test_events) == 1
@@ -457,7 +457,7 @@ class TestUpdateEventIntegration:
             location="Room A",
         )
         try:
-            _update_single_event(connector, test_calendar_id, uid, location="Room B")
+            _update_single_event(connector,uid, location="Room B")
             events = connector.get_events(start_date=_future_date(3, 9, 2, "00:00:00"), end_date=_future_date(3, 9, 3, "00:00:00"), calendar_ids=[test_calendar_id])
             test_events = [e for e in events if e["uid"] == uid]
             assert len(test_events) == 1
@@ -474,7 +474,7 @@ class TestUpdateEventIntegration:
             end_date=_future_date(3, 9, 3, "11:00:00"),
         )
         try:
-            _update_single_event(connector, test_calendar_id, uid,
+            _update_single_event(connector,uid,
                 start_date=_future_date(3, 9, 3, "14:00:00"),
                 end_date=_future_date(3, 9, 3, "15:00:00"),
             )
@@ -495,7 +495,7 @@ class TestUpdateEventIntegration:
             location="Old Place",
         )
         try:
-            result = _update_single_event(connector, test_calendar_id, uid,
+            result = _update_single_event(connector,uid,
                 summary="New Multi Title",
                 location="New Place",
             )
@@ -511,7 +511,7 @@ class TestUpdateEventIntegration:
     def test_update_nonexistent_event(self, connector, test_calendar_id):
         """Updating a non-existent UID should raise an error."""
         with pytest.raises(ValueError, match="Event not found"):
-            _update_single_event(connector, test_calendar_id, "DOES-NOT-EXIST-UID", summary="X")
+            _update_single_event(connector,"DOES-NOT-EXIST-UID", summary="X")
 
     def test_clear_location(self, connector, test_calendar_id):
         """Passing location="" should clear the location field."""
@@ -523,7 +523,7 @@ class TestUpdateEventIntegration:
             location="Will Be Cleared",
         )
         try:
-            _update_single_event(connector, test_calendar_id, uid, location="")
+            _update_single_event(connector,uid, location="")
             events = connector.get_events(start_date=_future_date(3, 9, 5, "00:00:00"), end_date=_future_date(3, 9, 6, "00:00:00"), calendar_ids=[test_calendar_id])
             test_events = [e for e in events if e["uid"] == uid]
             assert len(test_events) == 1
@@ -542,7 +542,7 @@ class TestUpdateEventIntegration:
             notes="Keep these notes",
         )
         try:
-            _update_single_event(connector, test_calendar_id, uid, summary="New Title")
+            _update_single_event(connector,uid, summary="New Title")
             events = connector.get_events(start_date=_future_date(4, 9, 10), end_date=_future_date(4, 9, 11), calendar_ids=[test_calendar_id])
             matches = [e for e in events if e["uid"] == uid]
             assert len(matches) == 1
@@ -564,7 +564,7 @@ class TestUpdateEventIntegration:
             notes="Original notes",
         )
         try:
-            _update_single_event(connector, test_calendar_id, uid, notes="Updated notes")
+            _update_single_event(connector,uid, notes="Updated notes")
             events = connector.get_events(start_date=_future_date(4, 9, 15), end_date=_future_date(4, 9, 17), calendar_ids=[test_calendar_id])
             matches = [e for e in events if e["uid"] == uid]
             assert len(matches) == 1
@@ -585,7 +585,7 @@ class TestUpdateEventIntegration:
             notes="Important meeting",
         )
         try:
-            _update_single_event(connector, test_calendar_id, uid,
+            _update_single_event(connector,uid,
                 start_date=_future_date(4, 9, 25, "14:00:00"),
                 end_date=_future_date(4, 9, 25, "15:00:00"),
             )
@@ -614,7 +614,7 @@ class TestUpdateEventIntegration:
             notes="These notes will be cleared",
         )
         try:
-            connector.update_events(calendar_id=test_calendar_id, updates=[{"uid": uid, "notes": ""}])
+            connector.update_events(updates=[{"uid": uid, "notes": ""}])
             events = connector.get_events(start_date=_future_date(5, 4, 10, "00:00:00"), end_date=_future_date(5, 4, 11, "00:00:00"), calendar_ids=[test_calendar_id])
             matches = [e for e in events if e["uid"] == uid]
             assert len(matches) == 1
@@ -632,7 +632,7 @@ class TestUpdateEventIntegration:
             url="https://example.com/will-be-cleared",
         )
         try:
-            connector.update_events(calendar_id=test_calendar_id, updates=[{"uid": uid, "url": ""}])
+            connector.update_events(updates=[{"uid": uid, "url": ""}])
             events = connector.get_events(start_date=_future_date(5, 4, 11, "00:00:00"), end_date=_future_date(5, 4, 12, "00:00:00"), calendar_ids=[test_calendar_id])
             matches = [e for e in events if e["uid"] == uid]
             assert len(matches) == 1
@@ -650,7 +650,7 @@ class TestUpdateEventIntegration:
             alert_minutes=[15, 60],
         )
         try:
-            _update_single_event(connector, test_calendar_id, uid, alert_minutes=[])
+            _update_single_event(connector,uid, alert_minutes=[])
             events = connector.get_events(start_date=_future_date(5, 4, 12, "00:00:00"), end_date=_future_date(5, 4, 13, "00:00:00"), calendar_ids=[test_calendar_id])
             matches = [e for e in events if e["uid"] == uid]
             assert len(matches) == 1
@@ -667,7 +667,7 @@ class TestUpdateEventIntegration:
             end_date=_future_date(5, 4, 13, "11:00:00"),
         )
         try:
-            _update_single_event(connector, test_calendar_id, uid, availability="free")
+            _update_single_event(connector,uid, availability="free")
             events = connector.get_events(start_date=_future_date(5, 4, 13, "00:00:00"), end_date=_future_date(5, 4, 14, "00:00:00"), calendar_ids=[test_calendar_id])
             matches = [e for e in events if e["uid"] == uid]
             assert len(matches) == 1
@@ -693,7 +693,7 @@ class TestDeleteEventsIntegration:
             assert any(e["uid"] == uid for e in events)
 
             # Delete it
-            result = connector.delete_events(calendar_id=test_calendar_id, event_uids=uid)
+            result = connector.delete_events(event_uids=uid)
             assert uid in result["deleted_uids"]
             assert result["not_found_uids"] == []
 
@@ -715,7 +715,7 @@ class TestDeleteEventsIntegration:
             )
             uids.append(uid)
         try:
-            result = connector.delete_events(calendar_id=test_calendar_id, event_uids=uids)
+            result = connector.delete_events(event_uids=uids)
             assert len(result["deleted_uids"]) == 3
             assert result["not_found_uids"] == []
 
@@ -728,7 +728,7 @@ class TestDeleteEventsIntegration:
 
     def test_delete_nonexistent_event(self, connector, test_calendar_id):
         """Deleting a non-existent UID should report it as not found."""
-        result = connector.delete_events(calendar_id=test_calendar_id, event_uids="DOES-NOT-EXIST-UID")
+        result = connector.delete_events(event_uids="DOES-NOT-EXIST-UID")
         assert result["deleted_uids"] == []
         assert "DOES-NOT-EXIST-UID" in result["not_found_uids"]
 
@@ -741,10 +741,10 @@ class TestDeleteEventsIntegration:
             end_date=_future_date(3, 10, 3, "11:00:00"),
         )
         try:
-            result1 = connector.delete_events(calendar_id=test_calendar_id, event_uids=uid)
+            result1 = connector.delete_events(event_uids=uid)
             assert uid in result1["deleted_uids"]
 
-            result2 = connector.delete_events(calendar_id=test_calendar_id, event_uids=uid)
+            result2 = connector.delete_events(event_uids=uid)
             assert result2["deleted_uids"] == []
             assert uid in result2["not_found_uids"]
         finally:
@@ -766,7 +766,7 @@ class TestDeleteEventsIntegration:
 
         # Delete the middle occurrence (Aug 14)
         result = connector.delete_events(
-            calendar_id=fresh_calendar, event_uids=uid,
+            event_uids=uid,
             span="this_event",
             occurrence_date=_future_date(5, 8, 14, "10:00:00"),
         )
@@ -792,7 +792,7 @@ class TestDeleteEventsIntegration:
         assert any(e["uid"] == uid for e in events), "Event should exist before deletion"
 
         # Delete it
-        result = connector.delete_events(calendar_id=test_calendar_id, event_uids=uid)
+        result = connector.delete_events(event_uids=uid)
         assert uid in result["deleted_uids"]
 
         # Verify absent via re-query
@@ -813,7 +813,7 @@ class TestDeleteEventsIntegration:
         assert len(series) == 4
 
         # Delete entire series
-        result = connector.delete_events(calendar_id=fresh_calendar, event_uids=uid, span="future_events")
+        result = connector.delete_events(event_uids=uid, span="future_events")
         assert uid in result["deleted_uids"]
 
         # Verify all gone
@@ -1075,7 +1075,7 @@ class TestRecurringEventsIntegration:
         assert matches[0]["is_recurring"] is False
 
         # Add weekly recurrence
-        _update_single_event(connector, fresh_calendar, uid, recurrence_rule="FREQ=WEEKLY;COUNT=3")
+        _update_single_event(connector,uid, recurrence_rule="FREQ=WEEKLY;COUNT=3")
 
         # Verify now has 3 occurrences
         events = connector.get_events(start_date=_future_date(5, 4, 1), end_date=_future_date(5, 4, 30), calendar_ids=[fresh_calendar])
@@ -1098,7 +1098,7 @@ class TestRecurringEventsIntegration:
         assert len(matches) == 4
 
         # Remove recurrence
-        _update_single_event(connector, fresh_calendar, uid, recurrence_rule="")
+        _update_single_event(connector,uid, recurrence_rule="")
 
         # Verify now has 1 occurrence
         events = connector.get_events(start_date=_future_date(5, 5, 1), end_date=_future_date(5, 5, 31), calendar_ids=[fresh_calendar])
@@ -1133,7 +1133,7 @@ class TestRecurringEventsIntegration:
         # Retry: EventKit may not have fully materialized the occurrence yet
         for attempt in range(3):
             try:
-                _update_single_event(connector, fresh_calendar, uid,
+                _update_single_event(connector,uid,
                     start_date=f"{second_occ_day}T14:00:00",
                     end_date=f"{second_occ_day}T15:00:00",
                     occurrence_date=second_occ_date_str,
@@ -1294,7 +1294,7 @@ class TestRoundTripIntegration:
             location="Room A",
         )
         try:
-            _update_single_event(connector, test_calendar_id, uid, summary="After Update")
+            _update_single_event(connector,uid, summary="After Update")
             events = connector.get_events(start_date=_future_date(4, 4, 1), end_date=_future_date(4, 4, 2), calendar_ids=[test_calendar_id])
             matches = [e for e in events if e["uid"] == uid]
             assert len(matches) == 1
@@ -1317,14 +1317,14 @@ class TestWorkflowIntegration:
         )
         try:
             # Update
-            _update_single_event(connector, test_calendar_id, uid, summary="Updated Lifecycle")
+            _update_single_event(connector,uid, summary="Updated Lifecycle")
 
             # Verify update
             events = connector.get_events(start_date=_future_date(4, 5, 1), end_date=_future_date(4, 5, 2), calendar_ids=[test_calendar_id])
             assert any(e["uid"] == uid and e["summary"] == "Updated Lifecycle" for e in events)
 
             # Delete
-            result = connector.delete_events(calendar_id=test_calendar_id, event_uids=uid)
+            result = connector.delete_events(event_uids=uid)
             assert uid in result["deleted_uids"]
 
             # Verify gone
@@ -1434,7 +1434,7 @@ class TestTimezoneIntegration:
 
             # Update end_date to extend by one day
             new_end = _future_date(4, 9, 6)
-            _update_single_event(connector, test_calendar_id, uid,
+            _update_single_event(connector,uid,
                 end_date=new_end, allday_event=True)
 
             # Read back again
@@ -1497,7 +1497,7 @@ class TestErrorHandlingIntegration:
 
     def test_delete_nonexistent_uid_reports_not_found(self, connector, test_calendar_id):
         """Deleting a non-existent UID should report it, not crash."""
-        result = connector.delete_events(calendar_id=test_calendar_id, event_uids="DOES-NOT-EXIST-UID-12345")
+        result = connector.delete_events(event_uids="DOES-NOT-EXIST-UID-12345")
         assert result["deleted_uids"] == []
         assert "DOES-NOT-EXIST-UID-12345" in result["not_found_uids"]
 
@@ -1782,17 +1782,17 @@ class TestBatchLimitsIntegration:
         with pytest.raises(ValueError, match="exceeds limit of 50"):
             connector.create_events(events=events, calendar_id=test_calendar_id)
 
-    def test_update_events_exceeds_batch_limit(self, connector, test_calendar_id):
+    def test_update_events_exceeds_batch_limit(self, connector):
         """Batch update should reject arrays exceeding the size limit."""
         updates = [{"uid": f"UID-{i}", "summary": f"Event {i}"} for i in range(51)]
         with pytest.raises(ValueError, match="exceeds limit of 50"):
-            connector.update_events(calendar_id=test_calendar_id, updates=updates)
+            connector.update_events(updates=updates)
 
-    def test_delete_events_exceeds_batch_limit(self, connector, test_calendar_id):
+    def test_delete_events_exceeds_batch_limit(self, connector):
         """Batch delete should reject arrays exceeding the size limit."""
         uids = [f"UID-{i}" for i in range(51)]
         with pytest.raises(ValueError, match="exceeds limit of 50"):
-            connector.delete_events(calendar_id=test_calendar_id, event_uids=uids)
+            connector.delete_events(event_uids=uids)
 
 
 # ── calendar safety guards ─────────────────────────────────────────────────
@@ -1805,16 +1805,6 @@ class TestCalendarSafetyIntegration:
         """Creating events on a non-test calendar should raise CalendarSafetyError."""
         with pytest.raises(CalendarSafetyError):
             connector.create_events(events=[{"summary": "Test"}], calendar_id="fake-uuid")
-
-    def test_delete_events_blocked_on_non_test_calendar(self, connector):
-        """Deleting events on a non-test calendar should raise CalendarSafetyError."""
-        with pytest.raises(CalendarSafetyError):
-            connector.delete_events(calendar_id="fake-uuid", event_uids="UID-1")
-
-    def test_update_events_blocked_on_non_test_calendar(self, connector):
-        """Updating events on a non-test calendar should raise CalendarSafetyError."""
-        with pytest.raises(CalendarSafetyError):
-            connector.update_events(calendar_id="fake-uuid", updates=[{"uid": "UID-1", "summary": "Test"}])
 
     def test_delete_calendar_blocked_on_non_test_calendar(self, connector):
         """Deleting a non-test calendar should raise CalendarSafetyError."""

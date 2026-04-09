@@ -27,7 +27,7 @@ make test-verbose          # Tests with verbose output
 
 ## Core API Principles
 
-1. **Comprehensive update functions over specialized operations** — no `set_event_title()`, use `update_events(calendar, [{uid, title=X}])`
+1. **Comprehensive update functions over specialized operations** — no `set_event_title()`, use `update_events([{uid, title=X}])`
 2. **No field-specific setters or getters** — `update_events` handles all fields, `get_events` handles all filters
 3. **Single update tool** — `update_events` handles both single and batch updates (pass array with one element for single)
 4. **Union types for deletes only** — `Union[str, list[str]]` for delete operations, NOT for updates

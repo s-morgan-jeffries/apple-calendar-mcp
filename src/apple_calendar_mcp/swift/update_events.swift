@@ -4,25 +4,7 @@ import Foundation
 
 // MARK: - Argument Parsing
 
-struct UpdateEventsArgs {
-    var calendarId: String = ""
-}
-
-func parseArgs() -> UpdateEventsArgs {
-    var result = UpdateEventsArgs()
-    let args = CommandLine.arguments
-    var i = 1
-    while i < args.count {
-        switch args[i] {
-        case "--calendar-id":
-            i += 1; if i < args.count { result.calendarId = args[i] }
-        default:
-            break
-        }
-        i += 1
-    }
-    return result
-}
+// No CLI arguments needed — update data is read from stdin as JSON array.
 
 // MARK: - Date Parsing
 
@@ -148,14 +130,6 @@ func outputError(_ error: String, _ message: String) {
 
 // MARK: - Main
 
-let parsed = parseArgs()
-let calendarId = parsed.calendarId
-
-guard !calendarId.isEmpty else {
-    outputError("invalid_args", "Required: --calendar-id <uuid>. Update data is read from stdin as JSON array.")
-    exit(1)
-}
-
 let stdinData = FileHandle.standardInput.readDataToEndOfFile()
 guard let updatesJson = try? JSONSerialization.jsonObject(with: stdinData) as? [[String: Any]] else {
     outputError("invalid_input", "Expected JSON array of update objects on stdin")
@@ -178,11 +152,6 @@ if !accessGranted {
 
 store.refreshSourcesIfNecessary()
 
-guard let calendar = store.calendars(for: .event).first(where: { $0.calendarIdentifier == calendarId }) else {
-    outputError("calendar_not_found", "Calendar with ID '\(calendarId)' not found.")
-    exit(1)
-}
-
 var updated: [[String: Any]] = []
 var errors: [[String: Any]] = []
 
@@ -204,15 +173,15 @@ for (index, updateData) in updatesJson.enumerated() {
         // Predicate-based search: ±1 day around occurrence_date, filter by UID, 60s tolerance
         let dayBefore = occDate.addingTimeInterval(-86400)
         let dayAfter = occDate.addingTimeInterval(86400)
-        let pred = store.predicateForEvents(withStart: dayBefore, end: dayAfter, calendars: [calendar])
+        let pred = store.predicateForEvents(withStart: dayBefore, end: dayAfter, calendars: nil)
         let tolerance: TimeInterval = 60
         event = store.events(matching: pred)
             .filter { $0.calendarItemIdentifier == uid }
             .first { abs($0.occurrenceDate.timeIntervalSince(occDate)) < tolerance }
     } else {
-        // Standard lookup
+        // Standard lookup — UID is globally unique
         let items = store.calendarItems(withExternalIdentifier: uid)
-        event = items.compactMap { $0 as? EKEvent }.first { $0.calendar.calendarIdentifier == calendarId }
+        event = items.compactMap { $0 as? EKEvent }.first
     }
 
     guard let event = event else {
@@ -269,7 +238,7 @@ for (index, updateData) in updatesJson.enumerated() {
 
         // Create standalone event with same properties at new time
         let newEvent = EKEvent(eventStore: store)
-        newEvent.calendar = calendar
+        newEvent.calendar = event.calendar
         newEvent.title = eventTitle
         newEvent.isAllDay = eventAllDay
         newEvent.startDate = eventStart

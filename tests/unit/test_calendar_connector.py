@@ -1051,50 +1051,41 @@ class TestDeleteEvents:
     def test_deletes_single_event(self, mock_swift):
         """Single event UID should be passed to Swift helper and returned in deleted_uids."""
         mock_swift.return_value = json.dumps({"deleted_uids": ["ABC-123"], "not_found_uids": []})
-        result = self.connector.delete_events("test-cal-id", "ABC-123")
+        result = self.connector.delete_events("ABC-123")
         assert result["deleted_uids"] == ["ABC-123"]
         assert result["not_found_uids"] == []
         args = mock_swift.call_args[0][1]
         assert "--uid" in args
         assert "ABC-123" in args
+        assert "--calendar-id" not in args
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_deletes_multiple_events(self, mock_swift):
         """Multiple UIDs should be passed in a single Swift helper call."""
         mock_swift.return_value = json.dumps({"deleted_uids": ["UID-1", "UID-2", "UID-3"], "not_found_uids": []})
-        result = self.connector.delete_events("test-cal-id", ["UID-1", "UID-2", "UID-3"])
+        result = self.connector.delete_events(["UID-1", "UID-2", "UID-3"])
         assert result["deleted_uids"] == ["UID-1", "UID-2", "UID-3"]
         args = mock_swift.call_args[0][1]
-        # All UIDs passed in single call
         assert args.count("--uid") == 3
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_normalizes_single_uid_to_list(self, mock_swift):
         """Single string UID should be normalized to a list in the result."""
         mock_swift.return_value = json.dumps({"deleted_uids": ["SINGLE-UID"], "not_found_uids": []})
-        result = self.connector.delete_events("test-cal-id", "SINGLE-UID")
+        result = self.connector.delete_events("SINGLE-UID")
         assert isinstance(result["deleted_uids"], list)
         assert result["deleted_uids"] == ["SINGLE-UID"]
-
-    def test_safety_blocks_non_test_calendar(self):
-        """Safety check should block deletion of events from non-test calendars."""
-        connector = CalendarConnector(enable_safety_checks=True)
-        with patch.object(connector, "get_calendars", return_value=[
-            {"calendar_id": "non-test-id", "name": "Personal", "writable": True},
-        ]):
-            with pytest.raises(CalendarSafetyError, match="not an allowed test calendar"):
-                connector.delete_events(calendar_id="non-test-id", event_uids="ABC-123")
 
     def test_empty_list_raises(self):
         """Empty UID list should raise ValueError."""
         with pytest.raises(ValueError, match="At least one event UID"):
-            self.connector.delete_events("test-cal-id", [])
+            self.connector.delete_events([])
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_not_found_uid(self, mock_swift):
         """Nonexistent UID should appear in not_found_uids, not deleted_uids."""
         mock_swift.return_value = json.dumps({"deleted_uids": [], "not_found_uids": ["BAD-UID"]})
-        result = self.connector.delete_events("test-cal-id", "BAD-UID")
+        result = self.connector.delete_events("BAD-UID")
         assert result["deleted_uids"] == []
         assert result["not_found_uids"] == ["BAD-UID"]
 
@@ -1102,7 +1093,7 @@ class TestDeleteEvents:
     def test_batch_partial_failure(self, mock_swift):
         """Batch with some not-found UIDs should split results between deleted and not_found."""
         mock_swift.return_value = json.dumps({"deleted_uids": ["UID-1", "UID-3"], "not_found_uids": ["UID-2"]})
-        result = self.connector.delete_events("test-cal-id", ["UID-1", "UID-2", "UID-3"])
+        result = self.connector.delete_events(["UID-1", "UID-2", "UID-3"])
         assert result["deleted_uids"] == ["UID-1", "UID-3"]
         assert result["not_found_uids"] == ["UID-2"]
 
@@ -1110,7 +1101,7 @@ class TestDeleteEvents:
     def test_passes_span_future_events(self, mock_swift):
         """Span parameter 'future_events' should be passed as --span to Swift helper."""
         mock_swift.return_value = json.dumps({"deleted_uids": ["REC-123"], "not_found_uids": []})
-        self.connector.delete_events("test-cal-id", "REC-123", span="future_events")
+        self.connector.delete_events("REC-123", span="future_events")
         args = mock_swift.call_args[0][1]
         assert "--span" in args
         assert "future_events" in args
@@ -1119,7 +1110,7 @@ class TestDeleteEvents:
     def test_default_span_not_passed(self, mock_swift):
         """Default (no span) should omit --span from Swift helper arguments."""
         mock_swift.return_value = json.dumps({"deleted_uids": ["ABC-123"], "not_found_uids": []})
-        self.connector.delete_events("test-cal-id", "ABC-123")
+        self.connector.delete_events("ABC-123")
         args = mock_swift.call_args[0][1]
         assert "--span" not in args
 
@@ -1127,23 +1118,21 @@ class TestDeleteEvents:
         """More than 50 UIDs should raise ValueError for exceeding batch limit."""
         uids = [f"UID-{i}" for i in range(51)]
         with pytest.raises(ValueError, match="exceeds limit of 50"):
-            self.connector.delete_events("test-cal-id", uids)
+            self.connector.delete_events(uids)
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_batch_limit_boundary_succeeds(self, mock_swift):
         """Exactly 50 UIDs should succeed (boundary of MAX_BATCH_SIZE)."""
         uids = [f"UID-{i}" for i in range(50)]
         mock_swift.return_value = json.dumps({"deleted_uids": uids, "not_found_uids": []})
-        result = self.connector.delete_events("test-cal-id", uids)
+        result = self.connector.delete_events(uids)
         assert len(result["deleted_uids"]) == 50
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_passes_occurrence_date_to_swift(self, mock_swift):
         """Occurrence date should be passed as --occurrence-date to Swift helper."""
         mock_swift.return_value = json.dumps({"deleted_uids": ["REC-123"], "not_found_uids": []})
-        self.connector.delete_events(
-            "MCP-Test-Calendar", "REC-123", occurrence_date="2026-03-15T10:00:00"
-        )
+        self.connector.delete_events("REC-123", occurrence_date="2026-03-15T10:00:00")
         args = mock_swift.call_args[0][1]
         assert "--occurrence-date" in args
         assert "2026-03-15T10:00:00" in args
@@ -1315,13 +1304,15 @@ class TestUpdateEvents:
             "updated": [{"uid": "UID-1", "summary": "Updated", "updated_fields": ["summary"]}],
             "errors": [],
         })
-        result = self.connector.update_events(calendar_id="test-cal-id", updates=[{"uid": "UID-1", "summary": "Updated"}])
+        result = self.connector.update_events(updates=[{"uid": "UID-1", "summary": "Updated"}])
         assert len(result["updated"]) == 1
+        args = mock_swift.call_args[0][1]
+        assert "--calendar-id" not in args
 
     def test_empty_list_raises(self):
         """Empty updates list should raise ValueError."""
         with pytest.raises(ValueError, match="At least one update"):
-            self.connector.update_events(calendar_id="test-cal-id", updates=[])
+            self.connector.update_events(updates=[])
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_occurrence_date_passed_through(self, mock_swift):
@@ -1331,11 +1322,9 @@ class TestUpdateEvents:
             "errors": [],
         })
         result = self.connector.update_events(
-            calendar_id="test-cal-id",
             updates=[{"uid": "UID-1", "summary": "Test", "occurrence_date": "2026-03-15T10:00:00"}],
         )
         assert len(result["updated"]) == 1
-        # Verify the occurrence_date was included in the JSON sent to stdin
         import json as json_mod
         stdin_data = mock_swift.call_args[1].get("stdin_data") or mock_swift.call_args[0][2] if len(mock_swift.call_args[0]) > 2 else None
         if stdin_data is None:
@@ -1343,20 +1332,11 @@ class TestUpdateEvents:
         parsed = json_mod.loads(stdin_data)
         assert parsed[0]["occurrence_date"] == "2026-03-15T10:00:00"
 
-    def test_safety_blocks_non_test_calendar(self):
-        """Safety check should block updates to non-test calendars."""
-        connector = CalendarConnector(enable_safety_checks=True)
-        with patch.object(connector, "get_calendars", return_value=[
-            {"calendar_id": "non-test-id", "name": "Personal", "writable": True},
-        ]):
-            with pytest.raises(CalendarSafetyError):
-                connector.update_events(calendar_id="non-test-id", updates=[{"uid": "UID-1", "summary": "Test"}])
-
     def test_exceeds_batch_limit(self):
         """More than 50 updates should raise ValueError for exceeding batch limit."""
         updates = [{"uid": f"UID-{i}", "summary": f"Event {i}"} for i in range(51)]
         with pytest.raises(ValueError, match="exceeds limit of 50"):
-            self.connector.update_events(calendar_id="test-cal-id", updates=updates)
+            self.connector.update_events(updates=updates)
 
     @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
     def test_batch_limit_boundary_succeeds(self, mock_swift):
@@ -1364,23 +1344,8 @@ class TestUpdateEvents:
         updated = [{"uid": f"UID-{i}", "summary": f"Event {i}", "updated_fields": ["summary"]} for i in range(50)]
         mock_swift.return_value = json.dumps({"updated": updated, "errors": []})
         updates = [{"uid": f"UID-{i}", "summary": f"Event {i}"} for i in range(50)]
-        result = self.connector.update_events(calendar_id="test-cal-id", updates=updates)
+        result = self.connector.update_events(updates=updates)
         assert len(result["updated"]) == 50
-
-    @patch("apple_calendar_mcp.calendar_connector.run_swift_helper")
-    def test_passes_calendar_id_to_swift(self, mock_swift):
-        """Calendar ID should be passed as --calendar-id to Swift helper."""
-        mock_swift.return_value = json.dumps({
-            "updated": [{"uid": "UID-1", "summary": "Updated", "updated_fields": ["summary"]}],
-            "errors": [],
-        })
-        self.connector.update_events(
-            calendar_id="test-cal-id",
-            updates=[{"uid": "UID-1", "summary": "Updated"}],
-        )
-        args = mock_swift.call_args[0][1]
-        assert "--calendar-id" in args
-        assert "test-cal-id" in args
 
 
 # ── search_events ─────────────────────────────────────────────────────────
