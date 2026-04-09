@@ -4,7 +4,6 @@ import Foundation
 // MARK: - Argument Parsing
 
 struct DeleteEventsArgs {
-    var calendarId: String = ""
     var uids: [String] = []
     var span: EKSpan = .thisEvent
     var occurrenceDate: String?
@@ -17,8 +16,6 @@ func parseArgs() -> DeleteEventsArgs? {
     var i = 1
     while i < args.count {
         switch args[i] {
-        case "--calendar-id":
-            i += 1; if i < args.count { result.calendarId = args[i] }
         case "--uid":
             i += 1; if i < args.count { result.uids.append(args[i]) }
         case "--span":
@@ -31,7 +28,7 @@ func parseArgs() -> DeleteEventsArgs? {
         i += 1
     }
 
-    guard !result.calendarId.isEmpty, !result.uids.isEmpty else {
+    guard !result.uids.isEmpty else {
         return nil
     }
     return result
@@ -66,7 +63,7 @@ func outputError(_ error: String, _ message: String) {
 // MARK: - Main
 
 guard let parsed = parseArgs() else {
-    outputError("invalid_args", "Required: --calendar <name> --uid <uid> [--uid <uid> ...]")
+    outputError("invalid_args", "Required: --uid <uid> [--uid <uid> ...]")
     exit(1)
 }
 
@@ -91,13 +88,6 @@ if !accessGranted {
 
 store.refreshSourcesIfNecessary()
 
-// Find the calendar by ID
-let allCalendars = store.calendars(for: .event)
-guard let calendar = allCalendars.first(where: { $0.calendarIdentifier == parsed.calendarId }) else {
-    outputError("calendar_not_found", "Calendar with ID '\(parsed.calendarId)' not found.")
-    exit(1)
-}
-
 // Delete events by UID
 var deletedUids: [String] = []
 var notFoundUids: [String] = []
@@ -109,14 +99,14 @@ for uid in parsed.uids {
     if let occDateStr = parsed.occurrenceDate, let occDate = parseISO8601(occDateStr) {
         let dayBefore = occDate.addingTimeInterval(-86400)
         let dayAfter = occDate.addingTimeInterval(86400)
-        let pred = store.predicateForEvents(withStart: dayBefore, end: dayAfter, calendars: [calendar])
+        let pred = store.predicateForEvents(withStart: dayBefore, end: dayAfter, calendars: nil)
         let tolerance: TimeInterval = 60
         matches = store.events(matching: pred)
             .filter { $0.calendarItemIdentifier == uid && abs($0.occurrenceDate.timeIntervalSince(occDate)) < tolerance }
     } else {
-        // No occurrence date: use calendarItems lookup
+        // UID is globally unique — no calendar scoping needed
         let items = store.calendarItems(withExternalIdentifier: uid)
-        matches = items.compactMap { $0 as? EKEvent }.filter { $0.calendar.calendarIdentifier == parsed.calendarId }
+        matches = items.compactMap { $0 as? EKEvent }
     }
 
     if matches.isEmpty {

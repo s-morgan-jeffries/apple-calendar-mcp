@@ -166,7 +166,6 @@ def create_events(
 
 @mcp.tool()
 def update_events(
-    calendar_id: str,
     updates: str = "",
 ) -> str:
     """Update one or more events. Only provided fields are changed; omitted fields are unchanged.
@@ -174,7 +173,6 @@ def update_events(
     Use get_events or search_events first to find event UIDs.
 
     Args:
-        calendar_id: Calendar UUID from get_calendars.
         updates: JSON array of update objects. Each must have "uid" plus fields to update.
             Supports same fields as create_events, plus:
             - Pass "" to clear location, notes, url, or recurrence. Pass [] to clear alerts.
@@ -193,7 +191,6 @@ def update_events(
     client = get_client()
     try:
         result = client.update_events(
-            calendar_id=calendar_id,
             updates=update_list,
         )
     except Exception as e:
@@ -448,7 +445,6 @@ def get_conflicts(
 
 @mcp.tool()
 def delete_events(
-    calendar_id: str,
     event_uids: str | list[str] = "",
     span: str = "this_event",
     occurrence_date: str = "",
@@ -461,13 +457,11 @@ def delete_events(
     to target a specific occurrence.
 
     Args:
-        calendar_id: Calendar UUID from get_calendars.
         span: "this_event" (default) or "future_events" for recurring events.
     """
     client = get_client()
     try:
         result = client.delete_events(
-            calendar_id=calendar_id,
             event_uids=event_uids,
             span=span,
             occurrence_date=occurrence_date or None,

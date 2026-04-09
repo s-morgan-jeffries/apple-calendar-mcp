@@ -411,7 +411,7 @@ class TestDeleteEventsTool:
         mock_get_client.return_value = mock_client
 
         from apple_calendar_mcp.server_fastmcp import delete_events
-        result = delete_events(calendar_id="test-cal-id", event_uids="ABC-123")
+        result = delete_events(event_uids="ABC-123")
         assert "Deleted 1 event(s)" in result
         assert isinstance(result, str)
 
@@ -423,7 +423,7 @@ class TestDeleteEventsTool:
         mock_get_client.return_value = mock_client
 
         from apple_calendar_mcp.server_fastmcp import delete_events
-        result = delete_events(calendar_id="test-cal-id", event_uids="ABC-123")
+        result = delete_events(event_uids="ABC-123")
         assert "Error" in result
         assert isinstance(result, str)
 
@@ -438,7 +438,7 @@ class TestDeleteEventsTool:
         mock_get_client.return_value = mock_client
 
         from apple_calendar_mcp.server_fastmcp import delete_events
-        result = delete_events(calendar_id="test-cal-id", event_uids=["UID-1", "UID-2", "UID-3"])
+        result = delete_events(event_uids=["UID-1", "UID-2", "UID-3"])
         assert "Deleted 2 event(s)" in result
         assert "not found" in result.lower() or "UID-2" in result
 
@@ -453,9 +453,8 @@ class TestDeleteEventsTool:
         mock_get_client.return_value = mock_client
 
         from apple_calendar_mcp.server_fastmcp import delete_events
-        delete_events(calendar_id="test-cal-id", event_uids=["UID-1", "UID-2"])
+        delete_events(event_uids=["UID-1", "UID-2"])
         mock_client.delete_events.assert_called_once_with(
-            calendar_id="test-cal-id",
             event_uids=["UID-1", "UID-2"],
             span="this_event",
             occurrence_date=None,
@@ -734,7 +733,7 @@ class TestUpdateEventsTool:
             {"uid": "UID-A", "start_date": "2026-03-15T11:00:00", "end_date": "2026-03-15T12:00:00"},
             {"uid": "UID-B", "location": "Room B"},
         ])
-        result = update_events(calendar_id="test-cal-id", updates=updates_json)
+        result = update_events(updates=updates_json)
         assert "Updated 2 event(s)" in result
         assert "Event A" in result
         assert "start_date, end_date" in result
@@ -750,7 +749,7 @@ class TestUpdateEventsTool:
 
         from apple_calendar_mcp.server_fastmcp import update_events
         updates_json = json.dumps([{"uid": "UID-A", "summary": "New"}])
-        result = update_events(calendar_id="test-cal-id", updates=updates_json)
+        result = update_events(updates=updates_json)
         assert "Error" in result
         assert isinstance(result, str)
 
@@ -769,7 +768,7 @@ class TestUpdateEventsTool:
             {"uid": "UID-A", "summary": "New A"},
             {"uid": "UID-B", "summary": "New B"},
         ])
-        result = update_events(calendar_id="test-cal-id", updates=updates_json)
+        result = update_events(updates=updates_json)
         assert "Updated 1 event(s)" in result
         assert "1 error(s)" in result
         assert "Event not found" in result
@@ -777,14 +776,14 @@ class TestUpdateEventsTool:
     def test_invalid_json(self):
         """Invalid JSON in updates should return an error mentioning invalid JSON."""
         from apple_calendar_mcp.server_fastmcp import update_events
-        result = update_events(calendar_id="test-cal-id", updates="not json")
+        result = update_events(updates="not json")
         assert "Error" in result
         assert "invalid JSON" in result
 
     def test_non_array_json(self):
         """Non-array JSON in updates should return an error requiring a JSON array."""
         from apple_calendar_mcp.server_fastmcp import update_events
-        result = update_events(calendar_id="test-cal-id", updates='{"uid": "test"}')
+        result = update_events(updates='{"uid": "test"}')
         assert "Error" in result
         assert "JSON array" in result
 
@@ -949,10 +948,9 @@ class TestDeleteEventsToolBranches:
         mock_get_client.return_value = mock_client
 
         from apple_calendar_mcp.server_fastmcp import delete_events
-        result = delete_events(calendar_id="test-cal-id", event_uids="UID-1")
+        result = delete_events(event_uids="UID-1")
         # event_uid is passed as-is (string) to event_uids
         mock_client.delete_events.assert_called_once_with(
-            calendar_id="test-cal-id",
             event_uids="UID-1",
             span="this_event",
             occurrence_date=None,
@@ -971,7 +969,7 @@ class TestDeleteEventsToolBranches:
 
         from apple_calendar_mcp.server_fastmcp import delete_events
         delete_events(
-            calendar_id="test-cal-id", event_uids="UID-1",
+            event_uids="UID-1",
             span="future_events",
             occurrence_date="2026-03-15T09:00:00",
         )
@@ -990,7 +988,7 @@ class TestDeleteEventsToolBranches:
         mock_get_client.return_value = mock_client
 
         from apple_calendar_mcp.server_fastmcp import delete_events
-        result = delete_events(calendar_id="test-cal-id", event_uids="UID-GONE")
+        result = delete_events(event_uids="UID-GONE")
         assert "Deleted 0 event(s)" in result
         assert "Not found" in result
         assert "UID-GONE" in result
